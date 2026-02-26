@@ -8,12 +8,14 @@ Conman is a Git-backed configuration manager backend (Rust, API-first).
 
 It models and orchestrates:
 
-- apps (Git repositories)
+- tenants
+- repositories (Git-backed, exposed by `/api/repos`; `/api/apps` is kept as a compatibility alias)
+- app surfaces (multiple user-facing apps per repository)
 - workspaces (user editing branches)
 - changesets (reviewable proposals)
 - releases (queue-first, publishable artifacts)
 - deployments across configurable environments
-- runtime profiles (URL, env vars, secrets, DB/data/migration settings)
+- runtime profiles (URL, per-surface endpoints, env vars, secrets, DB/data/migration settings)
 
 ## Status
 

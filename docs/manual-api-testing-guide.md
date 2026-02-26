@@ -112,18 +112,30 @@ api GET /api/me/notification-preferences | jq
 api PATCH /api/me/notification-preferences -d '{"email_enabled":true}' | jq
 ```
 
-## 6. Create app and base settings
+## 6. Create tenant + repository and base settings
 
 ```bash
-APP_JSON=$(api POST /api/apps -d '{
+TENANT_JSON=$(api POST /api/tenants -d '{
+  "name": "Demo Tenant",
+  "slug": "demo-tenant"
+}')
+echo "$TENANT_JSON" | jq
+export TENANT_ID=$(echo "$TENANT_JSON" | jq -r '.data.id')
+
+REPO_JSON=$(api POST "/api/tenants/$TENANT_ID/repos" -d '{
   "name": "Demo App",
   "repo_path": "group/demo-app.git",
   "integration_branch": "main"
 }')
+echo "$REPO_JSON" | jq
+export APP_ID=$(echo "$REPO_JSON" | jq -r '.data.id')
 
-echo "$APP_JSON" | jq
-export APP_ID=$(echo "$APP_JSON" | jq -r '.data.id')
+api GET /api/tenants | jq
+api GET "/api/tenants/$TENANT_ID" | jq
+api GET /api/repos | jq
+api GET "/api/repos/$APP_ID" | jq
 
+# Compatibility alias still available.
 api GET /api/apps | jq
 api GET "/api/apps/$APP_ID" | jq
 
@@ -136,7 +148,25 @@ api PATCH "/api/apps/$APP_ID/settings" -d '{
 }' | jq
 ```
 
-## 7. Runtime profiles and environments
+## 7. Create app surfaces
+
+```bash
+api POST "/api/repos/$APP_ID/surfaces" -d '{
+  "key": "portal",
+  "title": "Patient Portal",
+  "domains": ["portal.example.test"]
+}' | jq
+
+api POST "/api/repos/$APP_ID/surfaces" -d '{
+  "key": "admin",
+  "title": "Admin Console",
+  "domains": ["admin.example.test"]
+}' | jq
+
+api GET "/api/repos/$APP_ID/surfaces" | jq
+```
+
+## 8. Runtime profiles and environments
 
 Create two persistent runtime profiles:
 
@@ -145,6 +175,10 @@ DEV_PROFILE_JSON=$(api POST "/api/apps/$APP_ID/runtime-profiles" -d '{
   "name": "Development",
   "kind": "persistent_env",
   "base_url": "https://dev.example.test",
+  "surface_endpoints": {
+    "portal": "https://portal.dev.example.test",
+    "admin": "https://admin.dev.example.test"
+  },
   "env_vars": {
     "FEATURE_X": {"type":"boolean", "value": true},
     "MAX_ITEMS": {"type":"number", "value": 100}
@@ -164,6 +198,10 @@ PROD_PROFILE_JSON=$(api POST "/api/apps/$APP_ID/runtime-profiles" -d '{
   "name": "Production",
   "kind": "persistent_env",
   "base_url": "https://app.example.test",
+  "surface_endpoints": {
+    "portal": "https://portal.example.test",
+    "admin": "https://admin.example.test"
+  },
   "env_vars": {
     "FEATURE_X": {"type":"boolean", "value": false}
   },
@@ -205,7 +243,7 @@ export PROD_ENV_ID=$(echo "$ENV_JSON" | jq -r '.data[] | select(.name=="prod") |
 api GET "/api/apps/$APP_ID/environments" | jq
 ```
 
-## 8. Members and invites (create reviewer user)
+## 9. Members and invites (create reviewer user)
 
 ```bash
 INVITE_JSON=$(api POST "/api/apps/$APP_ID/invites" -d '{
@@ -228,7 +266,7 @@ api POST "/api/apps/$APP_ID/members" -d "{\"user_id\":\"$REVIEWER_USER_ID\",\"ro
 api GET "/api/apps/$APP_ID/members" | jq
 ```
 
-## 9. Workspace and file operations
+## 10. Workspace and file operations
 
 ```bash
 WS_JSON=$(api POST "/api/apps/$APP_ID/workspaces" -d '{"title":"Main Workspace"}')
@@ -256,7 +294,7 @@ api DELETE "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/files" -d '{"path":"confi
 api POST "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/reset" -d '{}' | jq
 ```
 
-## 10. Changesets: create -> submit -> review -> queue
+## 11. Changesets: create -> submit -> review -> queue
 
 Create a fresh file change first:
 
@@ -317,7 +355,7 @@ api POST "/api/apps/$APP_ID/changesets/$CHANGESET_ID/move-to-draft" -d '{}' | jq
 api POST "/api/apps/$APP_ID/changesets/$CHANGESET_ID/resubmit" -d '{"profile_overrides":[]}' | jq
 ```
 
-## 11. Release flow (queue-first)
+## 12. Release flow (queue-first)
 
 Make sure the changeset is approved + queued before continuing.
 
@@ -353,7 +391,7 @@ else
 fi
 ```
 
-## 12. Deploy, promote, rollback
+## 13. Deploy, promote, rollback
 
 Deploy uses gate jobs (drift check and msuite deploy). First deploy calls may return
 `409` with gate-enqueued messages; retry after gate job success.
@@ -397,7 +435,7 @@ api POST "/api/apps/$APP_ID/environments/$PROD_ENV_ID/rollback" -d "{
 api GET "/api/apps/$APP_ID/deployments?page=1&limit=50" | jq
 ```
 
-## 13. Temp environments
+## 14. Temp environments
 
 ```bash
 TEMP_JSON=$(api POST "/api/apps/$APP_ID/temp-envs" -d "{
@@ -417,7 +455,7 @@ api DELETE "/api/apps/$APP_ID/temp-envs/$TEMP_ENV_ID" -d '{}' | jq
 api POST "/api/apps/$APP_ID/temp-envs/$TEMP_ENV_ID/undo-expire" -d '{}' | jq
 ```
 
-## 14. Jobs endpoint usage for all async flows
+## 15. Jobs endpoint usage for all async flows
 
 ```bash
 api GET "/api/apps/$APP_ID/jobs?page=1&limit=100" | jq
@@ -427,23 +465,24 @@ JOB_ID=$(api GET "/api/apps/$APP_ID/jobs?page=1&limit=1" | jq -r '.data[0].id')
 api GET "/api/apps/$APP_ID/jobs/$JOB_ID" | jq
 ```
 
-## 15. Endpoint coverage checklist
+## 16. Endpoint coverage checklist
 
 This sequence exercises every currently wired route in `conman-api/src/router.rs`:
 
 - Platform: `/api/health`, `/api/metrics`, `/api/openapi.json`, `/api/docs`
 - Auth: login/logout/forgot-password/reset-password/accept-invite
-- Apps: list/create/get/settings/members/invites
+- Tenants + repos: tenant list/create/get + repo create/list/get + surface create/list
+- Apps compatibility: list/create/get/settings/members/invites
 - Workspaces: list/create/get/update/reset/sync/files/checkpoints
 - Changesets: list/create/get/update/submit/resubmit/review/queue/move-to-draft/diff/comments
 - Releases: list/create/get/changesets/reorder/assemble/publish
-- Environments + runtime profiles: list/replace + profile list/create/get/update/reveal-secret
+- Environments + runtime profiles: list/replace + profile list/create/get/update/reveal-secret (`surface_endpoints` included)
 - Deployments: deploy/promote/rollback/list
 - Temp envs: list/create/extend/undo-expire/delete
 - Me: notification preferences get/update
 - Jobs: list/get
 
-## 16. Common failure modes
+## 17. Common failure modes
 
 - `403 missing bearer token`:
   token missing or expired.

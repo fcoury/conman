@@ -9,7 +9,7 @@ Execution order (topological):
 1. E00 Platform foundation
 2. E01 Git adapter (`gitaly-rs`) + repository abstraction
 3. E02 Auth, invites, memberships, RBAC
-4. E03 App setup + settings + environments metadata
+4. E03 Tenant/repo setup + settings + environments metadata
 5. E04 Workspace lifecycle + file operations + guardrails
 6. E05 Changeset lifecycle + review + comments + revisions
 7. E06 Async jobs + `msuite` execution pipeline
@@ -72,7 +72,7 @@ Depends on: E00.
 
 ## E02 Auth, Invites, Memberships, RBAC
 
-Goal: Secure access and per-app role model.
+Goal: Secure access and per-repository role model.
 
 Issues:
 
@@ -90,28 +90,35 @@ Acceptance:
 
 Depends on: E00.
 
-## E03 App Setup, Settings, Environment Metadata
+## E03 Tenant/Repo Setup, Settings, Environment Metadata
 
-Goal: Manage app-level configuration and baseline behavior.
+Goal: Manage tenant/repo setup, repository-level configuration, and baseline behavior.
 
 Issues:
 
-1. E03-01: `apps` CRUD and repository registration.
-2. E03-02: Settings API for baseline mode, canonical env, commit mode default,
+1. E03-01: `tenants` create/list/get APIs.
+2. E03-02: Repository creation under tenant + `repos` list/get APIs, with
+   `/api/apps` compatibility alias preserved.
+3. E03-03: App-surface CRUD/list APIs per repository.
+4. E03-04: Settings API for baseline mode, canonical env, commit mode default,
    blocked paths, file size limit.
-3. E03-03: Environment stage CRUD with canonical user-facing environment flag.
-4. E03-04: Membership listing and role assignment APIs.
-5. E03-05: Runtime profile CRUD/revisions, environment linkage, and canonical
+5. E03-05: Environment stage CRUD with canonical user-facing environment flag.
+6. E03-06: Membership listing and role assignment APIs.
+7. E03-07: Runtime profile CRUD/revisions, environment linkage, canonical
    approval policy config.
-6. E03-06: Runtime profile secret visibility rules (`app_admin` reveal endpoint,
+8. E03-08: Runtime profile secret visibility rules (`app_admin` reveal endpoint,
    masked previews for other roles) and typed env var schema validation.
-7. E03-07: Direct app-admin runtime profile emergency edit flow (audited).
+9. E03-09: Runtime profile `surface_endpoints` persistence and validation
+   against app-surface keys.
+10. E03-10: Direct app-admin runtime profile emergency edit flow (audited).
 
 Acceptance:
 
-- App admin can configure baseline mode (`integration_head` or
+- App admin can create tenants, repositories, and app surfaces before
+  workspace/changeset flow.
+- Repository admin can configure baseline mode (`integration_head` or
   `canonical_env_release`).
-- Environment pipeline metadata is app-configurable.
+- Environment pipeline metadata is repository-configurable.
 
 Depends on: E02, E01.
 
@@ -396,12 +403,12 @@ Fast-follow but not blocking first release assembly:
 1. E00-01/02/04
 2. E01-01/03
 3. E02-01/02/04/05
-4. E03-01/02
+4. E03-01/02/03/04
 5. E04-01/03/04
 6. E05-01/02
 
 Definition of done for Sprint 1:
 
-- Authenticated user can create app, get default workspace, edit files with
-  guardrails, create changeset, and submit it with persisted revision +
-  `head_sha`.
+- Authenticated user can create tenant + repository, get default workspace,
+  edit files with guardrails, create changeset, and submit it with persisted
+  revision + `head_sha`.

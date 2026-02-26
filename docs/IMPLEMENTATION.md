@@ -5,9 +5,10 @@ repositories. API-only backend in Rust.
 
 **Architecture:** Axum HTTP server exposing a REST API. Git operations delegated
 to a running gitaly-rs instance via gRPC (Tonic client). MongoDB stores workflow
-state, audit trails, and app metadata. Async job runner handles long-running
+state, audit trails, and tenant/repository metadata. Async job runner handles long-running
 operations (msuite, revalidation, deployments). Runtime profiles model URL/env
-vars/secrets/database/data configuration for environments and temp envs.
+vars/secrets/database/data configuration for environments and temp envs, including
+per-surface endpoint mappings.
 
 **Tech Stack:**
 
@@ -61,7 +62,8 @@ conman (binary)
 
 **`conman-core`** — Pure domain layer. No IO, no frameworks. Contains:
 
-- Domain structs: `App`, `Workspace`, `Changeset`, `Release`, `Deployment`, etc.
+- Domain structs: `Tenant`, `App` (repository record), `AppSurface`,
+  `Workspace`, `Changeset`, `Release`, `Deployment`, etc.
 - Enums: `ChangesetState`, `ReleaseState`, `DeploymentState`, `Role`, `BaselineMode`
 - State machine transition functions with guard conditions
 - Validation logic (blocked paths, file size limits, branch naming)
@@ -92,7 +94,8 @@ conman (binary)
 **`conman-api`** — HTTP layer. Contains:
 
 - Axum router with all route definitions
-- Handler functions (one file per resource: apps, workspaces, changesets, etc.)
+- Handler functions (resources include tenants, repos/surfaces, apps-compat,
+  workspaces, changesets, etc.)
 - Middleware: auth extraction, request ID injection, error mapping
 - Request/response types (API-facing DTOs, not domain types)
 - Pagination extractor
@@ -313,12 +316,14 @@ Loaded from environment variables with `CONMAN_` prefix:
 
 | Term            | Definition                                                                                    |
 | --------------- | --------------------------------------------------------------------------------------------- |
-| App             | A managed config repository (1 app = 1 Git repo)                                              |
+| Tenant          | Top-level customer/account boundary for repositories                                           |
+| Repository      | Managed config repository (stored in `App`; `/api/repos` primary, `/api/apps` compatibility) |
+| App Surface     | User-facing app within a repository (domains/branding/role hints)                             |
 | Workspace       | User-owned mutable branch (`ws/<user>/<app>`)                                                 |
 | Changeset       | Reviewable proposal: workspace HEAD vs integration baseline                                   |
 | Release         | Immutable Git tag (`rYYYY.MM.DD.N`) of composed changesets                                    |
 | Environment     | Deploy target stage (Dev, QA, UAT, Prod)                                                      |
-| Runtime Profile | Versioned runtime blueprint (URL, env vars, secrets, DB/data strategy)                        |
+| Runtime Profile | Versioned runtime blueprint (URL, surface endpoints, env vars, secrets, DB/data strategy)     |
 | Canonical env   | Production-facing environment for baseline calculations                                       |
 | Baseline        | The reference point workspaces branch from (integration branch HEAD or canonical env release) |
 
@@ -408,6 +413,7 @@ Runtime profile rules in v1:
 
 - Profiles are versioned and tied to releases.
 - Precedence is `app defaults < environment profile < temp overrides`.
+- `surface_endpoints` keys must map to existing app-surface keys for that repo.
 - Secrets are encrypted at rest via envelope encryption (master key from
   config, per-record data keys).
 - Secret plaintext reveal is `app_admin`-only; other roles get masked previews.
@@ -435,7 +441,7 @@ test cases.
 | [E00](epics/E00-platform.md)      | Platform Foundation   | none          | Server skeleton, MongoDB bootstrap, config, error envelope, pagination |
 | [E01](epics/E01-git-adapter.md)   | Git Adapter           | E00           | Tonic client wrapping gitaly-rs gRPC services                          |
 | [E02](epics/E02-auth.md)          | Auth & RBAC           | E00           | Local auth, invites, memberships, role-based access                    |
-| [E03](epics/E03-app-setup.md)     | App Setup             | E01, E02      | App CRUD, settings, environment metadata, runtime profiles             |
+| [E03](epics/E03-app-setup.md)     | Tenant/Repo Setup     | E01, E02      | Tenant + repo + surface APIs, settings, environment metadata, runtime profiles |
 | [E04](epics/E04-workspaces.md)    | Workspaces            | E01, E03      | Workspace lifecycle, file operations, guardrails                       |
 | [E05](epics/E05-changesets.md)    | Changesets            | E02, E04      | Changeset lifecycle, review, comments, diffs, profile overrides        |
 | [E06](epics/E06-async-jobs.md)    | Async Jobs            | E00, E05      | Job framework, msuite workers, profile-aware gates/drift jobs          |

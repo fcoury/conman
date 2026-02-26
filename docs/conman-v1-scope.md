@@ -7,23 +7,28 @@ DxFlow-style config repositories.
 
 Conman v1 model:
 
-- `App` -> `Workspace` -> `Changeset` -> `Release`
+- `Tenant` -> `Repository` -> `App Surface`
+- Repository workflow: `Workspace` -> `Changeset` -> `Release`
 - Git is source of truth for files and history
-- MongoDB stores app metadata, workflow state, and audit trails
+- MongoDB stores tenant/repository metadata, workflow state, and audit trails
 - `gitaly-rs` is the Git backend interface
 
 ## 2) Domain Terminology
 
-- **App**: A managed config repository (1 app = 1 Git repo).
-- **Workspace**: A user-owned mutable branch used to edit app files.
+- **Tenant**: Top-level customer/account boundary. Owns repositories.
+- **Repository**: A managed config repository (stored in `apps` in v1 for
+  compatibility).
+- **App surface**: A user-facing app within a repository (domain/branding/role
+  hints).
+- **Workspace**: A user-owned mutable branch used to edit repository files.
 - **Changeset**: A reviewable proposal from one workspace branch against the
-  app integration baseline.
+  repository integration baseline.
 - **Release**: Immutable selected set of approved changesets, published to Git
   and promoted across environments.
-- **Environment**: A deploy target stage (configurable per app).
+- **Environment**: A deploy target stage (configurable per repository).
 - **Canonical user-facing environment**: The environment designated as
   production-facing for baseline calculations.
-- **Integration branch**: The app-level branch where published releases are
+- **Integration branch**: The repository-level branch where published releases are
   applied (default `main`, configurable per app).
 - **Baseline mode**: How new workspace baselines are resolved:
   `integration_head` or `canonical_env_release`.
@@ -58,16 +63,16 @@ Conman v1 model:
 
 ### 3.1 Baseline and branching
 
-- Integration branch is configurable per app (`integration_branch`), defaulting
+- Integration branch is configurable per repository (`integration_branch`), defaulting
   to `main`.
-- New apps default baseline mode: `latest deployed release of canonical
+- New repositories default baseline mode: `latest deployed release of canonical
   user-facing environment`.
 - Fallback baseline when no release exists: integration branch HEAD.
-- Baseline mode is configurable per app and editable by app admins.
+- Baseline mode is configurable per repository and editable by app admins.
 
 ### 3.2 Workspace model
 
-- Default v1 behavior: one long-lived workspace branch per user per app.
+- Default v1 behavior: one long-lived workspace branch per user per repository.
 - Branch naming convention: `ws/<user>/<app>`.
 - Metadata supports optional workspace title now, for future multi-workspace UI.
 - Extra workspace creation API is supported in v1 backend; UI can defer it.
@@ -133,11 +138,11 @@ Conman v1 model:
 ### 3.8 File scope and guardrails
 
 - Editable scope: full repo by default.
-- Blocklist defaults (configurable per app):
+- Blocklist defaults (configurable per repository):
   - `.git/**`
   - `.gitignore`
   - `.github/**`
-- File size limit default: 5 MB per file, configurable per app.
+- File size limit default: 5 MB per file, configurable per repository.
 - No Git LFS support in v1.
 
 ### 3.9 Temporary environments
@@ -158,7 +163,7 @@ Conman v1 model:
 - Provisioning: invite-only by app admins.
 - Invite expiration: 7 days.
 - Password policy: minimum length + reset via email token.
-- User can belong to multiple apps with different roles per app.
+- User can belong to multiple repositories with different roles per repository.
 - Email notifications are per-user single toggle in v1.
 
 ### 3.11 API conventions
@@ -301,11 +306,11 @@ pending -> running -> succeeded
 
 ## 6.1 Mapping
 
-- App: Git repository.
-- Workspace: branch from app baseline.
+- Repository (`App` record): Git repository.
+- Workspace: branch from repository baseline.
 - Changeset: metadata object comparing workspace `head_sha` vs baseline.
 - Release: immutable Git tag (`rYYYY.MM.DD.N`) representing selected queued
-  changesets composed onto the app integration branch.
+  changesets composed onto the repository integration branch.
 
 ## 6.2 Queue-first release composition
 
@@ -321,7 +326,7 @@ pending -> running -> succeeded
 
 ## 6.3 "Up to date with integration branch" gate
 
-- Merge/release requires changeset branch to be up to date with the app
+- Merge/release requires changeset branch to be up to date with the repository
   integration branch.
 - Either merge-based sync or rebase-based sync is accepted.
 - Conflict resolution in v1 is text-based UI flow.
@@ -332,7 +337,9 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 ### 7.1 Collections
 
+- `tenants`
 - `apps`
+- `app_surfaces`
 - `app_memberships`
 - `workspaces`
 - `changesets`
@@ -356,9 +363,14 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 ### 7.2 Important fields
 
+`tenants`
+
+- `id`, `name`, `slug`
+- `created_at`, `updated_at`
+
 `apps`
 
-- `id`, `name`, `repo_url`
+- `id`, `tenant_id`, `name`, `repo_path`
 - `integration_branch` (default `main`)
 - `baseline_mode` (`integration_head` | `canonical_env_release`)
 - `canonical_env_id`
@@ -370,16 +382,22 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 - `temp_url_domain`
 - `validation_gates` (submit/release/deploy profile scope + command overrides)
 
+`app_surfaces`
+
+- `id`, `repo_id`, `key`, `title`
+- `domains[]`, `branding?`, `roles[]`
+- `created_at`, `updated_at`
+
 `environments`
 
 - `id`, `app_id`, `name`, `position`, `is_canonical`
 - `runtime_profile_id`
-- `branch_ref`
+- `created_at`, `updated_at`
 
 `runtime_profiles`
 
 - `id`, `app_id`, `name`, `kind`
-- `base_url`, `env_vars_typed`, `secrets_encrypted`
+- `base_url`, `surface_endpoints`, `env_vars_typed`, `secrets_encrypted`
 - `database` (`engine=mongodb`, `connection_ref`, `provisioning_mode`,
   `base_profile_id?`)
 - `migrations` (`repo_paths[]`, `command_ref`, `applied_state_ref`)
@@ -452,7 +470,22 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 Base path: `/api`
 
-## 8.1 Apps
+## 8.1 Tenants and repositories
+
+- `GET /api/tenants?page=&limit=`
+- `POST /api/tenants`
+- `GET /api/tenants/:tenantId`
+- `POST /api/tenants/:tenantId/repos`
+- `GET /api/repos?page=&limit=`
+- `GET /api/repos/:appId`
+- `GET /api/repos/:appId/surfaces`
+- `POST /api/repos/:appId/surfaces`
+- `PATCH /api/repos/:appId/surfaces/:surfaceId`
+
+## 8.2 Apps compatibility endpoints
+
+`/api/apps` remains available in v1 as a compatibility alias for repository
+records.
 
 - `GET /api/apps?page=&limit=`
 - `POST /api/apps`
@@ -463,7 +496,7 @@ Base path: `/api`
 - `POST /api/apps/:appId/invites/:inviteId/resend`
 - `DELETE /api/apps/:appId/invites/:inviteId`
 
-## 8.2 Workspaces
+## 8.3 Workspaces
 
 - `GET /api/apps/:appId/workspaces?page=&limit=`
 - `POST /api/apps/:appId/workspaces`
@@ -472,14 +505,14 @@ Base path: `/api`
 - `POST /api/apps/:appId/workspaces/:workspaceId/reset`
 - `POST /api/apps/:appId/workspaces/:workspaceId/sync-integration`
 
-## 8.3 Workspace files
+## 8.4 Workspace files
 
 - `GET /api/apps/:appId/workspaces/:workspaceId/files?path=`
 - `PUT /api/apps/:appId/workspaces/:workspaceId/files` (body: `path`, `content`)
 - `DELETE /api/apps/:appId/workspaces/:workspaceId/files` (body: `path`)
 - `POST /api/apps/:appId/workspaces/:workspaceId/checkpoints`
 
-## 8.4 Changesets
+## 8.5 Changesets
 
 - `GET /api/apps/:appId/changesets?page=&limit=&state=`
 - `POST /api/apps/:appId/changesets` (from workspace)
@@ -495,7 +528,7 @@ Base path: `/api`
 
 `POST .../submit` responses include an `included_profile_overrides` summary.
 
-## 8.5 Diffs, comments, and AI
+## 8.6 Diffs, comments, and AI
 
 - `GET /api/apps/:appId/changesets/:changesetId/diff?mode=raw|semantic`
 - `GET /api/apps/:appId/changesets/:changesetId/comments?page=&limit=`
@@ -544,7 +577,7 @@ interface SemanticDiffResponse {
 }
 ```
 
-## 8.6 Releases
+## 8.7 Releases
 
 - `GET /api/apps/:appId/releases?page=&limit=&state=`
 - `POST /api/apps/:appId/releases` (create draft release)
@@ -554,7 +587,7 @@ interface SemanticDiffResponse {
 - `POST /api/apps/:appId/releases/:releaseId/publish`
 - `GET /api/apps/:appId/releases/:releaseId`
 
-## 8.7 Environments and deployments
+## 8.8 Environments and deployments
 
 - `GET /api/apps/:appId/environments`
 - `PATCH /api/apps/:appId/environments`
@@ -564,7 +597,7 @@ interface SemanticDiffResponse {
 - `POST /api/apps/:appId/environments/:envId/create-drift-fix-changeset`
 - `GET /api/apps/:appId/deployments?page=&limit=`
 
-## 8.8 Runtime profiles
+## 8.9 Runtime profiles
 
 - `GET /api/apps/:appId/runtime-profiles?page=&limit=`
 - `POST /api/apps/:appId/runtime-profiles`
@@ -575,11 +608,13 @@ interface SemanticDiffResponse {
 - `POST /api/apps/:appId/runtime-profiles/:profileId/rotate-key` (manual)
 - `POST /api/apps/:appId/runtime-profiles/:profileId/secrets/:key/reveal`
   (`app_admin` only; audited)
+- `surface_endpoints` keys must reference existing
+  `/api/repos/:appId/surfaces` keys
 
 `PATCH .../runtime-profiles/:profileId` allows direct emergency edits by
 `app_admin`; resulting drift still blocks deployment until revalidation.
 
-## 8.9 Temp environments and jobs
+## 8.10 Temp environments and jobs
 
 - `POST /api/apps/:appId/temp-envs` (workspace or changeset)
 - `GET /api/apps/:appId/temp-envs?page=&limit=`
@@ -589,7 +624,7 @@ interface SemanticDiffResponse {
 - `GET /api/apps/:appId/jobs/:jobId`
 - `GET /api/apps/:appId/jobs?page=&limit=&type=&state=`
 
-## 8.10 Notifications and auth
+## 8.11 Notifications and auth
 
 - `GET /api/me/notification-preferences`
 - `PATCH /api/me/notification-preferences`
@@ -666,7 +701,7 @@ Retention: keep forever in v1.
 
 ## 12) UI Component Scope (v1)
 
-- Dashboard: app cards and role-aware quick actions.
+- Dashboard: tenant/repository cards and role-aware quick actions.
 - App shell: sidebar, breadcrumbs, app switcher.
 - Workspace page:
   - repo tree with markers
@@ -712,7 +747,7 @@ Retention: keep forever in v1.
 
 ### Phase A: Foundations
 
-- Auth/invites, app setup, memberships, RBAC.
+- Auth/invites, tenant/repository setup, memberships, RBAC.
 - Workspace CRUD and file editing with guardrails.
 - Changeset creation/submit/review and approval reset behavior.
 - Async `msuite` at submit.

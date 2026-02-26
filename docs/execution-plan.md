@@ -29,7 +29,7 @@ Parallelizable after E06:
 1. `worker-platform`: E00 Platform Foundation
 2. `worker-git`: E01 Git Adapter
 3. `worker-auth`: E02 Auth & RBAC
-4. `worker-app`: E03 App Setup (apps/settings/env/runtime profiles)
+4. `worker-app`: E03 Tenant/Repo Setup (tenants/repos/surfaces + settings/env/runtime profiles)
 5. `worker-workspace`: E04 Workspaces
 6. `worker-changeset`: E05 Changesets
 7. `worker-jobs`: E06 Async Jobs + gates
@@ -52,7 +52,7 @@ Gate A exit:
   request-id UUIDv7).
 - Git adapter boundary in place.
 - Auth/RBAC active.
-- App/environment/runtime-profile baseline APIs available.
+- Tenant/repo/surface + environment/runtime-profile baseline APIs available.
 
 ## Wave B (M1 completion)
 

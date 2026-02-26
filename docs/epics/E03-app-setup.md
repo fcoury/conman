@@ -1,26 +1,32 @@
-# E03 App Setup, Settings, Environment Metadata
+# E03 Tenant/Repo Setup, Settings, Environment Metadata
 
 ## 1. Goal
 
-Deliver app-level CRUD, per-app settings management, environment pipeline
-metadata, and membership listing/role assignment. After this epic, an
-authenticated app admin can create an app backed by a gitaly repository,
-configure baseline mode, define the environment promotion pipeline, and manage
-team membership. This epic also establishes runtime profiles and links them to
+Deliver tenant/repository setup, repository settings management, environment
+pipeline metadata, and membership listing/role assignment. After this epic, an
+authenticated app admin can create a tenant, create a repository under that
+tenant, define app surfaces, configure baseline mode, define the environment
+promotion pipeline, and manage team membership. This epic also establishes
+runtime profiles (including per-surface endpoints) and links them to
 environments.
 
 **Issues:**
 
-- E03-01: `apps` CRUD and repository registration.
-- E03-02: Settings API for baseline mode, canonical env, commit mode default,
+- E03-01: `tenants` create/list/get.
+- E03-02: `repos` create under tenant + list/get (with `/api/apps`
+  compatibility retained).
+- E03-03: `app_surfaces` create/list/update per repository.
+- E03-04: Settings API for baseline mode, canonical env, commit mode default,
   blocked paths, file size limit.
-- E03-03: Environment stage CRUD with canonical user-facing environment flag.
-- E03-04: Membership listing and role assignment APIs.
-- E03-05: Runtime profile CRUD/revisions, environment linkage, and canonical
+- E03-05: Environment stage CRUD with canonical user-facing environment flag.
+- E03-06: Membership listing and role assignment APIs.
+- E03-07: Runtime profile CRUD/revisions, environment linkage, and canonical
   profile approval policy settings.
-- E03-06: Runtime profile typed env-var validation + secret visibility policy
+- E03-08: Runtime profile typed env-var validation + secret visibility policy
   (`app_admin` reveal, others masked).
-- E03-07: Direct app-admin runtime profile emergency edits (audited).
+- E03-09: Runtime profile `surface_endpoints` validation against app-surface
+  keys.
+- E03-10: Direct app-admin runtime profile emergency edits (audited).
 
 ---
 
@@ -108,6 +114,8 @@ impl Default for AppSettings {
 pub struct App {
     /// MongoDB ObjectId hex string.
     pub id: String,
+    /// Owning tenant id.
+    pub tenant_id: Option<String>,
     /// Human-readable app name (unique).
     pub name: String,
     /// Gitaly-relative path to the repository (e.g. "conman/my-app.git").
@@ -153,6 +161,8 @@ pub struct RuntimeProfile {
     pub name: String,
     pub kind: RuntimeProfileKind,
     pub base_url: String,
+    /// App-surface endpoint map (surface_key -> base URL).
+    pub surface_endpoints: std::collections::BTreeMap<String, String>,
     pub env_vars: std::collections::BTreeMap<String, EnvVarValue>,
     pub secrets_encrypted: std::collections::BTreeMap<String, String>,
     pub database_engine: String, // mongodb in v1
@@ -969,48 +979,51 @@ impl GitalyClient {
 
 ## 8. Implementation Checklist
 
-### E03-01: App CRUD and repository registration
+### E03-01: Tenant and repository bootstrap
 
-- [ ] Add `App`, `AppSettings`, `BaselineMode`, `CommitMode` types to `conman-core`
-- [ ] Add `AppRepo` to `conman-db` with `ensure_indexes()` (unique name, unique repo_path)
-- [ ] Add `repository_exists()` and `create_repository()` to `GitalyClient` in `conman-git`
-- [ ] Add `POST /api/apps` handler with gitaly verification, default settings, default environments, and auto app_admin membership
-- [ ] Add `GET /api/apps` handler with membership-filtered listing and pagination
-- [ ] Add `GET /api/apps/:appId` handler with RBAC check
-- [ ] Emit audit events for app creation
-- [ ] Write unit tests for name/repo_path validation logic
-- [ ] Write integration test: create app with mock gitaly, verify DB state
+- [ ] Add `Tenant` + `App` (`repo`) model support in `conman-core`.
+- [ ] Add `TenantRepo` + `AppRepo` persistence/indexes (`tenants.slug` unique,
+  `apps.tenant_id` indexed).
+- [ ] Add `POST/GET /api/tenants`, `GET /api/tenants/:tenantId`, and
+  `POST /api/tenants/:tenantId/repos` handlers.
+- [ ] Keep `/api/apps` create/list/get functional as compatibility alias.
+- [ ] Emit audit events for tenant/repository creation.
 
-### E03-02: Settings API
+### E03-02: App-surface model
 
-- [ ] Add `PATCH /api/apps/:appId/settings` handler
-- [ ] Validate `canonical_env_id` references an existing environment in this app
-- [ ] Validate `baseline_mode` + `canonical_env_id` consistency
-- [ ] Validate `file_size_limit_bytes` bounds (> 0, <= 50 MB)
-- [ ] Partial update: only modify supplied fields
-- [ ] Emit audit event with before/after diff
-- [ ] Write unit tests for each validation rule
-- [ ] Write integration test: update settings, read back, verify
+- [ ] Add `AppSurface` model and `AppSurfaceRepo` (`repo_id + key` unique).
+- [ ] Add `GET/POST /api/repos/:appId/surfaces` and
+  `PATCH /api/repos/:appId/surfaces/:surfaceId` handlers.
+- [ ] Enforce `surface.key` validation and repo ownership checks.
+- [ ] Emit audit events for surface create/update.
 
-### E03-03: Environment stage CRUD
+### E03-03: Repository settings API
 
-- [ ] Add `Environment` type to `conman-core`
-- [ ] Add `EnvironmentRepo` to `conman-db` with `ensure_indexes()` (unique app_id+name, unique app_id+position, partial unique canonical)
-- [ ] Add `GET /api/apps/:appId/environments` handler
-- [ ] Add `PATCH /api/apps/:appId/environments` handler (full replacement)
-- [ ] Validate contiguous positions, unique names, exactly one canonical
-- [ ] Block deletion of environments with active deployments
-- [ ] Auto-update `app.settings.canonical_env_id` when canonical environment changes
-- [ ] Emit audit events for environment changes
-- [ ] Write unit tests for position/name/canonical validation
-- [ ] Write integration test: create app with defaults, reorder, add, remove environments
+- [ ] Add `PATCH /api/apps/:appId/settings` handler.
+- [ ] Validate `canonical_env_id` references an existing environment in this
+  repository.
+- [ ] Validate `baseline_mode` + `canonical_env_id` consistency.
+- [ ] Validate `file_size_limit_bytes` bounds (> 0, <= 50 MB).
+- [ ] Emit audit events with before/after payload.
 
-### E03-04: Membership listing and role assignment
+### E03-04: Environment stage CRUD
 
-- [ ] Add `GET /api/apps/:appId/members` handler with pagination
-- [ ] Join `app_memberships` with `users` to return email
-- [ ] RBAC: any member can list; only `app_admin` can change roles (role changes handled by E02 invite flow, listing is this epic's scope)
-- [ ] Write integration test: create app, add members via invite, list members
+- [ ] Add/maintain `Environment` repo with unique `(app_id, name)` and
+  `(app_id, position)` indexes.
+- [ ] Add `GET /api/apps/:appId/environments`.
+- [ ] Add `PATCH /api/apps/:appId/environments` (full replacement).
+- [ ] Validate contiguous positions, unique names, exactly one canonical env.
+- [ ] Auto-update `app.settings.canonical_env_id` on canonical changes.
+
+### E03-05: Membership and runtime profiles
+
+- [ ] Add `GET /api/apps/:appId/members` and member assignment APIs.
+- [ ] Add runtime profile CRUD/revision APIs with typed env vars and masked
+  secret previews.
+- [ ] Validate runtime profile `surface_endpoints` keys against existing app
+  surfaces.
+- [ ] Add app-admin secret reveal endpoint and direct emergency profile-edit
+  audit path.
 
 ---
 
