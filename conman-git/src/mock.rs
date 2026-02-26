@@ -248,6 +248,7 @@ impl GitAdapter for MockGitalyClient {
         repo: &GitRepo,
         _user: &GitUser,
         branch_name: &str,
+        _start_branch_name: Option<&str>,
         _message: &str,
         _actions: Vec<FileAction>,
     ) -> Result<CommitResult, ConmanError> {
@@ -621,7 +622,7 @@ mod tests {
         let mock = MockGitalyClient::new().with_repo(&repo);
 
         let result = mock
-            .commit_files(&repo, &user(), "main", "msg", Vec::new())
+            .commit_files(&repo, &user(), "main", None, "msg", Vec::new())
             .await
             .expect("commit");
         assert!(!result.commit_id.is_empty());

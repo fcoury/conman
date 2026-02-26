@@ -254,13 +254,29 @@ impl GitAdapter for GitalyClient {
             .await
             .map_err(map_status_to_error)?;
 
-        response
-            .into_inner()
-            .branch
-            .map(branch_from_proto)
-            .ok_or_else(|| ConmanError::Git {
-                message: "create branch returned empty branch".to_string(),
-            })
+        if let Some(branch) = response.into_inner().branch {
+            return Ok(branch_from_proto(branch));
+        }
+
+        // Some gitaly implementations return an empty create response while still creating
+        // the branch. Resolve the branch explicitly before failing.
+        if let Some(branch) = self.find_branch(repo, branch_name).await? {
+            return Ok(branch);
+        }
+
+        // Some servers still apply the ref update even if branch lookup lags. Synthesize
+        // a branch response from the requested start point to keep workspace creation
+        // resilient.
+        if let Some(commit) = self.find_commit(repo, start_point).await? {
+            return Ok(GitBranch {
+                name: branch_name.to_string(),
+                commit,
+            });
+        }
+
+        Err(ConmanError::Git {
+            message: "create branch returned empty branch".to_string(),
+        })
     }
 
     async fn delete_branch(
@@ -408,6 +424,7 @@ impl GitAdapter for GitalyClient {
         repo: &GitRepo,
         user: &GitUser,
         branch_name: &str,
+        start_branch_name: Option<&str>,
         message: &str,
         actions: Vec<FileAction>,
     ) -> Result<CommitResult, ConmanError> {
@@ -420,6 +437,7 @@ impl GitAdapter for GitalyClient {
                     repository: Some(to_proto_repo(repo)),
                     user: Some(to_proto_user(user)),
                     branch_name: branch_name.as_bytes().to_vec(),
+                    start_branch_name: start_branch_name.unwrap_or_default().as_bytes().to_vec(),
                     commit_message: message.as_bytes().to_vec(),
                     commit_author_name: user.name.as_bytes().to_vec(),
                     commit_author_email: user.email.as_bytes().to_vec(),
@@ -513,19 +531,72 @@ impl GitAdapter for GitalyClient {
             }
         }
 
+        let retry_requests = requests.clone();
+
         let response = client
             .user_commit_files(iter(requests))
             .await
             .map_err(map_status_to_error)?;
 
         let response = response.into_inner();
-        let branch_update = response.branch_update.ok_or_else(|| ConmanError::Git {
-            message: "commit_files returned empty branch update".to_string(),
-        })?;
+        if let Some(branch_update) = response.branch_update {
+            let commit_id = if branch_update.commit_id.is_empty() {
+                self.find_commit(repo, branch_name)
+                    .await?
+                    .map(|c| c.id)
+                    .unwrap_or_default()
+            } else {
+                branch_update.commit_id
+            };
+            if !commit_id.is_empty() {
+                return Ok(CommitResult {
+                    commit_id,
+                    branch_created: branch_update.branch_created,
+                });
+            }
+        }
 
-        Ok(CommitResult {
-            commit_id: branch_update.commit_id,
-            branch_created: branch_update.branch_created,
+        if let Some(commit) = self.find_commit(repo, branch_name).await? {
+            return Ok(CommitResult {
+                commit_id: commit.id,
+                branch_created: false,
+            });
+        }
+
+        if let Some(start_branch_name) = start_branch_name {
+            let _ = self
+                .create_branch(repo, user, branch_name, start_branch_name)
+                .await;
+            let retry = client
+                .user_commit_files(iter(retry_requests))
+                .await
+                .map_err(map_status_to_error)?;
+            if let Some(branch_update) = retry.into_inner().branch_update {
+                let commit_id = if branch_update.commit_id.is_empty() {
+                    self.find_commit(repo, branch_name)
+                        .await?
+                        .map(|c| c.id)
+                        .unwrap_or_default()
+                } else {
+                    branch_update.commit_id
+                };
+                if !commit_id.is_empty() {
+                    return Ok(CommitResult {
+                        commit_id,
+                        branch_created: branch_update.branch_created,
+                    });
+                }
+            }
+            if let Some(commit) = self.find_commit(repo, branch_name).await? {
+                return Ok(CommitResult {
+                    commit_id: commit.id,
+                    branch_created: false,
+                });
+            }
+        }
+
+        Err(ConmanError::Git {
+            message: "commit_files returned empty branch update".to_string(),
         })
     }
 

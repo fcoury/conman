@@ -79,6 +79,7 @@ pub trait GitAdapter: Send + Sync + 'static {
         _repo: &GitRepo,
         _user: &GitUser,
         _branch_name: &str,
+        _start_branch_name: Option<&str>,
         _message: &str,
         _actions: Vec<FileAction>,
     ) -> Result<CommitResult, ConmanError> {

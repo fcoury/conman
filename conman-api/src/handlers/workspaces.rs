@@ -144,6 +144,16 @@ fn is_unimplemented_git(err: &ConmanError) -> bool {
     matches!(err, ConmanError::Git { message } if message.contains("not implemented"))
 }
 
+fn is_missing_revision_git(err: &ConmanError) -> bool {
+    matches!(
+        err,
+        ConmanError::Git { message }
+            if message.contains("Needed a single revision")
+                || message.contains("bad revision")
+                || message.contains("Not a valid object name")
+    )
+}
+
 async fn find_app(state: &AppState, app_id: &str) -> Result<App, ApiConmanError> {
     conman_db::AppRepo::new(state.db.clone())
         .find_by_id(app_id)
@@ -222,7 +232,11 @@ async fn ensure_default_workspace(
         .create_branch(&git_repo, &git_user, &branch_name, &app.integration_branch)
         .await
     {
-        Ok(branch) => head_sha = branch.commit.id,
+        Ok(branch) => {
+            if !branch.commit.id.is_empty() {
+                head_sha = branch.commit.id;
+            }
+        }
         Err(err) if is_unimplemented_git(&err) => {}
         Err(err) => return Err(err.into()),
     }
@@ -307,7 +321,11 @@ pub async fn create_workspace(
         )
         .await
     {
-        Ok(branch) => head_sha = branch.commit.id,
+        Ok(branch) => {
+            if !branch.commit.id.is_empty() {
+                head_sha = branch.commit.id;
+            }
+        }
         Err(err) if is_unimplemented_git(&err) => {}
         Err(err) => return Err(err.into()),
     }
@@ -502,17 +520,38 @@ pub async fn write_workspace_file(
     let message = req.message.unwrap_or_else(|| format!("update {path}"));
     let git_repo = git_repo(&app);
     let git_user = git_user(&auth);
+    let file_action = match state
+        .git_adapter
+        .get_blob(&git_repo, &workspace.branch_name, &path)
+        .await
+    {
+        Ok(_) => FileAction::Update {
+            path: path.clone(),
+            content: content.clone(),
+        },
+        Err(ConmanError::NotFound { .. }) => FileAction::Create {
+            path: path.clone(),
+            content: content.clone(),
+        },
+        Err(err) if is_missing_revision_git(&err) => FileAction::Create {
+            path: path.clone(),
+            content: content.clone(),
+        },
+        Err(err) if is_unimplemented_git(&err) => FileAction::Update {
+            path: path.clone(),
+            content: content.clone(),
+        },
+        Err(err) => return Err(err.into()),
+    };
     let result = state
         .git_adapter
         .commit_files(
             &git_repo,
             &git_user,
             &workspace.branch_name,
+            Some(&app.integration_branch),
             &message,
-            vec![FileAction::Update {
-                path: path.clone(),
-                content,
-            }],
+            vec![file_action],
         )
         .await?;
 
@@ -574,6 +613,7 @@ pub async fn delete_workspace_file(
             &git_repo,
             &git_user,
             &workspace.branch_name,
+            Some(&app.integration_branch),
             &message,
             vec![FileAction::Delete { path: path.clone() }],
         )

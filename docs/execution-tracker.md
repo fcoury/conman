@@ -18,7 +18,7 @@ Use this file as the live control plane for delivery.
   - Epics complete: `10 / 13`
   - Gates passed: `2 / 5`
 - Active blockers:
-  - E12 still needs staged real-repo load/fault runs (with test gitaly + seeded repos)
+  - Staged gitaly run is blocked on `UserCommitFiles` behavior (`empty branch update`) in current gitaly-rs build, preventing full authoring E2E execution
 
 ## 2) Epic Tracker (Dependency Controlled)
 
@@ -38,10 +38,10 @@ Legend:
 | E06 Async Jobs | worker-jobs | E00, E05 | B | done | master | 100 |  |
 | E07 Queue Orchestration | worker-queue-release | E05, E06 | C | done | master | 100 |  |
 | E08 Releases | worker-queue-release | E01, E06, E07 | C | done | master | 100 |  |
-| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 92 | Drift/deploy gates are command-backed; provider-specific deployment executors remain app-specific |
+| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 96 | Command-backed deploy executor and stricter exceptional approval validation are in; full staged E2E remains blocked by upstream workspace write path |
 | E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 95 | Provision/expire hooks are command-backed and TTL/grace cleanup is active; provider integrations still app-specific |
 | E11 Notifications & Audit | worker-observability | E05-E10 | E | done | master | 100 |  |
-| E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 88 | Local load/fault drills and dashboard provisioning wiring are done; staged real-repo load/fault runs remain |
+| E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 90 | Local load/fault drills and dashboard provisioning wiring are done; staged full-flow run is blocked by gitaly `UserCommitFiles` response semantics |
 
 ## 3) Dependency Gate Rules (Hard Stop)
 
@@ -85,7 +85,7 @@ Do not merge when prerequisites are incomplete:
 - [x] Required audit events emitted
 - Result: `pass | fail`
 - Date:
-- Notes:
+- Notes: staged attempt reached workspace creation against live gitaly, but write step is blocked by `commit_files returned empty branch update`.
 
 ## Gate C (M2: E07-E08)
 
@@ -116,7 +116,7 @@ Do not merge when prerequisites are incomplete:
 - [ ] Hardening/runbooks/load/fault checks complete
 - Result: `pass | fail`
 - Date:
-- Notes: Local load/fault drill artifacts and production dashboard provisioning files were added; staged real-repo drills remain open.
+- Notes: Local load/fault drill artifacts and production dashboard provisioning files were added; staged full-flow execution remains blocked by gitaly `UserCommitFiles` (see `tests/e2e/results/2026-02-26T03-45-43-staged-gitaly-attempt.md`).
 
 ## 5) CI Quality Gates (Required for Merge)
 

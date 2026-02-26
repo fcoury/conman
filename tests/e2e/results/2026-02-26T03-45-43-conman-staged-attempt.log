@@ -1,0 +1,163 @@
+Disable this behaviour by setting `HOMEBREW_NO_INSTALL_CLEANUP=1`.
+Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+__BREW_INSTALL_DONE__0
+
+fcoury@m3pro /V/E/c/conman on  master 🦀 v1.93.0 took 20s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3800 CONMAN_MONGO_URI=mongodb://127.0.0.1:27018 CONMAN_MONGO_DB=conman_e12 CONMAN_GITALY_ADDRESS=http://127.0.0.1:8075 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test cargo run
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.90s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:13:10.289609Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3800"},"target":"conman"}
+{"timestamp":"2026-02-26T06:13:10.342182Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e12"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:13:13.894361Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:13:13.908286Z","level":"WARN","fields":{"message":"gitaly-rs adapter unavailable, using noop adapter","addr":"http://127.0.0.1:8075","error":"git error: failed to connect to gitaly: transport error"},"target":"conman"}
+{"timestamp":"2026-02-26T06:13:13.913819Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:13:13.925417Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3800"},"target":"conman"}
+{"timestamp":"2026-02-26T06:14:11.230419Z","level":"ERROR","fields":{"message":"job runner tick failed","error":"internal: failed to scan due temp environments: Kind: Server selection timeout: No available servers. Topology: { Type: Single, Servers: [ { Address: 127.0.0.1:27018, Type: Unknown, Error: Kind: I/O error: Connection refused (os error 61), labels: {}, source: None, server response: None } ] }, labels: {}, source: None, server response: None"},"target":"conman_jobs"}
+^C{"timestamp":"2026-02-26T06:14:54.058625Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 1m47s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.30s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:21:54.462834Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:21:54.501155Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:21:58.104679Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:21:58.118497Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:21:58.122704Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:21:58.132574Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:38:30.292861Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [!⇡] 🦀 v1.93.0 took 16m37s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.66s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:38:32.382572Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:38:32.421597Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:38:36.237309Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:38:36.252005Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:38:36.256536Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:38:36.267849Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:40:05.360807Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 1m34s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+   Compiling conman-git v0.1.0 (/Volumes/External/code-external/conman/conman-git)
+   Compiling conman-api v0.1.0 (/Volumes/External/code-external/conman/conman-api)
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.12s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:40:13.029046Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:40:13.082330Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:40:13.092310Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:40:13.103605Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:40:13.106987Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:40:13.115590Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:40:15.137443Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 9s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:40:16.850089Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:40:17.428342Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:40:21.500340Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:40:21.515461Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:40:21.519923Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:40:21.530491Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:40:59.563810Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 43s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+   Compiling conman-git v0.1.0 (/Volumes/External/code-external/conman/conman-git)
+   Compiling conman-api v0.1.0 (/Volumes/External/code-external/conman/conman-api)
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.83s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:41:03.936721Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:41:03.974280Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:41:03.983152Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:41:03.993709Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:41:03.997189Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:41:04.005691Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:41:10.660041Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 10s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:41:12.279727Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:41:12.872047Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:41:16.514423Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:41:16.539381Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:41:16.545666Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:41:16.558754Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:41:34.057926Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 22s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+   Compiling conman-git v0.1.0 (/Volumes/External/code-external/conman/conman-git)
+   Compiling conman-api v0.1.0 (/Volumes/External/code-external/conman/conman-api)
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.53s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:41:39.098220Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:41:39.137490Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:41:42.790859Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:41:42.806480Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:41:42.811370Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:41:42.822746Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:43:11.636034Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 1m36s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.34s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:43:14.594691Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:43:14.631761Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:43:18.368500Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:43:18.398375Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:43:18.404023Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:43:18.417695Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:43:47.219609Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 34s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.10s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:43:49.706422Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:43:49.752793Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:43:53.448790Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:43:53.479686Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:43:53.485835Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:43:53.500793Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:44:18.326713Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 30s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.04s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:44:20.998550Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:44:21.034284Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:44:24.596358Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:44:24.624804Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:44:24.630750Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:44:24.646676Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+^C{"timestamp":"2026-02-26T06:45:07.569834Z","level":"INFO","fields":{"message":"received SIGINT, shutting down"},"target":"conman"}
+
+fcoury@m3pro /V/E/c/conman on  master [●!⇡] 🦀 v1.93.0 took 47s 
+> $ cd /Volumes/External/code-external/conman && CONMAN_HOST=127.0.0.1 CONMAN_PORT=3900 CONMAN_MONGO_URI=mongodb://127.0.0.1:27019 CONMAN_MONGO_DB=conman_e2e2 CONMAN_GITALY_ADDRESS=http://127.0.0.1:2305 CONMAN_JWT_SECRET=test-secret-test-secret-test-1234 CONMAN_SECRETS_MASTER_KEY=master-key CONMAN_TEMP_URL_DOMAIN=config.example.test CONMAN_DEPLOY_RELEASE_CMD=true cargo run
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.22s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T06:45:10.414898Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3900"},"target":"conman"}
+{"timestamp":"2026-02-26T06:45:10.456440Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e2"},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:45:14.000003Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T06:45:14.014857Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T06:45:14.019188Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T06:45:14.029781Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3900"},"target":"conman"}
+
