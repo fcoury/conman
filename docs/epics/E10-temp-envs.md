@@ -242,9 +242,10 @@ pub struct CreateTempEnvRequest {
     #[serde(default)]
     pub base_runtime_profile_id: Option<String>,
 
-    /// Optional env var overrides applied on top of derived runtime profile.
+    /// Optional typed env var overrides applied on top of derived runtime profile.
+    /// Uses the same `EnvVarValue` enum defined in E03.
     #[serde(default)]
-    pub env_var_overrides: std::collections::BTreeMap<String, String>,
+    pub env_var_overrides: std::collections::BTreeMap<String, EnvVarValue>,
 }
 
 /// Response body for temp environment endpoints.
@@ -1591,7 +1592,10 @@ async fn touch_activity_extends_expiry() {
 
 8. **Runtime profile derivation and URL generation.**
    - Temp env runtime profile is derived from selected base environment profile.
-   - Default base is development (or app-defined special base).
+   - Base selection priority is app default base profile first, then user
+     override at creation time.
    - Generated URL follows readable host pattern:
      `{app}-{kind}-{word}.<domain>`.
+   - Each temp-env instance gets a unique generated URL (no workspace-stable
+     host reuse).
    - Special reusable base profiles are managed by `app_admin` only.

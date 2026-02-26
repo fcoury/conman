@@ -412,8 +412,15 @@ Runtime profile rules in v1:
 - Precedence is `app defaults < environment profile < temp overrides`.
 - Secrets are encrypted at rest via envelope encryption (master key from
   config, per-record data keys).
+- Secret plaintext reveal is `app_admin`-only; other roles get masked previews.
+- Env vars are typed (`string | number | boolean | json`).
+- Runtime profile schema is strict typed (no arbitrary top-level custom fields).
 - Canonical environment profile changes default to stricter two-approval policy
   (configurable to `same_as_changeset`).
+- `app_admin` emergency direct profile edits are allowed, audited, and still
+  trigger deploy drift blocking until revalidation passes.
+- Changeset profile overrides are auto-included on submit and shown in submit
+  summary.
 - Deploy is blocked on profile drift across env vars, secrets, URL, DB settings,
   or migration set differences.
 

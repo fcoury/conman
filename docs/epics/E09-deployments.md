@@ -1644,3 +1644,8 @@ async fn deploy_emits_audit_event() {
    - Drift across env vars, secrets, URL, DB settings, or migration set
      differences returns conflict and blocks deployment until revalidation
      succeeds.
+
+10. **Drift remediation path is available.**
+   - When a deployment is blocked by drift, API exposes a helper action to
+     create a drift-fix changeset pre-scoped to the affected environment/profile
+     context.

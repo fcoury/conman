@@ -149,15 +149,31 @@ Conman v1 model:
   `app defaults < environment profile < temp profile overrides`.
 - Runtime profile overrides may be attached to changesets and travel with
   release/promotion.
+- Runtime profile overrides are auto-included on changeset submit and surfaced
+  in the submit summary payload.
 - If two queued changesets override the same env var key, the later changeset
   becomes `conflicted`.
+- If both overrides resolve to the same typed value for the same key/target,
+  they are treated as non-conflicting.
 - Canonical user-facing environment profile changes require configurable policy:
   `same_as_changeset` or `stricter_two_approvals` (default).
 - Deployment is blocked on runtime profile drift until revalidation passes.
+- `app_admin` may apply direct emergency edits to persistent runtime profiles;
+  these edits are fully audited and still trigger drift/revalidation gating.
 - v1 DB engine scope is MongoDB only.
 - Temp DB provisioning defaults to snapshot clone with dump/restore fallback.
 - Secrets are encrypted at rest in Conman (no external secret manager required
   for v1).
+- Secret plaintext reveal is `app_admin`-only in v1; other roles get masked
+  preview only.
+- Secret reveal does not require forced re-auth or reason entry in v1.
+- Secret masking policy:
+  - length <= 8: reveal only last 4 chars
+  - length > 8: reveal first 4 and last 4 chars
+- Env vars are typed in v1 (`string | number | boolean | json`).
+- Runtime profile schema is strict typed in v1 (no arbitrary top-level custom
+  fields).
+- Applied migration metadata is stored in Conman and used by drift checks.
 - Temp environment URLs are auto-generated and human-readable.
 - Validation defaults:
   - submit: temp profile only
@@ -196,6 +212,8 @@ Notes:
 | Skip stage / concurrent deploy approval | N | Y | Y | Y |
 | Invite users | N | N | N | Y |
 | Manage app settings/roles/envs | N | N | N | Y |
+| Manage persistent runtime profiles directly | N | N | N | Y |
+| Reveal secret plaintext | N | N | N | Y |
 
 `Own` means for items authored by that user.
 
@@ -297,6 +315,7 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 - `environments`
 - `runtime_profiles`
 - `runtime_profile_revisions`
+- `migration_executions`
 - `deployments`
 - `temp_environments`
 - `jobs`
@@ -329,9 +348,10 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 `runtime_profiles`
 
 - `id`, `app_id`, `name`, `kind`
-- `base_url`, `env_vars`, `secrets_encrypted`
+- `base_url`, `env_vars_typed`, `secrets_encrypted`
 - `database` (`engine=mongodb`, `connection_ref`, `provisioning_mode`,
   `base_profile_id?`)
+- `migrations` (`repo_paths[]`, `command_ref`, `applied_state_ref`)
 - `data_strategy` (`seed_mode`, `seed_source_ref?`)
 - `lifecycle` (`ttl_idle_hours?`, `grace_hours?`, `auto_cleanup`)
 - `created_by`, `created_at`, `updated_at`
@@ -345,9 +365,15 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 - `id`, `changeset_id`, `app_id`
 - `target_environment_id?`, `target_profile_id?`
-- `env_var_overrides`, `secret_overrides_encrypted`
+- `env_var_overrides_typed`, `secret_overrides_encrypted`
 - `database_overrides`, `data_overrides`
 - `created_by`, `updated_by`, `created_at`, `updated_at`
+
+`migration_executions`
+
+- `id`, `app_id`, `environment_id`, `release_id`
+- `runtime_profile_revision_id`, `status`, `started_at`, `finished_at`
+- `applied_migrations[]`, `logs_ref`, `triggered_by`
 
 `workspaces`
 
@@ -436,6 +462,8 @@ Base path: `/api`
 - `GET /api/apps/:appId/changesets/:changesetId/profile-overrides`
 - `PUT /api/apps/:appId/changesets/:changesetId/profile-overrides`
 
+`POST .../submit` responses include an `included_profile_overrides` summary.
+
 ## 8.5 Diffs, comments, and AI
 
 - `GET /api/apps/:appId/changesets/:changesetId/diff?mode=raw|semantic`
@@ -502,6 +530,7 @@ interface SemanticDiffResponse {
 - `POST /api/apps/:appId/environments/:envId/deploy`
 - `POST /api/apps/:appId/environments/:envId/promote`
 - `POST /api/apps/:appId/environments/:envId/rollback`
+- `POST /api/apps/:appId/environments/:envId/create-drift-fix-changeset`
 - `GET /api/apps/:appId/deployments?page=&limit=`
 
 ## 8.8 Runtime profiles
@@ -513,6 +542,11 @@ interface SemanticDiffResponse {
 - `GET /api/apps/:appId/runtime-profiles/:profileId/revisions?page=&limit=`
 - `POST /api/apps/:appId/runtime-profiles/:profileId/revert`
 - `POST /api/apps/:appId/runtime-profiles/:profileId/rotate-key` (manual)
+- `POST /api/apps/:appId/runtime-profiles/:profileId/secrets/:key/reveal`
+  (`app_admin` only; audited)
+
+`PATCH .../runtime-profiles/:profileId` allows direct emergency edits by
+`app_admin`; resulting drift still blocks deployment until revalidation.
 
 ## 8.9 Temp environments and jobs
 
@@ -573,6 +607,8 @@ v1 event set:
 - deployment started
 - deployment succeeded
 - deployment failed
+- deployment blocked by drift
+- runtime profile changed
 - temp environment expiry warning
 - temp environment expired
 
@@ -587,7 +623,8 @@ Audit everything immutable and append-only:
 - changeset submit/resubmit/review/queue/state changes
 - changeset profile override changes
 - comment creation and comment edits
-- runtime profile create/update/revert/rotation
+- runtime profile create/update/revert/rotation/direct-edit
+- runtime secret reveal events
 - release compose/reorder/publish
 - deployment/promotion/rollback
 - temp env create/extend/expire/undo
@@ -609,8 +646,10 @@ Retention: keep forever in v1.
 - Queue view for config managers (prioritize and reorder).
 - Runtime profile editor:
   - environment profile assignment
-  - env vars and secret values (encrypted storage)
+  - typed env vars and secret values (encrypted storage)
+  - secret masked preview for non-admin roles, admin reveal action
   - DB provisioning mode and base profile selection
+  - migration command/path config and applied migration history
   - revision history and manual key rotation actions
 - Release builder page:
   - select queued changesets

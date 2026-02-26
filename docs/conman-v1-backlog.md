@@ -103,6 +103,9 @@ Issues:
 4. E03-04: Membership listing and role assignment APIs.
 5. E03-05: Runtime profile CRUD/revisions, environment linkage, and canonical
    approval policy config.
+6. E03-06: Runtime profile secret visibility rules (`app_admin` reveal endpoint,
+   masked previews for other roles) and typed env var schema validation.
+7. E03-07: Direct app-admin runtime profile emergency edit flow (audited).
 
 Acceptance:
 
@@ -148,6 +151,8 @@ Issues:
 7. E05-07: AI analyze/chat endpoints scoped to workspace/changeset.
 8. E05-08: Changeset profile overrides (`changeset_profile_overrides`) with
    release-travel semantics.
+9. E05-09: Auto-include profile overrides on submit with explicit submit
+   summary payload.
 
 Acceptance:
 
@@ -169,6 +174,7 @@ Issues:
 4. E06-04: Gate hooks in submit/queue/release/deploy flows with configurable
    runtime profile scope and command.
 5. E06-05: Retry and timeout policies with failure reason codes.
+6. E06-06: Persist migration execution metadata for release/deploy validation.
 
 Acceptance:
 
@@ -191,6 +197,8 @@ Issues:
    operations (author or config manager).
 6. E07-06: Detect override-key collisions between queued changesets and mark
    later ones `conflicted`.
+7. E07-07: Treat equal typed override values for same key/target as
+   non-conflicting.
 
 Acceptance:
 
@@ -235,6 +243,8 @@ Issues:
 6. E09-06: Rollback mode B: redeploy prior release tag.
 7. E09-07: Runtime profile drift check (env vars, secrets, URL, DB settings,
    migrations) and deploy block until revalidation.
+8. E09-08: Drift remediation helper: create drift-fix changeset from blocked
+   deployment context.
 
 Acceptance:
 
@@ -256,6 +266,7 @@ Issues:
 5. E10-05: Cleanup workers and DB teardown.
 6. E10-06: Derive temp runtime profiles from base profile with readable URL
    generation and Mongo snapshot->dump/restore strategy.
+7. E10-07: One URL per temp-env instance (no workspace-stable host reuse).
 
 Acceptance:
 

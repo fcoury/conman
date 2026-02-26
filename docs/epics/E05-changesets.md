@@ -671,6 +671,8 @@ revision record.
   3. Set `current_revision = 1`, freeze `head_sha`.
   4. Create `ChangesetRevision` record (revision_number=1).
   5. Emit audit event.
+- **Behavior:** Profile overrides are auto-included on submit and returned in
+  `SubmitChangesetResponse` as `included_profile_overrides`.
 - **Response 200:** `{ "data": SubmitChangesetResponse }`
 - **Errors:** 409 (wrong state), 404
 
@@ -696,7 +698,7 @@ approvals to zero.
 
 Submit a review decision on a changeset.
 
-- **Auth:** `reviewer`, `config_manager`, or `app_admin` (not the changeset author)
+- **Auth:** `reviewer`, `config_manager`, or `app_admin`
 - **Body:** `ReviewRequest`
 - **Guard:** State must be `Submitted`, `InReview`, or `ChangesRequested`.
 - **Logic:**
@@ -710,7 +712,7 @@ Submit a review decision on a changeset.
   7. Create `ChangesetReview` record.
   8. Emit audit event.
 - **Response 200:** `{ "data": ReviewResponse }`
-- **Errors:** 409 (wrong state), 403 (insufficient role or self-review)
+- **Errors:** 409 (wrong state), 403 (insufficient role)
 
 ### `POST /api/apps/:appId/changesets/:changesetId/queue`
 
@@ -883,7 +885,7 @@ Complete transition table with guard conditions:
 
 ### Review Flow
 
-1. Validate reviewer role and non-self-review.
+1. Validate reviewer role.
 2. Parse decision.
 3. On `Approve`:
    - Increment `approval_count`.
@@ -1225,7 +1227,7 @@ comparison.
 - [ ] Handle `Approve`, `RequestChanges`, `Reject` decisions
 - [ ] Emit audit events for each review decision
 - [ ] Unit tests for each review decision
-- [ ] Unit tests for self-review rejection
+- [ ] Unit tests for self-review acceptance when caller has reviewer-capable role
 - [ ] Unit tests for insufficient role rejection
 
 ### E05-05: Diff Endpoints
@@ -1341,7 +1343,7 @@ comparison.
 
 5. **Approval threshold auto-transition:** When `approval_count >= required_approval_count` after an `Approve` review, the changeset automatically transitions to `Approved` without additional API calls.
 
-6. **Review role enforcement:** Only users with `reviewer`, `config_manager`, or `app_admin` role can submit reviews. Authors cannot review their own changesets.
+6. **Review role enforcement:** Only users with `reviewer`, `config_manager`, or `app_admin` role can submit reviews. Self-review is allowed when the author has one of these roles.
 
 7. **Diff modes:** `GET /diff?mode=raw` returns a unified diff with per-file stats. `GET /diff?mode=semantic` returns classified `SemanticChange` entries with config type, operation, target, and description.
 
@@ -1358,3 +1360,6 @@ comparison.
 13. **Profile overrides are tracked and auditable:** Changeset-level runtime
     profile overrides are stored in `changeset_profile_overrides`, included in
     release flow, and emit audit events on create/update.
+
+14. **Secret diffs are metadata-only:** Review and diff surfaces show secret
+    key operations (added/rotated/deleted) without exposing plaintext values.

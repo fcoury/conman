@@ -18,6 +18,9 @@ environments.
 - E03-04: Membership listing and role assignment APIs.
 - E03-05: Runtime profile CRUD/revisions, environment linkage, and canonical
   profile approval policy settings.
+- E03-06: Runtime profile typed env-var validation + secret visibility policy
+  (`app_admin` reveal, others masked).
+- E03-07: Direct app-admin runtime profile emergency edits (audited).
 
 ---
 
@@ -135,18 +138,29 @@ pub enum RuntimeProfileKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+pub enum EnvVarValue {
+    String(String),
+    Number(f64),
+    Boolean(bool),
+    Json(serde_json::Value),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeProfile {
     pub id: String,
     pub app_id: String,
     pub name: String,
     pub kind: RuntimeProfileKind,
     pub base_url: String,
-    pub env_vars: std::collections::BTreeMap<String, String>,
+    pub env_vars: std::collections::BTreeMap<String, EnvVarValue>,
     pub secrets_encrypted: std::collections::BTreeMap<String, String>,
     pub database_engine: String, // mongodb in v1
     pub connection_ref: String,
     pub provisioning_mode: String,
     pub base_profile_id: Option<String>,
+    pub migration_paths: Vec<String>,
+    pub migration_command: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -1063,6 +1077,12 @@ impl GitalyClient {
 - [ ] Each environment can be linked to a runtime profile.
 - [ ] Canonical env profile approval policy is configurable
   (`same_as_changeset` or `stricter_two_approvals`).
+- [ ] Runtime profile env vars are validated as typed values
+  (`string|number|boolean|json`) on write.
+- [ ] `app_admin` can reveal secret plaintext; other roles receive masked values
+  only (length <= 8 => last 4, otherwise first 4 + last 4).
+- [ ] Direct app-admin persistent profile edits are allowed, audited, and mark
+  deployment drift until revalidation.
 - [ ] All mutations emit audit events with before/after snapshots.
 - [ ] All endpoints follow the standard response envelope and error format.
 - [ ] Pagination works correctly on list endpoints.

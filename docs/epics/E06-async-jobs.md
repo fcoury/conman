@@ -978,3 +978,7 @@ E09).
 11. **Profile-aware gate defaults.** Gate configuration supports:
     submit -> temp profile only, release publish -> environment profiles only,
     deploy -> target environment profile only.
+
+12. **Migration execution metadata is persisted.** Jobs that execute migration
+    commands record applied migration identifiers/status into Conman metadata
+    for downstream drift detection and deploy gating.

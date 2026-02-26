@@ -20,7 +20,8 @@ Key outcomes:
   privileged user.
 - A changeset branch must be up to date with the integration branch before it can enter the queue.
 - Queued changesets with conflicting runtime override keys are marked
-  `Conflicted` (later entry loses).
+  `Conflicted` (later entry loses), except when the overlapping key resolves to
+  the same typed value.
 
 ## 2. Dependencies
 
@@ -862,4 +863,5 @@ message Repository {
 
 11. **Override-key conflict handling:** If two queued changesets override the
     same env var key for the same target runtime profile, the later changeset
-    transitions to `Conflicted`.
+    transitions to `Conflicted`. If both overrides resolve to the same typed
+    value, no conflict is raised.

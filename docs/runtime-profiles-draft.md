@@ -22,7 +22,10 @@ environments.
 - Temp profiles are derived from a base persistent environment profile.
 - Temp environment URLs are auto-generated and should be readable/shareable.
 - Environment profile changes for canonical user-facing env require approval.
+- `app_admin` can perform direct emergency persistent-profile edits (fully
+  audited).
 - Profile overrides can travel with a changeset/release.
+- Changeset submit auto-includes profile overrides and returns a submit summary.
 - Validation (`msuite`) runs against both environment and temp profiles, with
   configurable gates and command.
 - Deployment is blocked on runtime profile drift until revalidation passes.
@@ -30,14 +33,27 @@ environments.
 - Special base databases/profiles are managed by `app_admin` only.
 - If two queued changesets override the same env var key, the later one becomes
   `conflicted`.
+- If both queued changesets set the same env var key to the same typed value,
+  it is not treated as a conflict.
 - Canonical env profile approval policy is configurable: `same_as_changeset` or
   `stricter_two_approvals` (default).
 - Drift includes env vars, secrets, URL, DB settings, and migration set changes.
 - Secret key rotation is manual in v1.
+- Secrets can be revealed in plaintext by `app_admin` only; other roles see
+  masked previews.
+- Secret reveal does not require re-auth/audit reason in v1.
 - MongoDB clone strategy defaults to snapshot clone, fallback to dump/restore.
 - Temp URL pattern omits `conman` branding in hostname.
+- Env vars are typed in v1: `string | number | boolean | json`.
+- Runtime profile schema is strict typed in v1 (no arbitrary custom top-level
+  fields).
 - Changeset profile overrides are stored in a separate
   `changeset_profile_overrides` collection.
+- Applied migration metadata is tracked in Conman DB for drift/revalidation.
+- Temp profile base selection priority is app default base profile first, then
+  user override at temp-env creation.
+- Temp URLs are unique per temp-env instance (not workspace-stable).
+- Deploy drift remediation should offer "create drift-fix changeset".
 - Validation defaults:
   - submit: temp profile only
   - release publish: environment profiles only
@@ -55,13 +71,17 @@ Suggested shape:
 - `name`
 - `kind`: `persistent_env | temp_workspace | temp_changeset`
 - `base_url`
-- `env_vars` (non-secret)
+- `env_vars` (typed: `string | number | boolean | json`)
 - `secrets` (encrypted at rest; optional external secret refs later)
 - `database`:
   - `engine` (`mongodb`)
   - `connection_ref`
   - `provisioning_mode` (`existing | clone_from_base | snapshot_restore | empty`)
   - `base_profile_id?`
+- `migrations`:
+  - `repo_paths[]`
+  - `command_ref`
+  - `applied_state_ref`
 - `data_strategy`:
   - `seed_mode` (`none | baseline | snapshot`)
   - `seed_source_ref?`
@@ -102,31 +122,45 @@ Rationale:
 5. Encrypt secrets at rest in Conman (no external dependency required for v1).
 6. Support changeset-bound profile overrides that can be released/promoted.
 7. Enforce override-key conflict detection during queue/release composition.
+8. Track applied migration metadata in Conman for drift and gating decisions.
+9. Support app-admin direct profile edits with audit and drift-triggered
+   revalidation requirements.
+10. Support secret masking/reveal policy (`app_admin` plaintext only).
 
 ## 6) Non-Goals (Initial Draft)
 
 - Full external secret manager integration in v1.
 - Arbitrary cross-app profile sharing.
 - Runtime profile templating language.
+- Arbitrary custom runtime-profile top-level schema fields.
 - Multiple baseline dataset variants (single baseline path in v1).
 
-## 7) Open Design Questions
+## 7) Resolved v1 Policy
 
 1. Secret encryption model:
-   - app-level data encryption key (DEK) envelope-encrypted by a service master
-     key from env/config?
-   - key rollover is manual in v1.
+   - Envelope encryption in-app.
+   - Service master key in config, manual key rollover in v1.
 2. Database clone strategy (MongoDB):
-   - snapshot clone by default, fallback to dump/restore.
+   - Snapshot clone by default, dump/restore fallback.
 3. URL generation:
-   - host pattern with readable short ID (recommended:
-     `{app}-{kind}-{word}.<domain>`).
+   - Host pattern uses readable short IDs:
+     `{app}-{kind}-{word}.<domain>`.
 4. Changeset-coupled profile overrides:
-   - stored in `changeset_profile_overrides` collection.
+   - Stored in `changeset_profile_overrides`.
+   - Auto-included on submit with submit summary.
 5. Validation gates:
    - submit: temp profile only.
    - release publish: environment profiles only.
    - deploy: target environment profile only.
+6. Secret visibility:
+   - `app_admin` can reveal plaintext.
+   - Other roles see masked values.
+   - Masking policy:
+     - length <= 8: show last 4 characters only.
+     - length > 8: show first 4 and last 4.
+7. Drift remediation:
+   - Deployment remains blocked until revalidation passes.
+   - UX offers creation of a drift-fix changeset.
 
 ## 8) Implementation Direction (v1)
 
@@ -134,3 +168,6 @@ Rationale:
   `aes-gcm`, `rand`, and `zeroize` (no external secret manager dependency).
 - URL short IDs: use human-readable word IDs (for example from a wordlist or a
   petname-style generator) instead of opaque UUID-only hostnames.
+- Use a typed env var value enum and validate per-key type at write-time.
+- Persist applied migration metadata (`migration_executions`) keyed by app/env/
+  runtime profile revision.
