@@ -169,6 +169,5 @@ Rules:
 - [x] Security checklist complete
 - [ ] Final sign-off (names/date)
 
-Latest readiness report: `tests/ops/results/20260226075333-go-live-readiness-summary.md`
-(pending warnings: target-env secrets master key confirmation and runbook
-owner checklist completion).
+Latest readiness report: `tests/ops/results/20260226075617-go-live-readiness-summary.md`
+(pending warning: runbook owner checklist completion).
