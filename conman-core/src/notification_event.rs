@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum NotificationState {
     Queued,
+    Sending,
     Sent,
     Failed,
 }
@@ -18,6 +19,7 @@ pub struct NotificationEvent {
     pub subject: String,
     pub body: String,
     pub state: NotificationState,
+    pub error_message: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

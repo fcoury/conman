@@ -3,11 +3,12 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use async_trait::async_trait;
 use chrono::{Duration as ChronoDuration, Utc};
 use conman_core::{
-    ChangesetState, ConmanError, DeploymentState, Job, JobState, JobType, TempEnvState,
+    ChangesetState, ConmanError, DeploymentState, Job, JobState, JobType, NotificationEvent,
+    TempEnvState,
 };
 use conman_db::{
     ChangesetProfileOverrideRepo, ChangesetRepo, DeploymentRepo, EnqueueJobInput, JobRepo,
-    ReleaseRepo, TempEnvRepo,
+    NotificationEventRepo, ReleaseRepo, TempEnvRepo,
 };
 use serde_json::json;
 
@@ -23,6 +24,28 @@ pub struct NoopWorker;
 impl JobWorker for NoopWorker {
     async fn run(&self, _job: &Job) -> Result<serde_json::Value, String> {
         Ok(json!({"status": "ok", "worker": "noop"}))
+    }
+}
+
+#[async_trait]
+pub trait NotificationSender: Send + Sync {
+    async fn send(&self, event: &NotificationEvent) -> Result<(), String>;
+}
+
+#[derive(Default)]
+pub struct LoggingNotificationSender;
+
+#[async_trait]
+impl NotificationSender for LoggingNotificationSender {
+    async fn send(&self, event: &NotificationEvent) -> Result<(), String> {
+        tracing::info!(
+            notification_id = %event.id,
+            user_id = %event.user_id,
+            event_type = %event.event_type,
+            subject = %event.subject,
+            "notification queued for delivery"
+        );
+        Ok(())
     }
 }
 
@@ -242,6 +265,8 @@ impl JobWorker for RevalidateQueuedChangesetWorker {
 pub struct JobRunner {
     repo: JobRepo,
     temp_env_repo: TempEnvRepo,
+    notification_repo: NotificationEventRepo,
+    notification_sender: Arc<dyn NotificationSender>,
     workers: Arc<HashMap<JobType, Arc<dyn JobWorker>>>,
     poll_interval: Duration,
 }
@@ -287,7 +312,9 @@ impl JobRunner {
 
         Self {
             repo: JobRepo::new(db.clone()),
-            temp_env_repo: TempEnvRepo::new(db),
+            temp_env_repo: TempEnvRepo::new(db.clone()),
+            notification_repo: NotificationEventRepo::new(db),
+            notification_sender: Arc::new(LoggingNotificationSender),
             workers: Arc::new(workers),
             poll_interval: Duration::from_secs(1),
         }
@@ -303,12 +330,18 @@ impl JobRunner {
         self
     }
 
+    pub fn with_notification_sender(mut self, sender: Arc<dyn NotificationSender>) -> Self {
+        self.notification_sender = sender;
+        self
+    }
+
     pub async fn enqueue(&self, input: EnqueueJobInput) -> Result<conman_core::Job, ConmanError> {
         self.repo.enqueue(input).await
     }
 
     pub async fn tick(&self) -> Result<(), ConmanError> {
         self.enqueue_due_temp_env_expiry_jobs().await?;
+        self.drain_notification_outbox().await?;
 
         let Some(job) = self.repo.reserve_next_queued().await? else {
             return Ok(());
@@ -348,6 +381,23 @@ impl JobRunner {
             }
         }
 
+        Ok(())
+    }
+
+    async fn drain_notification_outbox(&self) -> Result<(), ConmanError> {
+        for _ in 0..20 {
+            let Some(event) = self.notification_repo.reserve_next_queued().await? else {
+                break;
+            };
+            match self.notification_sender.send(&event).await {
+                Ok(()) => {
+                    self.notification_repo.mark_sent(&event.id).await?;
+                }
+                Err(err) => {
+                    self.notification_repo.mark_failed(&event.id, &err).await?;
+                }
+            }
+        }
         Ok(())
     }
 

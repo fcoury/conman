@@ -19,6 +19,7 @@ struct NotificationDoc {
     subject: String,
     body: String,
     state: NotificationState,
+    error_message: Option<String>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -33,6 +34,7 @@ impl From<NotificationDoc> for NotificationEvent {
             subject: value.subject,
             body: value.body,
             state: value.state,
+            error_message: value.error_message,
             created_at: value.created_at,
             updated_at: value.updated_at,
         }
@@ -78,6 +80,7 @@ impl NotificationEventRepo {
             subject: subject.to_string(),
             body: body.to_string(),
             state: NotificationState::Queued,
+            error_message: None,
             created_at: now,
             updated_at: now,
         };
@@ -88,6 +91,75 @@ impl NotificationEventRepo {
                 message: format!("failed to enqueue notification event: {e}"),
             })?;
         Ok(row.into())
+    }
+
+    pub async fn reserve_next_queued(&self) -> Result<Option<NotificationEvent>, ConmanError> {
+        let queued = mongodb::bson::to_bson(&NotificationState::Queued).map_err(|e| {
+            ConmanError::Internal {
+                message: format!("failed to encode queued notification state: {e}"),
+            }
+        })?;
+        let sending = mongodb::bson::to_bson(&NotificationState::Sending).map_err(|e| {
+            ConmanError::Internal {
+                message: format!("failed to encode sending notification state: {e}"),
+            }
+        })?;
+        let now = Utc::now();
+        let row = self
+            .collection
+            .find_one_and_update(
+                doc! {"state": queued},
+                doc! {"$set": {"state": sending, "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+            )
+            .sort(doc! {"created_at": 1})
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to reserve queued notification event: {e}"),
+            })?;
+        Ok(row.map(Into::into))
+    }
+
+    pub async fn mark_sent(&self, id: &str) -> Result<(), ConmanError> {
+        self.set_state(id, NotificationState::Sent, None).await
+    }
+
+    pub async fn mark_failed(&self, id: &str, error_message: &str) -> Result<(), ConmanError> {
+        self.set_state(
+            id,
+            NotificationState::Failed,
+            Some(error_message.to_string()),
+        )
+        .await
+    }
+
+    async fn set_state(
+        &self,
+        id: &str,
+        state: NotificationState,
+        error_message: Option<String>,
+    ) -> Result<(), ConmanError> {
+        let id = ObjectId::parse_str(id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid notification id: {e}"),
+        })?;
+        let state_bson = mongodb::bson::to_bson(&state).map_err(|e| ConmanError::Internal {
+            message: format!("failed to encode notification state: {e}"),
+        })?;
+        let now = Utc::now();
+        self.collection
+            .update_one(
+                doc! {"_id": id},
+                doc! {"$set": {
+                    "state": state_bson,
+                    "error_message": error_message,
+                    "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())
+                }},
+            )
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to set notification state: {e}"),
+            })?;
+        Ok(())
     }
 }
 
