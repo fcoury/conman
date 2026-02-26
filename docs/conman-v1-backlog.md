@@ -103,7 +103,7 @@ Issues:
 
 Acceptance:
 
-- App admin can configure baseline mode (`main_head` or
+- App admin can configure baseline mode (`integration_head` or
   `canonical_env_release`).
 - Environment pipeline metadata is app-configurable.
 
@@ -120,7 +120,7 @@ Issues:
 3. E04-03: File tree/list/read/write/delete endpoints using `path` query/body.
 4. E04-04: Guardrails for blocked paths and max file size (default 5 MB,
    app-configurable).
-5. E04-05: Workspace reset/sync-main flow with rebase/merge fallback.
+5. E04-05: Workspace reset/sync-integration flow with rebase/merge fallback.
 6. E04-06: Conflict detection primitives for later changeset/release flows.
 
 Acceptance:
@@ -198,7 +198,8 @@ Issues:
 
 1. E08-01: Draft release creation and selected changeset association.
 2. E08-02: Ordered composition engine (manual order by config manager).
-3. E08-03: Publish flow to `main` + lightweight tag `rYYYY.MM.DD.N`.
+3. E08-03: Publish flow to `integration_branch` + lightweight tag
+   `rYYYY.MM.DD.N`.
 4. E08-04: Persist release metadata (`published_sha`, actor, timestamps).
 5. E08-05: Release state machine enforcement.
 
@@ -220,7 +221,7 @@ Issues:
 3. E09-03: Skip-stage and concurrent multi-env deploy approvals:
    2 distinct users, at least one privileged role.
 4. E09-04: Deployment lock scope per environment.
-5. E09-05: Rollback mode A: `revert(main) + new release`.
+5. E09-05: Rollback mode A: `revert(integration_branch) + new release`.
 6. E09-06: Rollback mode B: redeploy prior release tag.
 
 Acceptance:

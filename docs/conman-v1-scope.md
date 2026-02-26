@@ -28,10 +28,11 @@ Conman v1 model:
 
 ### 3.1 Baseline and branching
 
-- Integration branch is always `main`.
+- Integration branch is configurable per app (`integration_branch`), defaulting
+  to `main`.
 - New apps default baseline mode: `latest deployed release of canonical
   user-facing environment`.
-- Fallback baseline when no release exists: `main` HEAD.
+- Fallback baseline when no release exists: integration branch HEAD.
 - Baseline mode is configurable per app and editable by app admins.
 
 ### 3.2 Workspace model
@@ -86,7 +87,7 @@ Conman v1 model:
   - go through changeset/review/queue
   - can fast-track to release with two approvals
 - Rollback support in v1:
-  - default: `revert on main + new release`
+  - default: `revert on integration_branch + new release`
   - also support: redeploy prior release tag to an environment
 
 ### 3.7 Edit and commit strategy
@@ -232,7 +233,7 @@ pending -> running -> succeeded
 - Workspace: branch from app baseline.
 - Changeset: metadata object comparing workspace `head_sha` vs baseline.
 - Release: immutable Git tag (`rYYYY.MM.DD.N`) representing selected queued
-  changesets composed onto `main`.
+  changesets composed onto the app integration branch.
 
 ## 6.2 Queue-first release composition
 
@@ -242,12 +243,14 @@ pending -> running -> succeeded
 4. Resolve failures:
    - conflicts -> mark specific changesets `conflicted`
    - test failures -> mark `needs_revalidation`
-5. Successful compose publishes release tag and updates `main` accordingly.
+5. Successful compose publishes release tag and updates integration branch
+   accordingly.
 6. Run post-publish revalidation for remaining queued items.
 
-## 6.3 "Up to date with main" gate
+## 6.3 "Up to date with integration branch" gate
 
-- Merge/release requires changeset branch to be up to date with `main`.
+- Merge/release requires changeset branch to be up to date with the app
+  integration branch.
 - Either merge-based sync or rebase-based sync is accepted.
 - Conflict resolution in v1 is text-based UI flow.
 
@@ -279,8 +282,9 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 `apps`
 
-- `id`, `name`, `repo_url`, `default_branch=main`
-- `baseline_mode` (`main_head` | `canonical_env_release`)
+- `id`, `name`, `repo_url`
+- `integration_branch` (default `main`)
+- `baseline_mode` (`integration_head` | `canonical_env_release`)
 - `canonical_env_id`
 - `file_size_limit_bytes` (default 5 MB)
 - `blocked_paths[]`
@@ -348,7 +352,7 @@ Base path: `/api`
 - `GET /api/apps/:appId/workspaces/:workspaceId`
 - `PATCH /api/apps/:appId/workspaces/:workspaceId`
 - `POST /api/apps/:appId/workspaces/:workspaceId/reset`
-- `POST /api/apps/:appId/workspaces/:workspaceId/sync-main`
+- `POST /api/apps/:appId/workspaces/:workspaceId/sync-integration`
 
 ## 8.3 Workspace files
 
