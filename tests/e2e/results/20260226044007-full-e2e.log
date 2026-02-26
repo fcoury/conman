@@ -1,0 +1,12 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.28s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T07:40:08.962212Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3925"},"target":"conman"}
+{"timestamp":"2026-02-26T07:40:09.018468Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e_full_20260226044007"},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:40:12.658740Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:40:12.682607Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T07:40:12.687813Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T07:40:12.702579Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3925"},"target":"conman"}
+{"timestamp":"2026-02-26T07:40:14.711085Z","level":"INFO","fields":{"message":"notification queued for delivery","notification_id":"699ff8ddf984309938c3c64d","user_id":"852be84c2b1a91fa53f5ea29","event_type":"changeset_submitted","subject":"Changeset submitted"},"target":"conman_jobs"}
+{"timestamp":"2026-02-26T07:40:17.771738Z","level":"INFO","fields":{"message":"notification queued for delivery","notification_id":"699ff8e1f984309938c3c65d","user_id":"852be84c2b1a91fa53f5ea29","event_type":"release_published","subject":"Release published"},"target":"conman_jobs"}
+{"timestamp":"2026-02-26T07:40:19.817679Z","level":"INFO","fields":{"message":"notification queued for delivery","notification_id":"699ff8e3f984309938c3c667","user_id":"852be84c2b1a91fa53f5ea29","event_type":"deployment_started","subject":"Deployment started"},"target":"conman_jobs"}
+{"timestamp":"2026-02-26T07:40:20.843641Z","level":"INFO","fields":{"message":"notification queued for delivery","notification_id":"699ff8e4f984309938c3c66d","user_id":"852be84c2b1a91fa53f5ea29","event_type":"temp_env_created","subject":"Temporary environment created"},"target":"conman_jobs"}

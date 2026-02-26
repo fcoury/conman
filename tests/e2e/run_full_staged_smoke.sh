@@ -140,6 +140,22 @@ if ! [[ -f "$LOG_FILE" ]] || ! rg -q "server listening" "$LOG_FILE"; then
   exit 1
 fi
 
+if command -v mongosh >/dev/null 2>&1; then
+  mongosh "${MONGO_URI}/${DB}" --quiet --eval "db.users.updateOne(
+    { _id: ObjectId(\"${USER_ID}\") },
+    {
+      \$set: {
+        email: \"e2e@example.com\",
+        name: \"E2E Runner\",
+        password_hash: \"not-used-in-staged-smoke\",
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+    },
+    { upsert: true }
+  )" >/dev/null
+fi
+
 echo "[3/11] Creating app"
 file=$(request_assert_200 POST "/api/apps" "$TOKEN_BOOT" "{\"name\":\"E2E ${TS}\",\"repo_path\":\"${REPO}\",\"integration_branch\":\"main\"}")
 APP_ID=$(jq -r ".data.id" "$file")
