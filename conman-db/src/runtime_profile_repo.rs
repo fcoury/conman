@@ -20,6 +20,8 @@ struct RuntimeProfileDoc {
     name: String,
     kind: RuntimeProfileKind,
     base_url: String,
+    #[serde(default)]
+    surface_endpoints: BTreeMap<String, String>,
     env_vars: BTreeMap<String, EnvVarValue>,
     secrets_encrypted: BTreeMap<String, String>,
     database_engine: String,
@@ -55,6 +57,7 @@ impl From<RuntimeProfileDoc> for RuntimeProfile {
             name: value.name,
             kind: value.kind,
             base_url: value.base_url,
+            surface_endpoints: value.surface_endpoints,
             env_vars: value.env_vars,
             secrets_encrypted: value.secrets_encrypted,
             database_engine: value.database_engine,
@@ -75,6 +78,7 @@ pub struct RuntimeProfileInput {
     pub name: String,
     pub kind: RuntimeProfileKind,
     pub base_url: String,
+    pub surface_endpoints: BTreeMap<String, String>,
     pub env_vars: BTreeMap<String, EnvVarValue>,
     pub secrets_plain: BTreeMap<String, String>,
     pub database_engine: String,
@@ -89,6 +93,7 @@ pub struct RuntimeProfileInput {
 pub struct RuntimeProfileUpdate {
     pub name: Option<String>,
     pub base_url: Option<String>,
+    pub surface_endpoints: Option<BTreeMap<String, String>>,
     pub env_vars: Option<BTreeMap<String, EnvVarValue>>,
     pub secrets_plain: Option<BTreeMap<String, String>>,
     pub database_engine: Option<String>,
@@ -143,6 +148,7 @@ impl RuntimeProfileRepo {
             name: input.name,
             kind: input.kind,
             base_url: input.base_url,
+            surface_endpoints: input.surface_endpoints,
             env_vars: input.env_vars,
             secrets_encrypted,
             database_engine: input.database_engine,
@@ -243,6 +249,9 @@ impl RuntimeProfileRepo {
         }
         if let Some(base_url) = patch.base_url {
             profile.base_url = base_url;
+        }
+        if let Some(surface_endpoints) = patch.surface_endpoints {
+            profile.surface_endpoints = surface_endpoints;
         }
         if let Some(env_vars) = patch.env_vars {
             profile.env_vars = env_vars;

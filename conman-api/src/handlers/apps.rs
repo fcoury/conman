@@ -76,6 +76,8 @@ pub struct CreateRuntimeProfileRequest {
     pub kind: String,
     pub base_url: String,
     #[serde(default)]
+    pub surface_endpoints: BTreeMap<String, String>,
+    #[serde(default)]
     pub env_vars: BTreeMap<String, EnvVarValue>,
     #[serde(default)]
     pub secrets: BTreeMap<String, String>,
@@ -92,6 +94,7 @@ pub struct CreateRuntimeProfileRequest {
 pub struct UpdateRuntimeProfileRequest {
     pub name: Option<String>,
     pub base_url: Option<String>,
+    pub surface_endpoints: Option<BTreeMap<String, String>>,
     pub env_vars: Option<BTreeMap<String, EnvVarValue>>,
     pub secrets: Option<BTreeMap<String, String>>,
     pub database_engine: Option<String>,
@@ -109,6 +112,7 @@ pub struct RuntimeProfileResponse {
     pub name: String,
     pub kind: RuntimeProfileKind,
     pub base_url: String,
+    pub surface_endpoints: BTreeMap<String, String>,
     pub env_vars: BTreeMap<String, EnvVarValue>,
     pub secrets: BTreeMap<String, String>,
     pub database_engine: String,
@@ -182,6 +186,7 @@ fn runtime_profile_response(
         name: profile.name,
         kind: profile.kind,
         base_url: profile.base_url,
+        surface_endpoints: profile.surface_endpoints,
         env_vars: profile.env_vars,
         secrets,
         database_engine: profile.database_engine,
@@ -194,6 +199,35 @@ fn runtime_profile_response(
         created_at: profile.created_at,
         updated_at: profile.updated_at,
     })
+}
+
+async fn validate_surface_endpoint_keys(
+    state: &AppState,
+    app_id: &str,
+    surface_endpoints: &BTreeMap<String, String>,
+) -> Result<(), ApiConmanError> {
+    if surface_endpoints.is_empty() {
+        return Ok(());
+    }
+
+    let surfaces = conman_db::AppSurfaceRepo::new(state.db.clone())
+        .list_by_repo(app_id)
+        .await?;
+    let keys = surfaces
+        .into_iter()
+        .map(|s| s.key)
+        .collect::<std::collections::BTreeSet<_>>();
+
+    for key in surface_endpoints.keys() {
+        if !keys.contains(key) {
+            return Err(ConmanError::Validation {
+                message: format!("unknown surface endpoint key `{key}` for app {app_id}"),
+            }
+            .into());
+        }
+    }
+
+    Ok(())
 }
 
 pub async fn list_apps(
@@ -538,6 +572,7 @@ pub async fn create_runtime_profile(
 ) -> Result<Json<ApiResponse<RuntimeProfileResponse>>, ApiConmanError> {
     require_role(&auth, &app_id, Role::AppAdmin)?;
     validate_env_keys(&req.env_vars)?;
+    validate_surface_endpoint_keys(&state, &app_id, &req.surface_endpoints).await?;
     let kind = parse_enum::<RuntimeProfileKind>(&req.kind, "kind")?;
     let profile = conman_db::RuntimeProfileRepo::new(state.db.clone())
         .create(
@@ -546,6 +581,7 @@ pub async fn create_runtime_profile(
                 name: req.name,
                 kind,
                 base_url: req.base_url,
+                surface_endpoints: req.surface_endpoints,
                 env_vars: req.env_vars,
                 secrets_plain: req.secrets,
                 database_engine: req.database_engine,
@@ -620,6 +656,9 @@ pub async fn update_runtime_profile(
     if let Some(env_vars) = req.env_vars.as_ref() {
         validate_env_keys(env_vars)?;
     }
+    if let Some(surface_endpoints) = req.surface_endpoints.as_ref() {
+        validate_surface_endpoint_keys(&state, &app_id, surface_endpoints).await?;
+    }
 
     let profile = conman_db::RuntimeProfileRepo::new(state.db.clone())
         .update(
@@ -627,6 +666,7 @@ pub async fn update_runtime_profile(
             RuntimeProfileUpdate {
                 name: req.name,
                 base_url: req.base_url,
+                surface_endpoints: req.surface_endpoints,
                 env_vars: req.env_vars,
                 secrets_plain: req.secrets,
                 database_engine: req.database_engine,

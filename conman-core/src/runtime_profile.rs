@@ -40,6 +40,8 @@ pub struct RuntimeProfile {
     pub name: String,
     pub kind: RuntimeProfileKind,
     pub base_url: String,
+    #[serde(default)]
+    pub surface_endpoints: BTreeMap<String, String>,
     pub env_vars: BTreeMap<String, EnvVarValue>,
     pub secrets_encrypted: BTreeMap<String, String>,
     pub database_engine: String,
