@@ -26,6 +26,7 @@ plan are documented and continuously refined in `docs/`.
 - Implementation guide: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 - Backlog: [docs/conman-v1-backlog.md](docs/conman-v1-backlog.md)
 - Runtime profiles draft: [docs/runtime-profiles-draft.md](docs/runtime-profiles-draft.md)
+- Tenant/repo/app-surface model: [docs/tenant-repo-app-surface-model.md](docs/tenant-repo-app-surface-model.md)
 - Epics: [docs/epics/](docs/epics/)
 
 ## Repository Layout

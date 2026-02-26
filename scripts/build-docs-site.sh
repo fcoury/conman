@@ -69,6 +69,12 @@ build_page \
   "style.css"
 
 build_page \
+  "$SRC_DIR/tenant-repo-app-surface-model.md" \
+  "$DIST_DIR/tenant-repo-app-surface-model.html" \
+  "Tenant, Repo, and App Surface Model" \
+  "style.css"
+
+build_page \
   "$SRC_DIR/execution-plan.md" \
   "$DIST_DIR/execution-plan.html" \
   "Multi-Agent Execution Plan" \
@@ -156,6 +162,10 @@ cat > "$DIST_DIR/index.html" <<EOF
         <a class="doc-card" href="./runtime-profiles.html">
           <p class="card-title">Runtime Profiles Draft</p>
           <p class="card-desc">Profile model for URLs, env vars, secrets, database, and data lifecycle.</p>
+        </a>
+        <a class="doc-card" href="./tenant-repo-app-surface-model.html">
+          <p class="card-title">Tenant/Repo/App Surface Model</p>
+          <p class="card-desc">Domain model update for multi-app repositories with tenant and app-surface layers.</p>
         </a>
         <a class="doc-card" href="./execution-plan.html">
           <p class="card-title">Execution Plan</p>
