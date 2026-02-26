@@ -22,6 +22,7 @@ pub struct Config {
     pub msuite_submit_cmd: String,
     pub msuite_merge_cmd: String,
     pub msuite_deploy_cmd: String,
+    pub deploy_release_cmd: String,
     pub runtime_profile_drift_check_cmd: String,
     pub temp_env_provision_cmd: Option<String>,
     pub temp_env_expire_cmd: Option<String>,
@@ -101,6 +102,8 @@ impl Config {
             std::env::var("CONMAN_MSUITE_MERGE_CMD").unwrap_or_else(|_| "true".to_string());
         let msuite_deploy_cmd =
             std::env::var("CONMAN_MSUITE_DEPLOY_CMD").unwrap_or_else(|_| "true".to_string());
+        let deploy_release_cmd =
+            std::env::var("CONMAN_DEPLOY_RELEASE_CMD").unwrap_or_else(|_| "true".to_string());
         let runtime_profile_drift_check_cmd =
             std::env::var("CONMAN_RUNTIME_PROFILE_DRIFT_CHECK_CMD")
                 .unwrap_or_else(|_| "true".to_string());
@@ -141,6 +144,7 @@ impl Config {
             msuite_submit_cmd,
             msuite_merge_cmd,
             msuite_deploy_cmd,
+            deploy_release_cmd,
             runtime_profile_drift_check_cmd,
             temp_env_provision_cmd,
             temp_env_expire_cmd,
@@ -176,6 +180,7 @@ mod tests {
             "CONMAN_MSUITE_SUBMIT_CMD",
             "CONMAN_MSUITE_MERGE_CMD",
             "CONMAN_MSUITE_DEPLOY_CMD",
+            "CONMAN_DEPLOY_RELEASE_CMD",
             "CONMAN_RUNTIME_PROFILE_DRIFT_CHECK_CMD",
             "CONMAN_TEMP_ENV_PROVISION_CMD",
             "CONMAN_TEMP_ENV_EXPIRE_CMD",
@@ -207,6 +212,7 @@ mod tests {
         assert_eq!(config.msuite_submit_cmd, "true");
         assert_eq!(config.msuite_merge_cmd, "true");
         assert_eq!(config.msuite_deploy_cmd, "true");
+        assert_eq!(config.deploy_release_cmd, "true");
         assert_eq!(config.runtime_profile_drift_check_cmd, "true");
         assert!(config.temp_env_provision_cmd.is_none());
         assert!(config.temp_env_expire_cmd.is_none());

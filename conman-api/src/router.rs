@@ -351,6 +351,7 @@ mod tests {
                 msuite_submit_cmd: "true".to_string(),
                 msuite_merge_cmd: "true".to_string(),
                 msuite_deploy_cmd: "true".to_string(),
+                deploy_release_cmd: "true".to_string(),
                 runtime_profile_drift_check_cmd: "true".to_string(),
                 temp_env_provision_cmd: None,
                 temp_env_expire_cmd: None,

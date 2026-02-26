@@ -46,19 +46,64 @@ pub struct DeploymentEnqueueResponse {
 
 const DEPLOYMENTS_TOTAL: &str = "conman_deployments_total";
 
-fn validate_exceptional_approvals(
+fn is_exceptional_deploy(is_skip_stage: bool, is_concurrent_batch: bool) -> bool {
+    is_skip_stage || is_concurrent_batch
+}
+
+fn role_can_approve_exceptional(role: Role) -> bool {
+    role.satisfies(Role::Reviewer)
+}
+
+fn role_is_privileged_for_exceptional(role: Role) -> bool {
+    role.satisfies(Role::ConfigManager)
+}
+
+async fn validate_exceptional_approvals(
+    state: &AppState,
+    app_id: &str,
     is_skip_stage: bool,
     is_concurrent_batch: bool,
     approvals: &[String],
 ) -> Result<(), ConmanError> {
-    if is_skip_stage || is_concurrent_batch {
-        let unique = approvals.iter().cloned().collect::<HashSet<_>>();
-        if unique.len() < 2 {
+    if !is_exceptional_deploy(is_skip_stage, is_concurrent_batch) {
+        return Ok(());
+    }
+
+    let unique = approvals.iter().cloned().collect::<HashSet<_>>();
+    if unique.len() < 2 {
+        return Err(ConmanError::Validation {
+            message: "skip-stage/concurrent deploy requires 2 distinct approvers".to_string(),
+        });
+    }
+
+    let membership_repo = conman_db::MembershipRepo::new(state.db.clone());
+    let mut has_privileged_approver = false;
+    for approver_user_id in unique {
+        let roles = membership_repo
+            .find_roles_by_user_id(&approver_user_id)
+            .await?;
+        let role = roles
+            .get(app_id)
+            .copied()
+            .ok_or_else(|| ConmanError::Validation {
+                message: format!("approver {approver_user_id} is not a member of app {app_id}"),
+            })?;
+        if !role_can_approve_exceptional(role) {
             return Err(ConmanError::Validation {
-                message: "skip-stage/concurrent deploy requires 2 distinct approvers".to_string(),
+                message: format!(
+                    "approver {approver_user_id} must be reviewer/config_manager/app_admin"
+                ),
             });
         }
+        has_privileged_approver |= role_is_privileged_for_exceptional(role);
     }
+    if !has_privileged_approver {
+        return Err(ConmanError::Validation {
+            message: "skip-stage/concurrent deploy requires at least one config_manager or app_admin approver"
+                .to_string(),
+        });
+    }
+
     Ok(())
 }
 
@@ -91,7 +136,14 @@ pub async fn deploy_environment(
 ) -> Result<Json<ApiResponse<DeploymentEnqueueResponse>>, ApiConmanError> {
     auth.require_role(&app_id, Role::ConfigManager)?;
     counter!(DEPLOYMENTS_TOTAL, "action" => "deploy").increment(1);
-    validate_exceptional_approvals(req.is_skip_stage, req.is_concurrent_batch, &req.approvals)?;
+    validate_exceptional_approvals(
+        &state,
+        &app_id,
+        req.is_skip_stage,
+        req.is_concurrent_batch,
+        &req.approvals,
+    )
+    .await?;
     let release = conman_db::ReleaseRepo::new(state.db.clone())
         .find_by_id(&req.release_id)
         .await?
@@ -299,7 +351,7 @@ pub async fn rollback_environment(
 ) -> Result<Json<ApiResponse<DeploymentEnqueueResponse>>, ApiConmanError> {
     auth.require_role(&app_id, Role::ConfigManager)?;
     counter!(DEPLOYMENTS_TOTAL, "action" => "rollback").increment(1);
-    validate_exceptional_approvals(true, false, &req.approvals)?;
+    validate_exceptional_approvals(&state, &app_id, true, false, &req.approvals).await?;
     let release = conman_db::ReleaseRepo::new(state.db.clone())
         .find_by_id(&req.release_id)
         .await?
@@ -378,4 +430,28 @@ pub async fn list_deployments(
         pagination.limit,
         total,
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exceptional_deploy_detection() {
+        assert!(!is_exceptional_deploy(false, false));
+        assert!(is_exceptional_deploy(true, false));
+        assert!(is_exceptional_deploy(false, true));
+    }
+
+    #[test]
+    fn exceptional_role_rules() {
+        assert!(!role_can_approve_exceptional(Role::User));
+        assert!(role_can_approve_exceptional(Role::Reviewer));
+        assert!(role_can_approve_exceptional(Role::ConfigManager));
+        assert!(role_can_approve_exceptional(Role::AppAdmin));
+
+        assert!(!role_is_privileged_for_exceptional(Role::Reviewer));
+        assert!(role_is_privileged_for_exceptional(Role::ConfigManager));
+        assert!(role_is_privileged_for_exceptional(Role::AppAdmin));
+    }
 }

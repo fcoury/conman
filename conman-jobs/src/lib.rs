@@ -193,6 +193,7 @@ impl JobWorker for ReleaseAssembleWorker {
 
 pub struct DeployReleaseWorker {
     deployments: DeploymentRepo,
+    command: String,
 }
 
 #[async_trait]
@@ -202,16 +203,28 @@ impl JobWorker for DeployReleaseWorker {
             .set_state(&job.entity_id, DeploymentState::Running)
             .await
             .map_err(|e| e.to_string())?;
-        let deployment = self
-            .deployments
-            .set_state(&job.entity_id, DeploymentState::Succeeded)
-            .await
-            .map_err(|e| e.to_string())?;
-        Ok(json!({
-            "status": "deployed",
-            "deployment_id": deployment.id,
-            "state": deployment.state,
-        }))
+        match run_shell_command(&self.command, "deploy_release", job).await {
+            Ok(executor_result) => {
+                let deployment = self
+                    .deployments
+                    .set_state(&job.entity_id, DeploymentState::Succeeded)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok(json!({
+                    "status": "deployed",
+                    "deployment_id": deployment.id,
+                    "state": deployment.state,
+                    "executor": executor_result,
+                }))
+            }
+            Err(err) => {
+                let _ = self
+                    .deployments
+                    .set_state(&job.entity_id, DeploymentState::Failed)
+                    .await;
+                Err(err)
+            }
+        }
     }
 }
 
@@ -396,6 +409,7 @@ impl JobWorker for RevalidateQueuedChangesetWorker {
 pub struct JobRunner {
     repo: JobRepo,
     temp_env_repo: TempEnvRepo,
+    deployment_repo: DeploymentRepo,
     notification_repo: NotificationEventRepo,
     notification_sender: Arc<dyn NotificationSender>,
     workers: Arc<HashMap<JobType, Arc<dyn JobWorker>>>,
@@ -462,6 +476,7 @@ impl JobRunner {
             JobType::DeployRelease,
             Arc::new(DeployReleaseWorker {
                 deployments: DeploymentRepo::new(db.clone()),
+                command: config.deploy_release_cmd.clone(),
             }),
         );
         workers.insert(
@@ -489,6 +504,7 @@ impl JobRunner {
         Self {
             repo: JobRepo::new(db.clone()),
             temp_env_repo: TempEnvRepo::new(db.clone()),
+            deployment_repo: DeploymentRepo::new(db.clone()),
             notification_repo: NotificationEventRepo::new(db),
             notification_sender: Arc::new(LoggingNotificationSender),
             workers: Arc::new(workers),
@@ -566,6 +582,12 @@ impl JobRunner {
                 self.repo
                     .append_log(&job.app_id, &job.id, "error", &err)
                     .await?;
+                if job.job_type == JobType::DeployRelease {
+                    let _ = self
+                        .deployment_repo
+                        .set_state(&job.entity_id, DeploymentState::Failed)
+                        .await;
+                }
                 counter!(JOBS_COMPLETED_TOTAL, "job_type" => job_type, "outcome" => "timed_out")
                     .increment(1);
             }
