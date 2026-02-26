@@ -7,4 +7,5 @@ pub mod me;
 pub mod metrics;
 pub mod releases;
 pub mod temp_envs;
+pub mod tenants;
 pub mod workspaces;

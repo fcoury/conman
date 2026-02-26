@@ -33,6 +33,10 @@ use crate::handlers::releases::{
 use crate::handlers::temp_envs::{
     create_temp_env, delete_temp_env, extend_temp_env, list_temp_envs, undo_expire_temp_env,
 };
+use crate::handlers::tenants::{
+    create_repo_surface, create_repo_under_tenant, create_tenant, get_tenant, list_repo_surfaces,
+    list_tenants, update_repo_surface,
+};
 use crate::handlers::workspaces::{
     create_workspace, create_workspace_checkpoint, delete_workspace_file, get_workspace,
     get_workspace_file_or_tree, list_workspaces, reset_workspace, sync_workspace_integration,
@@ -54,6 +58,22 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/auth/forgot-password", post(forgot_password))
         .route("/api/auth/reset-password", post(reset_password))
         .route("/api/auth/accept-invite", post(accept_invite))
+        .route("/api/tenants", get(list_tenants).post(create_tenant))
+        .route("/api/tenants/{tenantId}", get(get_tenant))
+        .route(
+            "/api/tenants/{tenantId}/repos",
+            post(create_repo_under_tenant),
+        )
+        .route("/api/repos", get(list_apps))
+        .route("/api/repos/{appId}", get(get_app))
+        .route(
+            "/api/repos/{appId}/surfaces",
+            get(list_repo_surfaces).post(create_repo_surface),
+        )
+        .route(
+            "/api/repos/{appId}/surfaces/{surfaceId}",
+            patch(update_repo_surface),
+        )
         .route("/api/apps", get(list_apps).post(create_app))
         .route("/api/apps/{appId}", get(get_app))
         .route("/api/apps/{appId}/settings", patch(update_app_settings))
