@@ -1,0 +1,34 @@
+groups:
+  - name: conman-platform
+    rules:
+      - alert: ConmanHighApiErrorRate
+        expr: sum(rate(conman_http_requests_total{status=~"5.."}[5m])) / sum(rate(conman_http_requests_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Conman API 5xx rate is above 1%"
+
+      - alert: ConmanJobQueueBacklog
+        expr: conman_job_queue_depth > 250
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "Conman job queue depth is above 250"
+
+      - alert: ConmanDeployFailureSpike
+        expr: increase(conman_jobs_completed_total{job_type="deploy_release",outcome="failed"}[15m]) > 3
+        for: 5m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Conman deploy failures spiked in last 15 minutes"
+
+      - alert: ConmanAuthFailureSpike
+        expr: increase(conman_auth_failures_total[10m]) > 100
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Conman authentication failures are above baseline"

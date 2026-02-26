@@ -21,3 +21,7 @@
 2. Deploy failure ratio > 5% over 15 minutes.
 3. Auth failure spike > 3x baseline over 10 minutes.
 4. API 5xx rate > 1% over 5 minutes.
+
+## Artifacts
+- Prometheus alert rules: `ops/alerts/conman-alerts.yml`
+- Grafana starter dashboard: `ops/grafana/conman-overview.json`
