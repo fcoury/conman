@@ -51,8 +51,15 @@ pub async fn emit_notification(
     if !pref.email_enabled {
         return Ok(());
     }
+    let user = conman_db::UserRepo::new(state.db.clone())
+        .find_by_id(user_id)
+        .await?
+        .ok_or_else(|| ConmanError::NotFound {
+            entity: "user",
+            id: user_id.to_string(),
+        })?;
     conman_db::NotificationEventRepo::new(state.db.clone())
-        .enqueue(user_id, app_id, event_type, subject, body)
+        .enqueue(user_id, &user.email, app_id, event_type, subject, body)
         .await?;
     Ok(())
 }

@@ -90,7 +90,20 @@ async fn main() {
         ),
     };
 
-    let _job_runner = JobRunner::new(state.db.clone()).spawn();
+    let mut job_runner = JobRunner::new(state.db.clone());
+    match conman_jobs::SmtpNotificationSender::from_config(&config) {
+        Ok(Some(sender)) => {
+            tracing::info!("smtp notification sender configured");
+            job_runner = job_runner.with_notification_sender(Arc::new(sender));
+        }
+        Ok(None) => {
+            tracing::info!("smtp not configured, using logging notification sender");
+        }
+        Err(err) => {
+            tracing::warn!(error = %err, "invalid smtp configuration; using logging sender");
+        }
+    }
+    let _job_runner = job_runner.spawn();
 
     let app = build_router(state);
 

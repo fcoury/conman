@@ -14,6 +14,11 @@ pub struct Config {
     pub secrets_master_key: String,
     pub temp_url_domain: String,
     pub http_rate_limit_per_second: u64,
+    pub smtp_host: Option<String>,
+    pub smtp_port: u16,
+    pub smtp_username: Option<String>,
+    pub smtp_password: Option<String>,
+    pub smtp_from_email: Option<String>,
 }
 
 impl Config {
@@ -74,6 +79,30 @@ impl Config {
                 message: "CONMAN_HTTP_RATE_LIMIT_PER_SECOND must be a valid u64".to_string(),
             })?;
 
+        let smtp_host = std::env::var("CONMAN_SMTP_HOST").ok();
+        let smtp_port: u16 = std::env::var("CONMAN_SMTP_PORT")
+            .unwrap_or_else(|_| "587".to_string())
+            .parse()
+            .map_err(|_| ConmanError::Validation {
+                message: "CONMAN_SMTP_PORT must be a valid u16".to_string(),
+            })?;
+        let smtp_username = std::env::var("CONMAN_SMTP_USERNAME").ok();
+        let smtp_password = std::env::var("CONMAN_SMTP_PASSWORD").ok();
+        let smtp_from_email = std::env::var("CONMAN_SMTP_FROM_EMAIL").ok();
+
+        if smtp_host.is_some() && smtp_from_email.is_none() {
+            return Err(ConmanError::Validation {
+                message: "CONMAN_SMTP_FROM_EMAIL is required when CONMAN_SMTP_HOST is set"
+                    .to_string(),
+            });
+        }
+        if smtp_username.is_some() ^ smtp_password.is_some() {
+            return Err(ConmanError::Validation {
+                message: "CONMAN_SMTP_USERNAME and CONMAN_SMTP_PASSWORD must be provided together"
+                    .to_string(),
+            });
+        }
+
         Ok(Self {
             listen_addr,
             mongo_uri: std::env::var("CONMAN_MONGO_URI")
@@ -87,6 +116,11 @@ impl Config {
             secrets_master_key,
             temp_url_domain,
             http_rate_limit_per_second,
+            smtp_host,
+            smtp_port,
+            smtp_username,
+            smtp_password,
+            smtp_from_email,
         })
     }
 }
@@ -111,6 +145,11 @@ mod tests {
             "CONMAN_SECRETS_MASTER_KEY",
             "CONMAN_TEMP_URL_DOMAIN",
             "CONMAN_HTTP_RATE_LIMIT_PER_SECOND",
+            "CONMAN_SMTP_HOST",
+            "CONMAN_SMTP_PORT",
+            "CONMAN_SMTP_USERNAME",
+            "CONMAN_SMTP_PASSWORD",
+            "CONMAN_SMTP_FROM_EMAIL",
         ] {
             unsafe { std::env::remove_var(key) };
         }
@@ -135,6 +174,7 @@ mod tests {
         assert_eq!(config.jwt_expiry_hours, 24);
         assert_eq!(config.invite_expiry_days, 7);
         assert_eq!(config.http_rate_limit_per_second, 200);
+        assert!(config.smtp_host.is_none());
     }
 
     #[test]

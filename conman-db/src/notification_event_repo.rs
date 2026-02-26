@@ -14,6 +14,7 @@ struct NotificationDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
     user_id: ObjectId,
+    recipient_email: String,
     app_id: Option<ObjectId>,
     event_type: String,
     subject: String,
@@ -29,6 +30,7 @@ impl From<NotificationDoc> for NotificationEvent {
         Self {
             id: value.id.to_hex(),
             user_id: value.user_id.to_hex(),
+            recipient_email: value.recipient_email,
             app_id: value.app_id.map(|v| v.to_hex()),
             event_type: value.event_type,
             subject: value.subject,
@@ -56,6 +58,7 @@ impl NotificationEventRepo {
     pub async fn enqueue(
         &self,
         user_id: &str,
+        recipient_email: &str,
         app_id: Option<&str>,
         event_type: &str,
         subject: &str,
@@ -75,6 +78,7 @@ impl NotificationEventRepo {
         let row = NotificationDoc {
             id: ObjectId::new(),
             user_id,
+            recipient_email: recipient_email.to_string(),
             app_id,
             event_type: event_type.to_string(),
             subject: subject.to_string(),

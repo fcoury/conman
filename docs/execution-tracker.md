@@ -41,7 +41,7 @@ Legend:
 | E08 Releases | worker-queue-release | E01, E06, E07 | C | in_progress | master | 85 | Git composition/publish must be tied to gitaly operations |
 | E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 85 | Drift checks and deploy approvals are enforced; real execution hooks are still noop |
 | E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 90 | Runtime cleanup worker is active; provider-side teardown hooks remain stubbed |
-| E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 80 | Outbox drain is active; SMTP/provider hookup and full audit assertions pending |
+| E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 90 | Outbox drain + SMTP provider path shipped; full audit completeness assertions pending |
 | E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 65 | Metrics, throttling, runbooks, test scaffolding, and core security guards shipped; load/fault execution + dashboards pending |
 
 ## 3) Dependency Gate Rules (Hard Stop)

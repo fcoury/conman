@@ -3,12 +3,16 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use async_trait::async_trait;
 use chrono::{Duration as ChronoDuration, Utc};
 use conman_core::{
-    ChangesetState, ConmanError, DeploymentState, Job, JobState, JobType, NotificationEvent,
-    TempEnvState,
+    ChangesetState, Config, ConmanError, DeploymentState, Job, JobState, JobType,
+    NotificationEvent, TempEnvState,
 };
 use conman_db::{
     ChangesetProfileOverrideRepo, ChangesetRepo, DeploymentRepo, EnqueueJobInput, JobRepo,
     NotificationEventRepo, ReleaseRepo, TempEnvRepo,
+};
+use lettre::{
+    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+    transport::smtp::authentication::Credentials,
 };
 use metrics::{counter, gauge, histogram};
 use serde_json::json;
@@ -46,6 +50,63 @@ impl NotificationSender for LoggingNotificationSender {
             subject = %event.subject,
             "notification queued for delivery"
         );
+        Ok(())
+    }
+}
+
+pub struct SmtpNotificationSender {
+    mailer: AsyncSmtpTransport<Tokio1Executor>,
+    from_email: String,
+}
+
+impl SmtpNotificationSender {
+    pub fn from_config(config: &Config) -> Result<Option<Self>, ConmanError> {
+        let Some(host) = config.smtp_host.as_ref() else {
+            return Ok(None);
+        };
+        let from_email = config
+            .smtp_from_email
+            .clone()
+            .ok_or_else(|| ConmanError::Validation {
+                message: "smtp_from_email is required when smtp_host is configured".to_string(),
+            })?;
+        let mut builder = AsyncSmtpTransport::<Tokio1Executor>::relay(host).map_err(|e| {
+            ConmanError::Validation {
+                message: format!("invalid smtp host: {e}"),
+            }
+        })?;
+        builder = builder.port(config.smtp_port);
+        if let (Some(username), Some(password)) = (&config.smtp_username, &config.smtp_password) {
+            builder = builder.credentials(Credentials::new(username.clone(), password.clone()));
+        }
+        Ok(Some(Self {
+            mailer: builder.build(),
+            from_email,
+        }))
+    }
+}
+
+#[async_trait]
+impl NotificationSender for SmtpNotificationSender {
+    async fn send(&self, event: &NotificationEvent) -> Result<(), String> {
+        let from = self
+            .from_email
+            .parse()
+            .map_err(|e| format!("invalid from email address: {e}"))?;
+        let to = event
+            .recipient_email
+            .parse()
+            .map_err(|e| format!("invalid recipient email address: {e}"))?;
+        let message = Message::builder()
+            .from(from)
+            .to(to)
+            .subject(event.subject.clone())
+            .body(event.body.clone())
+            .map_err(|e| format!("failed to build email message: {e}"))?;
+        self.mailer
+            .send(message)
+            .await
+            .map_err(|e| format!("smtp send failed: {e}"))?;
         Ok(())
     }
 }
