@@ -1,12 +1,3 @@
-use axum::{
-    Extension, Json,
-    extract::{Path, Query, State},
-};
-use conman_auth::AuthUser;
-use conman_core::{ConmanError, Job, JobState, JobType, ReleaseBatch, ReleaseState, Role};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 use crate::{
     error::ApiConmanError,
     events::{emit_audit, emit_notification},
@@ -14,6 +5,16 @@ use crate::{
     response::ApiResponse,
     state::AppState,
 };
+use axum::{
+    Extension, Json,
+    extract::{Path, Query, State},
+};
+use conman_auth::AuthUser;
+use conman_core::{
+    ConmanError, GitRepo, GitUser, Job, JobState, JobType, RefUpdate, ReleaseBatch, ReleaseState,
+    Role,
+};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct SetReleaseChangesetsRequest {
@@ -30,6 +31,24 @@ pub struct AssembleReleaseResponse {
 pub struct PublishReleaseResponse {
     pub release: ReleaseBatch,
     pub released_changesets: Vec<String>,
+}
+
+fn git_repo(app_id: &str, repo_path: &str) -> GitRepo {
+    GitRepo {
+        storage_name: "default".to_string(),
+        relative_path: repo_path.to_string(),
+        gl_repository: format!("project-{app_id}"),
+    }
+}
+
+fn git_user(auth: &AuthUser) -> GitUser {
+    GitUser {
+        gl_id: format!("user-{}", auth.user_id),
+        name: auth.email.clone(),
+        email: auth.email.clone(),
+        gl_username: auth.email.clone(),
+        timezone: "UTC".to_string(),
+    }
 }
 
 pub async fn list_releases(
@@ -336,11 +355,140 @@ pub async fn publish_release(
         }
     }
 
-    let published_sha = Uuid::now_v7().to_string();
+    let app = conman_db::AppRepo::new(state.db.clone())
+        .find_by_id(&app_id)
+        .await?
+        .ok_or_else(|| ConmanError::NotFound {
+            entity: "app",
+            id: app_id.clone(),
+        })?;
+    let git_repo = git_repo(&app_id, &app.repo_path);
+    let git_user = git_user(&auth);
+    let integration_branch = app.integration_branch.clone();
+    let integration_ref = format!("refs/heads/{integration_branch}");
+    let compose_ref = format!("refs/heads/conman/release/{}", release.id);
+    let base_branch = state
+        .git_adapter
+        .find_branch(&git_repo, &integration_branch)
+        .await?
+        .ok_or_else(|| ConmanError::Conflict {
+            message: format!("integration branch {integration_branch} not found"),
+        })?;
+    let base_sha = base_branch.commit.id;
+
+    state
+        .git_adapter
+        .update_references(
+            &git_repo,
+            vec![RefUpdate {
+                reference: compose_ref.clone(),
+                old_object_id: String::new(),
+                new_object_id: base_sha.clone(),
+            }],
+        )
+        .await?;
+
+    let changeset_repo = conman_db::ChangesetRepo::new(state.db.clone());
+    let mut compose_head = base_sha.clone();
+    for changeset_id in &release.ordered_changeset_ids {
+        let changeset = changeset_repo
+            .find_by_id(changeset_id)
+            .await?
+            .ok_or_else(|| ConmanError::NotFound {
+                entity: "changeset",
+                id: changeset_id.clone(),
+            })?;
+        if changeset.state != conman_core::ChangesetState::Queued {
+            return Err(ConmanError::Conflict {
+                message: format!(
+                    "changeset {} is no longer queued; refresh release selection",
+                    changeset.id
+                ),
+            }
+            .into());
+        }
+        let source_sha = changeset
+            .submitted_head_sha
+            .clone()
+            .unwrap_or(changeset.head_sha.clone());
+        let merge_message = format!(
+            "Release {} includes changeset {} ({})",
+            release.tag, changeset.id, changeset.title
+        );
+        match state
+            .git_adapter
+            .merge_to_ref(
+                &git_repo,
+                &git_user,
+                &source_sha,
+                &compose_ref,
+                &compose_ref,
+                &merge_message,
+            )
+            .await
+        {
+            Ok(sha) => compose_head = sha,
+            Err(err) => {
+                if let ConmanError::Git { message } = &err {
+                    if message.to_ascii_lowercase().contains("conflict") {
+                        let _ = changeset_repo.mark_conflicted(&changeset.id).await;
+                        return Err(ConmanError::Conflict {
+                            message: format!(
+                                "changeset {} conflicts during release compose and was moved to conflicted",
+                                changeset.id
+                            ),
+                        }
+                        .into());
+                    }
+                }
+                return Err(err.into());
+            }
+        }
+    }
+
+    state
+        .git_adapter
+        .update_references(
+            &git_repo,
+            vec![RefUpdate {
+                reference: integration_ref.clone(),
+                old_object_id: base_sha,
+                new_object_id: compose_head.clone(),
+            }],
+        )
+        .await
+        .map_err(|err| match err {
+            ConmanError::Git { message } => ConmanError::Conflict {
+                message: format!(
+                    "integration branch moved while publishing release; re-run compose: {message}"
+                ),
+            },
+            other => other,
+        })?;
+
+    let _ = state
+        .git_adapter
+        .create_tag(
+            &git_repo,
+            &git_user,
+            &release.tag,
+            &compose_head,
+            &format!("Release {}", release.tag),
+        )
+        .await?;
+    let _ = state
+        .git_adapter
+        .delete_branch(
+            &git_repo,
+            &git_user,
+            compose_ref.trim_start_matches("refs/heads/"),
+        )
+        .await;
+
+    let published_sha = compose_head;
     let release = repo
         .publish(&release_id, published_sha, &auth.user_id)
         .await?;
-    let changeset_repo = conman_db::ChangesetRepo::new(state.db.clone());
     changeset_repo
         .mark_released_batch(&release.ordered_changeset_ids)
         .await?;

@@ -15,10 +15,9 @@ Use this file as the live control plane for delivery.
 - Current wave: `E`
 - Current milestone: `M4`
 - Overall progress:
-  - Epics complete: `7 / 13`
-  - Gates passed: `1 / 5`
+  - Epics complete: `9 / 13`
+  - Gates passed: `2 / 5`
 - Active blockers:
-  - E08 still needs release composition/publish bound to real gitaly merge+tag operations
   - E11 still needs audit completeness assertions for critical mutations
   - E12 still needs executed load/fault results and production dashboard wiring
 
@@ -38,9 +37,9 @@ Legend:
 | E04 Workspaces | worker-workspace | E01, E03 | B | done | master | 100 |  |
 | E05 Changesets | worker-changeset | E02, E04 | B | done | master | 100 |  |
 | E06 Async Jobs | worker-jobs | E00, E05 | B | done | master | 100 |  |
-| E07 Queue Orchestration | worker-queue-release | E05, E06 | C | in_progress | master | 92 | Queue revalidation is automated; release composition still not wired to git materialization |
-| E08 Releases | worker-queue-release | E01, E06, E07 | C | in_progress | master | 85 | Git composition/publish must be tied to gitaly operations |
-| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 92 | Drift/deploy gates now execute configured commands; deploy still metadata-driven until E08 git publish is wired |
+| E07 Queue Orchestration | worker-queue-release | E05, E06 | C | done | master | 100 |  |
+| E08 Releases | worker-queue-release | E01, E06, E07 | C | done | master | 100 |  |
+| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 92 | Drift/deploy gates are command-backed; provider-specific deployment executors remain app-specific |
 | E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 95 | Provision/expire hooks are command-backed and TTL/grace cleanup is active; provider integrations still app-specific |
 | E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 90 | Outbox drain + SMTP provider path shipped; full audit completeness assertions pending |
 | E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 78 | Metrics, throttling, runbooks, test scaffolding, security guards, alert/dashboard artifacts, and component-level health checks shipped; load/fault execution pending |
@@ -91,13 +90,13 @@ Do not merge when prerequisites are incomplete:
 
 ## Gate C (M2: E07-E08)
 
-- [ ] E07 merged
-- [ ] E08 merged
-- [ ] Queue-first flow works with revalidation
-- [ ] Config manager can publish subset-based releases
-- Result: `pass | fail`
-- Date:
-- Notes:
+- [x] E07 merged
+- [x] E08 merged
+- [x] Queue-first flow works with revalidation
+- [x] Config manager can publish subset-based releases
+- Result: `pass`
+- Date: `2026-02-26`
+- Notes: Publish flow now composes selected queued changesets through gitaly merges, fast-forwards integration branch with optimistic checks, and tags releases.
 
 ## Gate D (M3: E09-E10)
 
