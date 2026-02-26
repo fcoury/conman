@@ -9,6 +9,7 @@ pub mod membership_repo;
 pub mod password_reset_repo;
 pub mod runtime_profile_repo;
 pub mod user_repo;
+pub mod workspace_repo;
 
 pub use app_repo::AppRepo;
 pub use environment_repo::{EnvironmentInput, EnvironmentRepo};
@@ -17,6 +18,7 @@ pub use membership_repo::MembershipRepo;
 pub use password_reset_repo::PasswordResetRepo;
 pub use runtime_profile_repo::{RuntimeProfileInput, RuntimeProfileRepo, RuntimeProfileUpdate};
 pub use user_repo::UserRepo;
+pub use workspace_repo::{CreateWorkspaceInput, WorkspaceRepo};
 
 #[async_trait]
 pub trait EnsureIndexes: Send + Sync {

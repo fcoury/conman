@@ -14,6 +14,11 @@ use crate::handlers::apps::{
     reveal_runtime_profile_secret, update_app_settings, update_runtime_profile,
 };
 use crate::handlers::health::health_check;
+use crate::handlers::workspaces::{
+    create_workspace, create_workspace_checkpoint, delete_workspace_file, get_workspace,
+    get_workspace_file_or_tree, list_workspaces, reset_workspace, sync_workspace_integration,
+    update_workspace, write_workspace_file,
+};
 use crate::request_context::RequestContext;
 use crate::response::{ApiError, ApiErrorBody};
 use crate::state::AppState;
@@ -36,29 +41,29 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/apps/{appId}/invites", post(create_invite))
         .route(
             "/api/apps/{appId}/workspaces",
-            get(not_implemented).post(not_implemented),
+            get(list_workspaces).post(create_workspace),
         )
         .route(
             "/api/apps/{appId}/workspaces/{workspaceId}",
-            get(not_implemented).patch(not_implemented),
+            get(get_workspace).patch(update_workspace),
         )
         .route(
             "/api/apps/{appId}/workspaces/{workspaceId}/reset",
-            post(not_implemented),
+            post(reset_workspace),
         )
         .route(
             "/api/apps/{appId}/workspaces/{workspaceId}/sync-integration",
-            post(not_implemented),
+            post(sync_workspace_integration),
         )
         .route(
             "/api/apps/{appId}/workspaces/{workspaceId}/files",
-            get(not_implemented)
-                .put(not_implemented)
-                .delete(not_implemented),
+            get(get_workspace_file_or_tree)
+                .put(write_workspace_file)
+                .delete(delete_workspace_file),
         )
         .route(
             "/api/apps/{appId}/workspaces/{workspaceId}/checkpoints",
-            post(not_implemented),
+            post(create_workspace_checkpoint),
         )
         .route(
             "/api/apps/{appId}/changesets",

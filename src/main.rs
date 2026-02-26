@@ -28,6 +28,7 @@ async fn main() {
     let invite_repo = conman_db::InviteRepo::new(db.clone());
     let runtime_profile_repo = conman_db::RuntimeProfileRepo::new(db.clone());
     let password_reset_repo = conman_db::PasswordResetRepo::new(db.clone());
+    let workspace_repo = conman_db::WorkspaceRepo::new(db.clone());
     conman_db::bootstrap_indexes(&[
         &user_repo,
         &membership_repo,
@@ -36,6 +37,7 @@ async fn main() {
         &invite_repo,
         &runtime_profile_repo,
         &password_reset_repo,
+        &workspace_repo,
     ])
     .await
     .expect("failed to bootstrap MongoDB indexes");
