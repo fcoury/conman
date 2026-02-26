@@ -40,8 +40,10 @@ pandoc "$SRC_DIR/IMPLEMENTATION.md" \
   --metadata title="V1 Implementation Guide" \
   -o "$DIST_DIR/implementation.html"
 
-# Rewrite .md links to .html so epic links resolve correctly
-sed -i '' 's/\.md"/.html"/g; s/\.md#/.html#/g' "$DIST_DIR/implementation.html"
+# Rewrite .md links to .html so cross-doc links resolve correctly
+for html in "$DIST_DIR"/*.html "$DIST_DIR"/epics/*.html; do
+  [ -f "$html" ] && sed -i '' 's/\.md"/.html"/g; s/\.md#/.html#/g' "$html"
+done
 
 # Build epic pages
 mkdir -p "$DIST_DIR/epics"
