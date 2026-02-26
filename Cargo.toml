@@ -43,6 +43,7 @@ conman-api = { path = "./conman-api" }
 conman-core = { path = "./conman-core" }
 conman-db = { path = "./conman-db" }
 conman-git = { path = "./conman-git" }
+conman-jobs = { path = "./conman-jobs" }
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true

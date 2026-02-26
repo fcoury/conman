@@ -34,8 +34,8 @@ Legend:
 | E02 Auth & RBAC | worker-auth | E00 | A | done | master | 100 |  |
 | E03 App Setup | worker-app | E01, E02 | A | done | master | 100 |  |
 | E04 Workspaces | worker-workspace | E01, E03 | B | done | master | 100 |  |
-| E05 Changesets | worker-changeset | E02, E04 | B | in_progress | master | 70 | Comment edit endpoint + AI endpoints pending |
-| E06 Async Jobs | worker-jobs | E00, E05 | B | not_started |  | 0 |  |
+| E05 Changesets | worker-changeset | E02, E04 | B | in_review | master | 85 | AI analysis/chat endpoints pending |
+| E06 Async Jobs | worker-jobs | E00, E05 | B | in_progress | master | 55 | Gate hooks not yet wired for release/deploy flows |
 | E07 Queue Orchestration | worker-queue-release | E05, E06 | C | not_started |  | 0 |  |
 | E08 Releases | worker-queue-release | E01, E06, E07 | C | not_started |  | 0 |  |
 | E09 Deployments | worker-deploy | E03, E06, E08 | D | not_started |  | 0 |  |

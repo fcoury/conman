@@ -8,6 +8,7 @@ pub mod changeset_profile_override_repo;
 pub mod changeset_repo;
 pub mod environment_repo;
 pub mod invite_repo;
+pub mod job_repo;
 pub mod membership_repo;
 pub mod password_reset_repo;
 pub mod runtime_profile_repo;
@@ -22,6 +23,7 @@ pub use changeset_profile_override_repo::{
 pub use changeset_repo::{ChangesetRepo, CreateChangesetInput, ReviewAction};
 pub use environment_repo::{EnvironmentInput, EnvironmentRepo};
 pub use invite_repo::InviteRepo;
+pub use job_repo::{EnqueueJobInput, JobRepo};
 pub use membership_repo::MembershipRepo;
 pub use password_reset_repo::PasswordResetRepo;
 pub use runtime_profile_repo::{RuntimeProfileInput, RuntimeProfileRepo, RuntimeProfileUpdate};

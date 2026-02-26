@@ -3,6 +3,7 @@ use std::sync::Arc;
 use conman_api::{AppState, build_router};
 use conman_core::Config;
 use conman_git::{GitAdapter, GitalyClient, NoopGitAdapter};
+use conman_jobs::JobRunner;
 
 #[tokio::main]
 async fn main() {
@@ -32,6 +33,7 @@ async fn main() {
     let changeset_repo = conman_db::ChangesetRepo::new(db.clone());
     let changeset_comment_repo = conman_db::ChangesetCommentRepo::new(db.clone());
     let changeset_profile_override_repo = conman_db::ChangesetProfileOverrideRepo::new(db.clone());
+    let job_repo = conman_db::JobRepo::new(db.clone());
     conman_db::bootstrap_indexes(&[
         &user_repo,
         &membership_repo,
@@ -44,6 +46,7 @@ async fn main() {
         &changeset_repo,
         &changeset_comment_repo,
         &changeset_profile_override_repo,
+        &job_repo,
     ])
     .await
     .expect("failed to bootstrap MongoDB indexes");
@@ -69,6 +72,8 @@ async fn main() {
         db,
         git_adapter,
     };
+
+    let _job_runner = JobRunner::new(state.db.clone()).spawn();
 
     let app = build_router(state);
 

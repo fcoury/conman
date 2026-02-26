@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, Query, State},
 };
 use conman_auth::AuthUser;
-use conman_core::{Changeset, ChangesetState, ConmanError, EnvVarValue, Role};
+use conman_core::{Changeset, ChangesetState, ConmanError, EnvVarValue, Job, JobType, Role};
 use conman_db::{ChangesetProfileOverride, OverrideInput, ReviewAction};
 use serde::{Deserialize, Serialize};
 
@@ -56,6 +56,12 @@ pub struct CreateCommentRequest {
 pub struct ChangesetDetailResponse {
     pub changeset: Changeset,
     pub profile_overrides: Vec<ChangesetProfileOverride>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SubmitResponse {
+    pub changeset: Changeset,
+    pub job: Job,
 }
 
 fn parse_review_action(input: &str) -> Result<ReviewAction, ApiConmanError> {
@@ -201,7 +207,7 @@ pub async fn submit_changeset(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, changeset_id)): Path<(String, String)>,
     Json(req): Json<SubmitRequest>,
-) -> Result<Json<ApiResponse<Changeset>>, ApiConmanError> {
+) -> Result<Json<ApiResponse<SubmitResponse>>, ApiConmanError> {
     auth.require_role(&app_id, Role::User)?;
     let changeset = find_changeset_or_404(&state, &changeset_id).await?;
     if changeset.app_id != app_id || changeset.author_user_id != auth.user_id {
@@ -234,7 +240,26 @@ pub async fn submit_changeset(
             .replace_for_changeset(&app_id, &changeset_id, &input)
             .await?;
     }
-    Ok(Json(ApiResponse::ok(submitted)))
+    let job = conman_db::JobRepo::new(state.db.clone())
+        .enqueue(conman_db::EnqueueJobInput {
+            app_id: app_id.clone(),
+            job_type: JobType::MsuiteSubmit,
+            entity_type: "changeset".to_string(),
+            entity_id: changeset_id.clone(),
+            payload: serde_json::json!({
+                "gate": "submit",
+                "app_id": app_id,
+                "changeset_id": changeset_id,
+            }),
+            max_retries: 1,
+            timeout_ms: 10 * 60 * 1000,
+            created_by: Some(auth.user_id.clone()),
+        })
+        .await?;
+    Ok(Json(ApiResponse::ok(SubmitResponse {
+        changeset: submitted,
+        job,
+    })))
 }
 
 pub async fn resubmit_changeset(
@@ -242,7 +267,7 @@ pub async fn resubmit_changeset(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, changeset_id)): Path<(String, String)>,
     Json(req): Json<SubmitRequest>,
-) -> Result<Json<ApiResponse<Changeset>>, ApiConmanError> {
+) -> Result<Json<ApiResponse<SubmitResponse>>, ApiConmanError> {
     auth.require_role(&app_id, Role::User)?;
     let changeset = find_changeset_or_404(&state, &changeset_id).await?;
     if changeset.app_id != app_id || changeset.author_user_id != auth.user_id {
@@ -274,7 +299,26 @@ pub async fn resubmit_changeset(
             .replace_for_changeset(&app_id, &changeset_id, &input)
             .await?;
     }
-    Ok(Json(ApiResponse::ok(submitted)))
+    let job = conman_db::JobRepo::new(state.db.clone())
+        .enqueue(conman_db::EnqueueJobInput {
+            app_id: app_id.clone(),
+            job_type: JobType::MsuiteSubmit,
+            entity_type: "changeset".to_string(),
+            entity_id: changeset_id.clone(),
+            payload: serde_json::json!({
+                "gate": "resubmit",
+                "app_id": app_id,
+                "changeset_id": changeset_id,
+            }),
+            max_retries: 1,
+            timeout_ms: 10 * 60 * 1000,
+            created_by: Some(auth.user_id.clone()),
+        })
+        .await?;
+    Ok(Json(ApiResponse::ok(SubmitResponse {
+        changeset: submitted,
+        job,
+    })))
 }
 
 pub async fn review_changeset(

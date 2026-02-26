@@ -19,6 +19,7 @@ use crate::handlers::changesets::{
     resubmit_changeset, review_changeset, submit_changeset, update_changeset,
 };
 use crate::handlers::health::health_check;
+use crate::handlers::jobs::{get_job, list_jobs};
 use crate::handlers::workspaces::{
     create_workspace, create_workspace_checkpoint, delete_workspace_file, get_workspace,
     get_workspace_file_or_tree, list_workspaces, reset_workspace, sync_workspace_integration,
@@ -175,8 +176,8 @@ pub fn build_router(state: AppState) -> Router {
             "/api/apps/{appId}/temp-envs/{tempEnvId}",
             delete(not_implemented),
         )
-        .route("/api/apps/{appId}/jobs", get(not_implemented))
-        .route("/api/apps/{appId}/jobs/{jobId}", get(not_implemented))
+        .route("/api/apps/{appId}/jobs", get(list_jobs))
+        .route("/api/apps/{appId}/jobs/{jobId}", get(get_job))
         .route(
             "/api/me/notification-preferences",
             get(not_implemented).patch(not_implemented),
