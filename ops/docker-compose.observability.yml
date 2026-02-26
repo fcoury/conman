@@ -10,6 +10,16 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./alerts/conman-alerts.yml:/etc/prometheus/rules/conman-alerts.yml:ro
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: conman-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
   grafana:
     image: grafana/grafana:11.2.2
     container_name: conman-grafana

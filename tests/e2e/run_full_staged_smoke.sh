@@ -75,6 +75,20 @@ request_assert_200() {
   echo "$file"
 }
 
+request_expect_status() {
+  local expected="$1" method="$2" path="$3" token="$4" body="${5-}"
+  local r status file
+  r=$(request "$method" "$path" "$token" "$body")
+  status=${r%%|*}; file=${r#*|}
+  if [[ "$status" != "$expected" ]]; then
+    echo "expected HTTP ${expected}, got ${status} for ${method} ${path}" >&2
+    cat "$file" >&2
+    rm -f "$file"
+    exit 1
+  fi
+  rm -f "$file"
+}
+
 latest_job_id() {
   local app_id="$1" token="$2" job_type="$3" entity_id_pattern="$4"
   local file
@@ -190,6 +204,15 @@ rm -f "$file"
 file=$(request_assert_200 GET "/api/apps/${APP_ID}/workspaces" "$TOKEN_APP")
 WORKSPACE_ID=$(jq -r ".data[0].id" "$file")
 rm -f "$file"
+
+request_assert_200 PATCH "/api/apps/${APP_ID}/settings" "$TOKEN_APP" "{\"file_size_limit_bytes\":128}" >/dev/null
+request_expect_status 403 PUT "/api/apps/${APP_ID}/workspaces/${WORKSPACE_ID}/files" "$TOKEN_APP" "{\"path\":\".git/config\",\"content\":\"YmxvY2tlZA==\",\"message\":\"blocked-path-check\"}"
+LARGE_CONTENT_B64=$(python3 - <<'PY'
+import base64
+print(base64.b64encode(b"a" * 512).decode())
+PY
+)
+request_expect_status 400 PUT "/api/apps/${APP_ID}/workspaces/${WORKSPACE_ID}/files" "$TOKEN_APP" "{\"path\":\"config/too-big.txt\",\"content\":\"${LARGE_CONTENT_B64}\",\"message\":\"size-guardrail-check\"}"
 
 echo "[5/11] Writing workspace file (UserCommitFiles path)"
 CONTENT_B64=$(printf 'feature: staged-%s\n' "$TS" | base64 | tr -d '\n')
@@ -333,6 +356,8 @@ cat > "$SUMMARY_FILE" <<EOF
 - final_promote_state: ${PROMOTE_STATE}
 - final_rollback_state: ${ROLLBACK_STATE}
 - final_temp_env_state: ${TEMP_ENV_FINAL_STATE}
+- blocked_path_guardrail_verified: true
+- file_size_guardrail_verified: true
 - terminal_job_succeeded: $(jq "[.data[] | select(.state==\"succeeded\")] | length" "$JOBS_FILE")
 - terminal_job_failed: $(jq "[.data[] | select(.state==\"failed\")] | length" "$JOBS_FILE")
 - terminal_job_canceled: $(jq "[.data[] | select(.state==\"canceled\")] | length" "$JOBS_FILE")

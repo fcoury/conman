@@ -85,7 +85,7 @@ Do not merge when prerequisites are incomplete:
 - [x] Required audit events emitted
 - Result: `pass`
 - Date: `2026-02-26`
-- Notes: Live staged runs confirm workspace write + submit/review path with gitaly-rs (`tests/e2e/results/20260226044307-full-e2e-summary.md`).
+- Notes: Live staged runs confirm workspace write + submit/review path with gitaly-rs, including blocked-path and file-size guardrail checks (`tests/e2e/results/20260226044825-full-e2e-summary.md`).
 
 ## Gate C (M2: E07-E08)
 
@@ -105,7 +105,7 @@ Do not merge when prerequisites are incomplete:
 - [x] Temp env provisioning + TTL/grace/cleanup pass
 - Result: `pass`
 - Date: `2026-02-26`
-- Notes: Deploy/promote/rollback and deploy-gate jobs reached terminal success in staged run; temp env provision/expire/undo-expire also succeeded (`tests/e2e/results/20260226044307-full-e2e-summary.md`).
+- Notes: Deploy/promote/rollback and deploy-gate jobs reached terminal success in staged run; temp env provision/expire/undo-expire also succeeded (`tests/e2e/results/20260226044825-full-e2e-summary.md`).
 
 ## Gate E (M4: E11-E12)
 
@@ -116,7 +116,7 @@ Do not merge when prerequisites are incomplete:
 - [x] Hardening/runbooks/load/fault checks complete
 - Result: `pass`
 - Date: `2026-02-26`
-- Notes: Local load/fault drill artifacts + dashboards remain in place and full staged flow is now green against live gitaly-rs (`tests/e2e/results/20260226044307-full-e2e-summary.md`).
+- Notes: Local load/fault drill artifacts + dashboards remain in place and full staged flow is now green against live gitaly-rs (`tests/e2e/results/20260226044825-full-e2e-summary.md`); observability wiring and alert routing checks are captured in `tests/ops/results/20260226044706-observability-wiring-summary.md`.
 
 ## 5) CI Quality Gates (Required for Merge)
 

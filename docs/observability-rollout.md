@@ -2,6 +2,7 @@
 
 ## Production Wiring Artifacts
 - Alerts: `ops/alerts/conman-alerts.yml`
+- Alertmanager routing: `ops/alertmanager/alertmanager.yml`
 - Prometheus config: `ops/prometheus/prometheus.yml`
 - Grafana dashboard JSON: `ops/grafana/dashboards/conman-overview.json`
 - Grafana provisioning:
@@ -20,6 +21,7 @@ docker compose -f docker-compose.observability.yml up -d
 Then verify:
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3001` (admin/admin)
+- Alertmanager: `http://localhost:9093`
 
 ## Production Checklist
 1. Mount `conman-alerts.yml` into Prometheus rules path.
@@ -31,3 +33,4 @@ Then verify:
 ## Drill Evidence
 - Load drill: `tests/load/results/2026-02-26-report.md`
 - Fault drill: `tests/fault/results/2026-02-26-report.md`
+- Observability wiring check: `tests/ops/results/20260226044706-observability-wiring-summary.md`

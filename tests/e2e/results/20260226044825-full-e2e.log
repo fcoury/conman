@@ -1,0 +1,13 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T07:48:26.964792Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3925"},"target":"conman"}
+{"timestamp":"2026-02-26T07:48:27.004219Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e_full_20260226044825"},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:48:30.506846Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:48:30.532627Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T07:48:30.537936Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T07:48:30.551958Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3925"},"target":"conman"}
+{"timestamp":"2026-02-26T07:48:32.566743Z","level":"INFO","fields":{"message":"notification queued for delivery","notification_id":"699ffad0211842b12367e684","user_id":"6fbebbedefebc36344fe06cc","event_type":"changeset_submitted","subject":"Changeset submitted"},"target":"conman_jobs"}
+{"timestamp":"2026-02-26T07:48:35.628559Z","level":"INFO","fields":{"message":"notification queued for delivery","notification_id":"699ffad3211842b12367e694","user_id":"6fbebbedefebc36344fe06cc","event_type":"release_published","subject":"Release published"},"target":"conman_jobs"}
+{"timestamp":"2026-02-26T07:48:37.662005Z","level":"INFO","fields":{"message":"notification queued for delivery","notification_id":"699ffad4211842b12367e69e","user_id":"6fbebbedefebc36344fe06cc","event_type":"deployment_started","subject":"Deployment started"},"target":"conman_jobs"}
+{"timestamp":"2026-02-26T07:48:38.716501Z","level":"INFO","fields":{"message":"notification queued for delivery","notification_id":"699ffad5211842b12367e6a4","user_id":"6fbebbedefebc36344fe06cc","event_type":"deployment_started","subject":"Deployment started"},"target":"conman_jobs"}
+{"timestamp":"2026-02-26T07:48:40.850389Z","level":"INFO","fields":{"message":"notification queued for delivery","notification_id":"699ffad7211842b12367e6af","user_id":"6fbebbedefebc36344fe06cc","event_type":"temp_env_created","subject":"Temporary environment created"},"target":"conman_jobs"}

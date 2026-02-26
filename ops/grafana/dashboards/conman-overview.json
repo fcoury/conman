@@ -43,6 +43,16 @@
           "legendFormat": "deploy events/15m"
         }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Auth Failures (10m)",
+      "targets": [
+        {
+          "expr": "sum(increase(conman_auth_failures_total[10m]))",
+          "legendFormat": "auth failures/10m"
+        }
+      ]
     }
   ]
 }
