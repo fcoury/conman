@@ -26,3 +26,4 @@
 - Staged full-flow smoke: `tests/e2e/results/20260226044825-full-e2e-summary.md`
 - Mongo backup/restore drill: `tests/ops/results/20260226044657-mongo-backup-restore-summary.md`
 - Observability wiring + alert routing: `tests/ops/results/20260226044706-observability-wiring-summary.md`
+- Consolidated readiness report: `tests/ops/run_go_live_readiness_check.sh` (latest output in `tests/ops/results/*-go-live-readiness-summary.md`)

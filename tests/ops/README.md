@@ -10,5 +10,9 @@ evidence artifacts.
   brings up the local observability stack, verifies Prometheus/Alertmanager/
   Grafana health, confirms alert rules and routing, and checks dashboard metric
   coverage.
+- `run_go_live_readiness_check.sh`:
+  verifies go-live evidence presence and reports any remaining human sign-off
+  requirements (master-key runtime config and runbook owner review). Use
+  `--strict` to fail on warnings.
 
 Results are written to `tests/ops/results/`.

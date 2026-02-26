@@ -168,3 +168,7 @@ Rules:
 - [x] Observability dashboards active
 - [x] Security checklist complete
 - [ ] Final sign-off (names/date)
+
+Latest readiness report: `tests/ops/results/20260226075333-go-live-readiness-summary.md`
+(pending warnings: target-env secrets master key confirmation and runbook
+owner checklist completion).
