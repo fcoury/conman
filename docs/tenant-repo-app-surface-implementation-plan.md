@@ -191,7 +191,7 @@ When implementation is complete, these checks must pass.
 
 ### Acceptance command set
 
-1. `./tests/ops/run_tenant_repo_surface_acceptance.sh --strict`
+1. `CONMAN_BASE_URL=... CONMAN_LOGIN_EMAIL=... CONMAN_LOGIN_PASSWORD=... CONMAN_ACCEPTANCE_REPO_PATH=... ./tests/ops/run_tenant_repo_surface_acceptance.sh --strict`
 2. `./tests/e2e/run_full_staged_smoke.sh`
 
 The first command validates the new model contracts. The second command guards

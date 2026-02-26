@@ -25,5 +25,7 @@ evidence artifacts.
   API-level acceptance checks for the tenant/repository/app-surface direction,
   including compatibility with `/api/apps` and runtime profile
   `surface_endpoints` persistence.
+  Typical invocation:
+  `CONMAN_BASE_URL=http://127.0.0.1:3001 CONMAN_LOGIN_EMAIL=... CONMAN_LOGIN_PASSWORD=... CONMAN_ACCEPTANCE_REPO_PATH=... ./tests/ops/run_tenant_repo_surface_acceptance.sh --strict`
 
 Results are written to `tests/ops/results/`.
