@@ -21,6 +21,7 @@ the runbooks and alerts needed to respond to incidents.
 - E12-04: Runbooks for release failure, revalidation storms, temp env cleanup.
 - E12-05: Security checklist (password policy, token expiry, RBAC tests, input
   validation).
+- E12-06: Runtime-profile secret encryption and manual key-rotation drills.
 
 ---
 
@@ -1258,5 +1259,6 @@ Every item must be verified and signed off before production deployment.
 - [ ] RBAC enforced for all permission-gated operations (full matrix tested).
 - [ ] No `.unwrap()` calls in non-test production code (or each is documented
   as intentionally infallible).
+- [ ] Manual runtime secret key rotation drill completed and documented.
 
 **No P0 blockers remaining in the issue tracker.**

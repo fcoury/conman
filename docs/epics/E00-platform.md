@@ -4,7 +4,8 @@
 
 Establish the service skeleton, shared primitives, and infrastructure plumbing so
 that every subsequent epic builds on a consistent foundation of configuration,
-error handling, request tracing, pagination, and database connectivity.
+error handling, request tracing, pagination, database connectivity, and secure
+runtime-profile secrets configuration.
 
 ## 2. Dependencies
 
@@ -53,6 +54,14 @@ pub struct Config {
     /// Invite token lifetime in days.
     /// Env: `CONMAN_INVITE_EXPIRY_DAYS` (default `7`).
     pub invite_expiry_days: u64,
+
+    /// Master key for envelope encryption of runtime-profile secrets.
+    /// Env: `CONMAN_SECRETS_MASTER_KEY` (required).
+    pub secrets_master_key: String,
+
+    /// Domain suffix used for generated temp runtime profile URLs.
+    /// Env: `CONMAN_TEMP_URL_DOMAIN` (required).
+    pub temp_url_domain: String,
 }
 
 impl Config {
@@ -94,6 +103,16 @@ impl Config {
                 message: "CONMAN_INVITE_EXPIRY_DAYS must be a valid u64".to_string(),
             })?;
 
+        let secrets_master_key = std::env::var("CONMAN_SECRETS_MASTER_KEY")
+            .map_err(|_| ConmanError::Validation {
+                message: "CONMAN_SECRETS_MASTER_KEY is required".to_string(),
+            })?;
+
+        let temp_url_domain = std::env::var("CONMAN_TEMP_URL_DOMAIN")
+            .map_err(|_| ConmanError::Validation {
+                message: "CONMAN_TEMP_URL_DOMAIN is required".to_string(),
+            })?;
+
         Ok(Self {
             listen_addr,
             mongo_uri: std::env::var("CONMAN_MONGO_URI")
@@ -105,6 +124,8 @@ impl Config {
             jwt_secret,
             jwt_expiry_hours,
             invite_expiry_days,
+            secrets_master_key,
+            temp_url_domain,
         })
     }
 }

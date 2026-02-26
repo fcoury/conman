@@ -35,7 +35,8 @@ Issues:
 
 1. E00-01: Create server modules and routing skeleton under `/api`.
 2. E00-02: Add MongoDB connection, health checks, and collection bootstrap.
-3. E00-03: Add config system (env vars, feature flags, limits).
+3. E00-03: Add config system (env vars, feature flags, limits, runtime profile
+   encryption keys, temp URL domain).
 4. E00-04: Standard error envelope + request tracing IDs.
 5. E00-05: Add pagination helpers (`page`, `limit`) and validation middleware.
 
@@ -100,6 +101,8 @@ Issues:
    blocked paths, file size limit.
 3. E03-03: Environment stage CRUD with canonical user-facing environment flag.
 4. E03-04: Membership listing and role assignment APIs.
+5. E03-05: Runtime profile CRUD/revisions, environment linkage, and canonical
+   approval policy config.
 
 Acceptance:
 
@@ -143,6 +146,8 @@ Issues:
 5. E05-05: Diff endpoints (`raw`, `semantic`) and semantic diff contract.
 6. E05-06: Comment threads with editable comments + revision history.
 7. E05-07: AI analyze/chat endpoints scoped to workspace/changeset.
+8. E05-08: Changeset profile overrides (`changeset_profile_overrides`) with
+   release-travel semantics.
 
 Acceptance:
 
@@ -158,9 +163,11 @@ Goal: Run mandatory checks asynchronously with logs and status APIs.
 Issues:
 
 1. E06-01: Generic jobs framework (`queued/running/succeeded/failed/canceled`).
-2. E06-02: Job worker for `msuite_submit`, `msuite_merge`, `msuite_deploy`.
+2. E06-02: Job worker for `msuite_submit`, `msuite_merge`, `msuite_deploy`,
+   and runtime-profile drift check jobs.
 3. E06-03: Structured job logs and result payload storage.
-4. E06-04: Gate hooks in submit/queue/release/deploy flows.
+4. E06-04: Gate hooks in submit/queue/release/deploy flows with configurable
+   runtime profile scope and command.
 5. E06-05: Retry and timeout policies with failure reason codes.
 
 Acceptance:
@@ -182,6 +189,8 @@ Issues:
 4. E07-04: Conflict + full `msuite` revalidation for queued changesets.
 5. E07-05: Transition to `conflicted` or `needs_revalidation` and return-to-draft
    operations (author or config manager).
+6. E07-06: Detect override-key collisions between queued changesets and mark
+   later ones `conflicted`.
 
 Acceptance:
 
@@ -202,6 +211,7 @@ Issues:
    `rYYYY.MM.DD.N`.
 4. E08-04: Persist release metadata (`published_sha`, actor, timestamps).
 5. E08-05: Release state machine enforcement.
+6. E08-06: Env-profile-only validation gate at publish.
 
 Acceptance:
 
@@ -223,6 +233,8 @@ Issues:
 4. E09-04: Deployment lock scope per environment.
 5. E09-05: Rollback mode A: `revert(integration_branch) + new release`.
 6. E09-06: Rollback mode B: redeploy prior release tag.
+7. E09-07: Runtime profile drift check (env vars, secrets, URL, DB settings,
+   migrations) and deploy block until revalidation.
 
 Acceptance:
 
@@ -242,6 +254,8 @@ Issues:
 3. E10-03: Soft expiry + 1h grace + undo-expire.
 4. E10-04: Manual TTL extension endpoint.
 5. E10-05: Cleanup workers and DB teardown.
+6. E10-06: Derive temp runtime profiles from base profile with readable URL
+   generation and Mongo snapshot->dump/restore strategy.
 
 Acceptance:
 
@@ -261,6 +275,7 @@ Issues:
 3. E11-03: Event fanout for required notifications.
 4. E11-04: Append-only audit event writer + schema enforcement.
 5. E11-05: Backfill audit for critical legacy transitions (if any).
+6. E11-06: Runtime profile and drift notifications.
 
 Acceptance:
 
@@ -281,6 +296,7 @@ Issues:
    deployment success rate).
 4. E12-04: Runbooks for release failure, revalidation storms, temp env cleanup.
 5. E12-05: Security checklist (password policy, token expiry, RBAC tests).
+6. E12-06: Secrets encryption and manual rotation drills.
 
 Acceptance:
 

@@ -5,7 +5,9 @@
 Enable on-demand, isolated validation environments scoped to a workspace or
 changeset. Each temp environment provisions its own database and (optionally) a
 dedicated Git branch so that users can run tests, preview deployments, and
-validate configuration changes without affecting shared environments.
+validate configuration changes without affecting shared environments. Each temp
+environment is derived from a base runtime profile and gets a generated,
+readable URL.
 
 Temp environments are ephemeral by design. A 24-hour idle TTL keeps resource
 usage bounded, with soft expiry and a 1-hour grace period giving users time to
@@ -169,9 +171,19 @@ pub struct TempEnvironment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub changeset_id: Option<ObjectId>,
 
+    /// Base runtime profile used for derivation.
+    pub base_runtime_profile_id: ObjectId,
+
+    /// Effective runtime profile for this temp environment.
+    pub runtime_profile_id: ObjectId,
+
     /// Name of the isolated database provisioned for this environment.
     /// Format: `conman_temp_{app_id_short}_{id_short}`.
     pub db_name: String,
+
+    /// Generated shareable URL for this temp environment.
+    /// Format: `{app}-{kind}-{word}.<domain>`.
+    pub base_url: String,
 
     /// Current lifecycle state.
     pub state: TempEnvState,
@@ -224,6 +236,15 @@ pub struct CreateTempEnvRequest {
     /// Source changeset to snapshot. Mutually exclusive with `workspace_id`.
     #[serde(default)]
     pub changeset_id: Option<String>,
+
+    /// Optional base runtime profile. If omitted, app default is used
+    /// (Development or app-defined special base profile).
+    #[serde(default)]
+    pub base_runtime_profile_id: Option<String>,
+
+    /// Optional env var overrides applied on top of derived runtime profile.
+    #[serde(default)]
+    pub env_var_overrides: std::collections::BTreeMap<String, String>,
 }
 
 /// Response body for temp environment endpoints.
@@ -238,7 +259,10 @@ pub struct TempEnvResponse {
     pub workspace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub changeset_id: Option<String>,
+    pub base_runtime_profile_id: String,
+    pub runtime_profile_id: String,
     pub db_name: String,
+    pub base_url: String,
     pub state: String,
     pub last_activity_at: String,
     pub expires_at: String,
@@ -278,7 +302,10 @@ impl From<TempEnvironment> for TempEnvResponse {
             kind: env.kind.to_string(),
             workspace_id: env.workspace_id.map(|id| id.to_hex()),
             changeset_id: env.changeset_id.map(|id| id.to_hex()),
+            base_runtime_profile_id: env.base_runtime_profile_id.to_hex(),
+            runtime_profile_id: env.runtime_profile_id.to_hex(),
             db_name: env.db_name,
+            base_url: env.base_url,
             state: env.state.to_string(),
             last_activity_at: env.last_activity_at.to_rfc3339(),
             expires_at: env.expires_at.to_rfc3339(),
@@ -304,7 +331,10 @@ Stores one document per temp environment instance.
 | `kind` | String | `"workspace"` or `"changeset"` |
 | `workspace_id` | ObjectId / null | Source workspace (when kind = workspace) |
 | `changeset_id` | ObjectId / null | Source changeset (when kind = changeset) |
+| `base_runtime_profile_id` | ObjectId | Base runtime profile for derivation |
+| `runtime_profile_id` | ObjectId | Effective temp runtime profile |
 | `db_name` | String | Isolated database name for this environment |
+| `base_url` | String | Generated URL (`{app}-{kind}-{word}.<domain>`) |
 | `state` | String | One of: `provisioning`, `active`, `expiring`, `expired`, `deleted` |
 | `last_activity_at` | DateTime | Last activity timestamp (TTL anchor) |
 | `expires_at` | DateTime | Absolute expiry time |
@@ -1558,3 +1588,10 @@ async fn touch_activity_extends_expiry() {
      `Deleted` and enqueues a cleanup job.
    - Allowed from `Active` or `Expiring` state.
    - Returns 204 on success.
+
+8. **Runtime profile derivation and URL generation.**
+   - Temp env runtime profile is derived from selected base environment profile.
+   - Default base is development (or app-defined special base).
+   - Generated URL follows readable host pattern:
+     `{app}-{kind}-{word}.<domain>`.
+   - Special reusable base profiles are managed by `app_admin` only.

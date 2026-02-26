@@ -15,6 +15,7 @@ scoped events when their notification preference is enabled.
 - E11-03: Event fanout for required notifications.
 - E11-04: Append-only audit event writer + schema enforcement.
 - E11-05: Backfill audit for critical legacy transitions (if any).
+- E11-06: Runtime profile and drift event notifications.
 
 ---
 
@@ -27,6 +28,7 @@ scoped events when their notification preference is enabled.
 | E08 Releases | Release assembly, publish, tag lifecycle events |
 | E09 Deployments | Deployment start, succeed, fail, promote, rollback events |
 | E10 Temp Environments | Temp env create, extend, expire, undo events |
+| E03 App Setup | Runtime profile create/update/revision events |
 
 ---
 
@@ -1467,3 +1469,5 @@ from MongoDB (audit events and notification preferences) and the email provider.
   request.
 - [ ] All endpoints follow the standard response envelope and error format.
 - [ ] Pagination works correctly on the audit query endpoint.
+- [ ] Runtime profile changes and drift-blocked deployment events emit
+  notifications and audit entries with correct payload/context.

@@ -6,7 +6,8 @@ Deliver app-level CRUD, per-app settings management, environment pipeline
 metadata, and membership listing/role assignment. After this epic, an
 authenticated app admin can create an app backed by a gitaly repository,
 configure baseline mode, define the environment promotion pipeline, and manage
-team membership.
+team membership. This epic also establishes runtime profiles and links them to
+environments.
 
 **Issues:**
 
@@ -15,6 +16,8 @@ team membership.
   blocked paths, file size limit.
 - E03-03: Environment stage CRUD with canonical user-facing environment flag.
 - E03-04: Membership listing and role assignment APIs.
+- E03-05: Runtime profile CRUD/revisions, environment linkage, and canonical
+  profile approval policy settings.
 
 ---
 
@@ -112,6 +115,38 @@ pub struct App {
     pub settings: AppSettings,
     /// User who created the app.
     pub created_by: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+```
+
+### conman-core/src/models/runtime_profile.rs
+
+```rust
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeProfileKind {
+    PersistentEnv,
+    TempWorkspace,
+    TempChangeset,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeProfile {
+    pub id: String,
+    pub app_id: String,
+    pub name: String,
+    pub kind: RuntimeProfileKind,
+    pub base_url: String,
+    pub env_vars: std::collections::BTreeMap<String, String>,
+    pub secrets_encrypted: std::collections::BTreeMap<String, String>,
+    pub database_engine: String, // mongodb in v1
+    pub connection_ref: String,
+    pub provisioning_mode: String,
+    pub base_profile_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -1024,6 +1059,10 @@ impl GitalyClient {
 - [ ] Exactly one environment per app is marked canonical at all times.
 - [ ] Environment removal is blocked when the environment has active deployments.
 - [ ] Any app member can list environments and members.
+- [ ] Runtime profiles can be created, updated, and revisioned per app.
+- [ ] Each environment can be linked to a runtime profile.
+- [ ] Canonical env profile approval policy is configurable
+  (`same_as_changeset` or `stricter_two_approvals`).
 - [ ] All mutations emit audit events with before/after snapshots.
 - [ ] All endpoints follow the standard response envelope and error format.
 - [ ] Pagination works correctly on list endpoints.

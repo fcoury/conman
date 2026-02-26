@@ -4,7 +4,7 @@
 
 Implement the full changeset lifecycle from creation through approval, including
 review workflow, inline/threaded comments with revision history, semantic and raw
-diffs, and AI analysis endpoints.
+diffs, runtime profile overrides, and AI analysis endpoints.
 
 ## 2. Dependencies
 
@@ -12,6 +12,7 @@ diffs, and AI analysis endpoints.
 |------------|-----------------|
 | **E02 Auth & RBAC** | `AuthUser` extractor, role checks (`reviewer`, `config_manager`, `app_admin`) for review actions |
 | **E04 Workspaces** | `Workspace` domain type, workspace repository, `head_sha` resolution, branch naming (`ws/<user>/<app>`) |
+| **E03 App Setup** | Runtime profiles and environment linkage metadata |
 | **E01 Git Adapter** | `GitalyClient` for diff generation, commit resolution, and blob content retrieval |
 | **E00 Platform** | Error envelope, pagination, MongoDB bootstrap, audit infrastructure |
 
@@ -1353,3 +1354,7 @@ comparison.
 11. **Queue and recovery:** `config_manager+` can queue approved changesets. `Conflicted` and `NeedsRevalidation` changesets can be moved to draft by their author or by `config_manager+`.
 
 12. **AI endpoints respond:** `POST /analyze` and `POST /chat` return structured responses scoped to the changeset's diff context. Failures in the AI service return `502 Bad Gateway`.
+
+13. **Profile overrides are tracked and auditable:** Changeset-level runtime
+    profile overrides are stored in `changeset_profile_overrides`, included in
+    release flow, and emit audit events on create/update.

@@ -7,7 +7,8 @@ After a release is published (E08), config managers need to deploy it to
 environments, promote it across the pipeline (Dev -> QA -> UAT -> Prod), and
 recover from bad deployments via two rollback strategies. Skip-stage and
 concurrent multi-environment deployments are exceptional flows requiring
-two-user approval.
+two-user approval. Deploy operations are blocked on runtime profile drift until
+revalidation passes.
 
 This epic introduces the `Deployment` domain object, environment-scoped locking,
 the `deploy_release` async job worker, and the Git-level operations for rollback
@@ -1638,3 +1639,8 @@ async fn deploy_emits_audit_event() {
    - Every deployment creation, promotion, and rollback emits an audit event
      with `entity_type: "deployment"`, the relevant action, and before/after
      state snapshots.
+
+9. **Runtime profile drift blocks deploys.**
+   - Drift across env vars, secrets, URL, DB settings, or migration set
+     differences returns conflict and blocks deployment until revalidation
+     succeeds.

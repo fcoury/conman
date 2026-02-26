@@ -19,6 +19,8 @@ Key outcomes:
   `NeedsRevalidation` and can be returned to `Draft` by the author or a
   privileged user.
 - A changeset branch must be up to date with the integration branch before it can enter the queue.
+- Queued changesets with conflicting runtime override keys are marked
+  `Conflicted` (later entry loses).
 
 ## 2. Dependencies
 
@@ -857,3 +859,7 @@ message Repository {
 10. **Audit trail:** All queue mutations (queue entry, reorder, revalidation
     outcomes, move-to-draft) are captured in the audit log with actor, timestamp,
     and before/after state.
+
+11. **Override-key conflict handling:** If two queued changesets override the
+    same env var key for the same target runtime profile, the later changeset
+    transitions to `Conflicted`.

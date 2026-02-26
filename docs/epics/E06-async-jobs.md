@@ -4,7 +4,8 @@
 
 Provide a generic asynchronous job framework that runs mandatory checks and
 long-running operations (msuite validation, release assembly, deployment,
-revalidation, temp-env provisioning) with state tracking, structured logs,
+revalidation, runtime-profile drift checks, temp-env provisioning) with state
+tracking, structured logs,
 retry/timeout policies, and gate hooks that block workflow transitions on job
 outcomes. After this epic, every flow that requires an external or long-running
 operation uses the jobs subsystem rather than inlining work in the HTTP request
@@ -18,6 +19,7 @@ cycle.
 |------------|--------|
 | **E00 Platform Foundation** | MongoDB connection, error types, config, pagination |
 | **E05 Changesets** | Submit and queue flows trigger msuite jobs; gate hooks read job results |
+| **E03 App Setup** | Runtime profile configuration and validation gate defaults |
 
 Soft consumers (not blocked, but will call into the framework):
 
@@ -48,6 +50,7 @@ pub enum JobType {
     RevalidateQueuedChangeset,
     ReleaseAssemble,
     DeployRelease,
+    RuntimeProfileDriftCheck,
     TempEnvProvision,
     TempEnvExpire,
 }
@@ -971,3 +974,7 @@ E09).
 10. **Horizontal scalability.** Multiple `JobRunner` instances can run in
     parallel (e.g. across pods) with correctness guaranteed by the atomic
     claim. No external coordination service is required.
+
+11. **Profile-aware gate defaults.** Gate configuration supports:
+    submit -> temp profile only, release publish -> environment profiles only,
+    deploy -> target environment profile only.

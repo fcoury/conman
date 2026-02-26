@@ -7,13 +7,15 @@ Git-tagged artifacts. A config manager selects which queued changesets to includ
 orders them manually, triggers composition (sequential merge onto `integration_branch`), and
 publishes the result as a lightweight tag (`rYYYY.MM.DD.N`). Published releases
 are immutable and auditable. After publish, remaining queued changesets are
-revalidated against the new `integration_branch` HEAD.
+revalidated against the new `integration_branch` HEAD. Publish also enforces
+environment-profile validation gates.
 
 ## 2. Dependencies
 
 | Epic | What it provides |
 |------|-----------------|
 | E01 Git Adapter | `GitalyClient` with Tonic channel, retry logic, `app_to_gitaly_repo()` helper |
+| E03 App Setup | Runtime profile definitions and environment linkage |
 | E06 Async Jobs | Job framework (`jobs` collection, runner, worker trait, job state machine) |
 | E07 Queue Orchestration | Queued changeset pool, revalidation trigger interface |
 
@@ -2131,3 +2133,7 @@ async fn published_release_rejects_re_assembly() {
      reordering, assembly start, and publish.
    - Audit events include before/after state, actor, and Git SHA where
      applicable.
+
+8. **Env-profile validation gate at publish.**
+   - Release publish runs required environment-profile validation jobs.
+   - Publish is blocked when the configured env-profile validation fails.

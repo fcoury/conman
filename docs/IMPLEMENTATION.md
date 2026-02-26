@@ -10,7 +10,8 @@ repositories. API-only backend in Rust.
 **Architecture:** Axum HTTP server exposing a REST API. Git operations delegated
 to a running gitaly-rs instance via gRPC (Tonic client). MongoDB stores workflow
 state, audit trails, and app metadata. Async job runner handles long-running
-operations (msuite, revalidation, deployments).
+operations (msuite, revalidation, deployments). Runtime profiles model URL/env
+vars/secrets/database/data configuration for environments and temp envs.
 
 **Tech Stack:**
 
@@ -31,6 +32,7 @@ operations (msuite, revalidation, deployments).
 | UUID | uuid | latest |
 
 **Full scope:** [`docs/conman-v1-scope.md`](./conman-v1-scope.md)
+and [`docs/runtime-profiles-draft.md`](./runtime-profiles-draft.md)
 
 ---
 
@@ -303,6 +305,8 @@ Loaded from environment variables with `CONMAN_` prefix:
 | `CONMAN_JWT_SECRET` | (required) | JWT signing secret |
 | `CONMAN_JWT_EXPIRY_HOURS` | `24` | JWT token lifetime |
 | `CONMAN_INVITE_EXPIRY_DAYS` | `7` | Invite token lifetime |
+| `CONMAN_SECRETS_MASTER_KEY` | (required) | Master key for envelope encryption of runtime secrets |
+| `CONMAN_TEMP_URL_DOMAIN` | (required) | Base domain for generated temp runtime URLs |
 
 ---
 
@@ -317,6 +321,7 @@ Loaded from environment variables with `CONMAN_` prefix:
 | Changeset | Reviewable proposal: workspace HEAD vs integration baseline |
 | Release | Immutable Git tag (`rYYYY.MM.DD.N`) of composed changesets |
 | Environment | Deploy target stage (Dev, QA, UAT, Prod) |
+| Runtime Profile | Versioned runtime blueprint (URL, env vars, secrets, DB/data strategy) |
 | Canonical env | Production-facing environment for baseline calculations |
 | Baseline | The reference point workspaces branch from (integration branch HEAD or canonical env release) |
 
@@ -388,6 +393,30 @@ fn resolve_baseline(app: &App, envs: &[Environment], releases: &[Release]) -> St
 }
 ```
 
+### Runtime profile defaults
+
+```rust
+pub struct ValidationGates {
+    // submit: temp profile only
+    pub submit_scope: ValidationScope, // TempOnly
+    // release publish: environment profiles only
+    pub release_scope: ValidationScope, // EnvOnly
+    // deploy: target environment profile only
+    pub deploy_scope: ValidationScope, // TargetEnvOnly
+}
+```
+
+Runtime profile rules in v1:
+
+- Profiles are versioned and tied to releases.
+- Precedence is `app defaults < environment profile < temp overrides`.
+- Secrets are encrypted at rest via envelope encryption (master key from
+  config, per-record data keys).
+- Canonical environment profile changes default to stricter two-approval policy
+  (configurable to `same_as_changeset`).
+- Deploy is blocked on profile drift across env vars, secrets, URL, DB settings,
+  or migration set differences.
+
 ---
 
 ## 5. Epic Index
@@ -401,16 +430,16 @@ test cases.
 | [E00](epics/E00-platform.md) | Platform Foundation | none | Server skeleton, MongoDB bootstrap, config, error envelope, pagination |
 | [E01](epics/E01-git-adapter.md) | Git Adapter | E00 | Tonic client wrapping gitaly-rs gRPC services |
 | [E02](epics/E02-auth.md) | Auth & RBAC | E00 | Local auth, invites, memberships, role-based access |
-| [E03](epics/E03-app-setup.md) | App Setup | E01, E02 | App CRUD, settings, environment metadata |
+| [E03](epics/E03-app-setup.md) | App Setup | E01, E02 | App CRUD, settings, environment metadata, runtime profiles |
 | [E04](epics/E04-workspaces.md) | Workspaces | E01, E03 | Workspace lifecycle, file operations, guardrails |
-| [E05](epics/E05-changesets.md) | Changesets | E02, E04 | Changeset lifecycle, review, comments, revisions, diffs |
-| [E06](epics/E06-async-jobs.md) | Async Jobs | E00, E05 | Job framework, msuite workers, gate hooks |
-| [E07](epics/E07-queue.md) | Queue Orchestration | E05, E06 | Queue-first workflow, revalidation loop |
-| [E08](epics/E08-releases.md) | Releases | E01, E06, E07 | Release assembly, composition, tagging, publish |
-| [E09](epics/E09-deployments.md) | Deployments | E03, E06, E08 | Deploy, promote, skip-stage, rollback |
-| [E10](epics/E10-temp-envs.md) | Temp Environments | E03, E06 | On-demand envs, TTL, grace period, cleanup |
-| [E11](epics/E11-notifications.md) | Notifications & Audit | E05-E10 | Email notifications, audit completeness |
-| [E12](epics/E12-hardening.md) | Hardening | E08-E11 | Load testing, fault injection, SLOs, runbooks |
+| [E05](epics/E05-changesets.md) | Changesets | E02, E04 | Changeset lifecycle, review, comments, diffs, profile overrides |
+| [E06](epics/E06-async-jobs.md) | Async Jobs | E00, E05 | Job framework, msuite workers, profile-aware gates/drift jobs |
+| [E07](epics/E07-queue.md) | Queue Orchestration | E05, E06 | Queue-first workflow, revalidation loop, override-key conflicts |
+| [E08](epics/E08-releases.md) | Releases | E01, E06, E07 | Release assembly, env-profile validation, tagging, publish |
+| [E09](epics/E09-deployments.md) | Deployments | E03, E06, E08 | Deploy, promote, skip-stage, rollback, drift blocking |
+| [E10](epics/E10-temp-envs.md) | Temp Environments | E03, E06 | On-demand envs, profile derivation, TTL, cleanup |
+| [E11](epics/E11-notifications.md) | Notifications & Audit | E05-E10 | Email notifications, audit completeness, runtime profile events |
+| [E12](epics/E12-hardening.md) | Hardening | E08-E11 | Load testing, fault injection, encryption/rotation runbooks |
 
 ### Critical path
 

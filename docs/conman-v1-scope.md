@@ -141,6 +141,29 @@ Conman v1 model:
 - Conman uses an internal Git adapter service boundary; adapter
   implementation targets `gitaly-rs` in v1.
 
+### 3.12 Runtime profiles
+
+- Runtime configuration is modeled as a first-class `RuntimeProfile` and is
+  versioned with releases.
+- Runtime variable precedence is:
+  `app defaults < environment profile < temp profile overrides`.
+- Runtime profile overrides may be attached to changesets and travel with
+  release/promotion.
+- If two queued changesets override the same env var key, the later changeset
+  becomes `conflicted`.
+- Canonical user-facing environment profile changes require configurable policy:
+  `same_as_changeset` or `stricter_two_approvals` (default).
+- Deployment is blocked on runtime profile drift until revalidation passes.
+- v1 DB engine scope is MongoDB only.
+- Temp DB provisioning defaults to snapshot clone with dump/restore fallback.
+- Secrets are encrypted at rest in Conman (no external secret manager required
+  for v1).
+- Temp environment URLs are auto-generated and human-readable.
+- Validation defaults:
+  - submit: temp profile only
+  - release publish: environment profiles only
+  - deploy: target environment profile only
+
 ## 4) Roles and RBAC
 
 Roles:
@@ -268,9 +291,12 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 - `changeset_reviews`
 - `changeset_comments`
 - `changeset_comment_revisions`
+- `changeset_profile_overrides`
 - `release_batches`
 - `release_changesets`
 - `environments`
+- `runtime_profiles`
+- `runtime_profile_revisions`
 - `deployments`
 - `temp_environments`
 - `jobs`
@@ -289,6 +315,39 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 - `file_size_limit_bytes` (default 5 MB)
 - `blocked_paths[]`
 - `commit_mode_default` (`submit_commit` | `manual_checkpoint`)
+- `runtime_profile_approval_policy` (`same_as_changeset` |
+  `stricter_two_approvals`)
+- `temp_url_domain`
+- `validation_gates` (submit/release/deploy profile scope + command overrides)
+
+`environments`
+
+- `id`, `app_id`, `name`, `position`, `is_canonical`
+- `runtime_profile_id`
+- `branch_ref`
+
+`runtime_profiles`
+
+- `id`, `app_id`, `name`, `kind`
+- `base_url`, `env_vars`, `secrets_encrypted`
+- `database` (`engine=mongodb`, `connection_ref`, `provisioning_mode`,
+  `base_profile_id?`)
+- `data_strategy` (`seed_mode`, `seed_source_ref?`)
+- `lifecycle` (`ttl_idle_hours?`, `grace_hours?`, `auto_cleanup`)
+- `created_by`, `created_at`, `updated_at`
+
+`runtime_profile_revisions`
+
+- `id`, `runtime_profile_id`, `revision_number`
+- `snapshot`, `created_by`, `created_at`
+
+`changeset_profile_overrides`
+
+- `id`, `changeset_id`, `app_id`
+- `target_environment_id?`, `target_profile_id?`
+- `env_var_overrides`, `secret_overrides_encrypted`
+- `database_overrides`, `data_overrides`
+- `created_by`, `updated_by`, `created_at`, `updated_at`
 
 `workspaces`
 
@@ -323,6 +382,8 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 - `id`, `app_id`, `kind` (`workspace` | `changeset`)
 - `workspace_id?`, `changeset_id?`
 - `db_name`, `state`, `last_activity_at`, `expires_at`, `grace_until`
+- `base_runtime_profile_id`, `runtime_profile_id`
+- `base_url_generated`
 
 `audit_events`
 
@@ -372,6 +433,8 @@ Base path: `/api`
 - `POST /api/apps/:appId/changesets/:changesetId/review`
 - `POST /api/apps/:appId/changesets/:changesetId/queue`
 - `POST /api/apps/:appId/changesets/:changesetId/move-to-draft`
+- `GET /api/apps/:appId/changesets/:changesetId/profile-overrides`
+- `PUT /api/apps/:appId/changesets/:changesetId/profile-overrides`
 
 ## 8.5 Diffs, comments, and AI
 
@@ -441,7 +504,17 @@ interface SemanticDiffResponse {
 - `POST /api/apps/:appId/environments/:envId/rollback`
 - `GET /api/apps/:appId/deployments?page=&limit=`
 
-## 8.8 Temp environments and jobs
+## 8.8 Runtime profiles
+
+- `GET /api/apps/:appId/runtime-profiles?page=&limit=`
+- `POST /api/apps/:appId/runtime-profiles`
+- `GET /api/apps/:appId/runtime-profiles/:profileId`
+- `PATCH /api/apps/:appId/runtime-profiles/:profileId`
+- `GET /api/apps/:appId/runtime-profiles/:profileId/revisions?page=&limit=`
+- `POST /api/apps/:appId/runtime-profiles/:profileId/revert`
+- `POST /api/apps/:appId/runtime-profiles/:profileId/rotate-key` (manual)
+
+## 8.9 Temp environments and jobs
 
 - `POST /api/apps/:appId/temp-envs` (workspace or changeset)
 - `GET /api/apps/:appId/temp-envs?page=&limit=`
@@ -451,7 +524,7 @@ interface SemanticDiffResponse {
 - `GET /api/apps/:appId/jobs/:jobId`
 - `GET /api/apps/:appId/jobs?page=&limit=&type=&state=`
 
-## 8.9 Notifications and auth
+## 8.10 Notifications and auth
 
 - `GET /api/me/notification-preferences`
 - `PATCH /api/me/notification-preferences`
@@ -471,6 +544,7 @@ Job types:
 - `revalidate_queued_changeset`
 - `release_assemble`
 - `deploy_release`
+- `runtime_profile_drift_check`
 - `temp_env_provision`
 - `temp_env_expire`
 
@@ -511,7 +585,9 @@ Audit everything immutable and append-only:
 - workspace creation/reset/sync
 - file edits/deletes/checkpoints
 - changeset submit/resubmit/review/queue/state changes
+- changeset profile override changes
 - comment creation and comment edits
+- runtime profile create/update/revert/rotation
 - release compose/reorder/publish
 - deployment/promotion/rollback
 - temp env create/extend/expire/undo
@@ -531,6 +607,11 @@ Retention: keep forever in v1.
   - checkpoint/submit controls
 - Changeset list and detail/review UI.
 - Queue view for config managers (prioritize and reorder).
+- Runtime profile editor:
+  - environment profile assignment
+  - env vars and secret values (encrypted storage)
+  - DB provisioning mode and base profile selection
+  - revision history and manual key rotation actions
 - Release builder page:
   - select queued changesets
   - reorder
@@ -565,12 +646,14 @@ Retention: keep forever in v1.
 - Workspace CRUD and file editing with guardrails.
 - Changeset creation/submit/review and approval reset behavior.
 - Async `msuite` at submit.
+- Runtime profile schema, storage, and environment linkage.
 
 ### Phase B: Queue and releases
 
 - Queue-first workflow and revalidation.
 - Release draft/assemble/reorder/publish.
 - Tagging (`rYYYY.MM.DD.N`) and immutable release records.
+- Changeset profile override flow and override conflict detection.
 
 ### Phase C: Environments and temp envs
 
@@ -578,14 +661,17 @@ Retention: keep forever in v1.
 - Skip-stage 2-approval flow.
 - Rollback modes (revert+new release and redeploy prior tag).
 - Temp env lifecycle with TTL, grace period, and undo.
+- Runtime profile drift checks and deploy-block rules.
 
 ### Phase D: Hardening
 
 - Auditing completeness verification.
 - Email notifications and user toggle.
 - Operational limits, retries, observability, and backfill tooling.
+- Secrets encryption hardening and manual key-rotation runbooks.
 
 ## 15) Open Items to Confirm During Implementation
 
 - Final email provider and templates.
 - Locking mechanism details for per-environment concurrent deployment safety.
+- Runtime profile URL generator wordlist/domain strategy.
