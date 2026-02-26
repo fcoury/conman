@@ -17,5 +17,9 @@ evidence artifacts.
 - `complete_runbook_signoff.sh`:
   helper for on-call owners to complete `docs/runbooks/REVIEW-SIGNOFF.md`
   consistently (`date`, `reviewer`, and all runbook checkboxes).
+- `run_plan_completion_gate.sh`:
+  single gate for milestone completion that checks tracker/checklists,
+  executes tests + clippy + docs build, and runs readiness checks; writes a
+  timestamped summary report. Use `--strict` to fail on warnings.
 
 Results are written to `tests/ops/results/`.

@@ -171,3 +171,4 @@ Rules:
 
 Latest readiness report: `tests/ops/results/20260226075757-go-live-readiness-summary.md`
 Final sign-off: `2026-02-26` (`fcoury`).
+Plan completion gate (strict): `tests/ops/results/20260226080015-plan-completion-gate-summary.md`.

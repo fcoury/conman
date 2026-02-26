@@ -28,3 +28,4 @@
 - Observability wiring + alert routing: `tests/ops/results/20260226044706-observability-wiring-summary.md`
 - Consolidated readiness report: `tests/ops/run_go_live_readiness_check.sh` (latest output in `tests/ops/results/*-go-live-readiness-summary.md`)
 - Strict readiness pass: `tests/ops/results/20260226075757-go-live-readiness-summary.md`
+- Plan completion gate (strict): `tests/ops/results/20260226080015-plan-completion-gate-summary.md`

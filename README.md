@@ -73,6 +73,17 @@ Optional explicit project:
 CLOUDFLARE_PAGES_BRANCH=main ./scripts/publish-docs-site.sh conman-docs
 ```
 
+## Delivery Gate
+
+Run the end-to-end plan completion gate:
+
+```bash
+CONMAN_SECRETS_MASTER_KEY='<prod-key>' ./tests/ops/run_plan_completion_gate.sh --strict
+```
+
+This verifies milestone/checklist completion, runs tests + clippy, rebuilds
+the docs site, and records a summary under `tests/ops/results/`.
+
 ## Notes
 
 - Git operations are planned behind an internal adapter boundary, with
