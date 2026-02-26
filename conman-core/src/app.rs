@@ -1,17 +1,12 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum BaselineMode {
     IntegrationHead,
+    #[default]
     CanonicalEnvRelease,
-}
-
-impl Default for BaselineMode {
-    fn default() -> Self {
-        Self::CanonicalEnvRelease
-    }
 }
 
 impl std::str::FromStr for BaselineMode {
@@ -26,17 +21,12 @@ impl std::str::FromStr for BaselineMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CommitMode {
+    #[default]
     SubmitCommit,
     ManualCheckpoint,
-}
-
-impl Default for CommitMode {
-    fn default() -> Self {
-        Self::SubmitCommit
-    }
 }
 
 impl std::str::FromStr for CommitMode {
@@ -51,17 +41,12 @@ impl std::str::FromStr for CommitMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfileApprovalPolicy {
     SameAsChangeset,
+    #[default]
     StricterTwoApprovals,
-}
-
-impl Default for ProfileApprovalPolicy {
-    fn default() -> Self {
-        Self::StricterTwoApprovals
-    }
 }
 
 impl std::str::FromStr for ProfileApprovalPolicy {

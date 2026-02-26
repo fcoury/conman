@@ -25,3 +25,7 @@
 ## Artifacts
 - Prometheus alert rules: `ops/alerts/conman-alerts.yml`
 - Grafana starter dashboard: `ops/grafana/conman-overview.json`
+- Rollout/wiring guide: `docs/observability-rollout.md`
+- Latest drill reports:
+  - `tests/load/results/2026-02-26-report.md`
+  - `tests/fault/results/2026-02-26-report.md`

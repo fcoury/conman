@@ -168,7 +168,7 @@ impl AppRepo {
 
         self.find_by_id(&app_id_hex)
             .await?
-            .ok_or_else(|| ConmanError::NotFound {
+            .ok_or(ConmanError::NotFound {
                 entity: "app",
                 id: app_id_hex,
             })

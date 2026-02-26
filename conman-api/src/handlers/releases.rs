@@ -429,17 +429,17 @@ pub async fn publish_release(
         {
             Ok(sha) => compose_head = sha,
             Err(err) => {
-                if let ConmanError::Git { message } = &err {
-                    if message.to_ascii_lowercase().contains("conflict") {
-                        let _ = changeset_repo.mark_conflicted(&changeset.id).await;
-                        return Err(ConmanError::Conflict {
-                            message: format!(
-                                "changeset {} conflicts during release compose and was moved to conflicted",
-                                changeset.id
-                            ),
-                        }
-                        .into());
+                if let ConmanError::Git { message } = &err
+                    && message.to_ascii_lowercase().contains("conflict")
+                {
+                    let _ = changeset_repo.mark_conflicted(&changeset.id).await;
+                    return Err(ConmanError::Conflict {
+                        message: format!(
+                            "changeset {} conflicts during release compose and was moved to conflicted",
+                            changeset.id
+                        ),
                     }
+                    .into());
                 }
                 return Err(err.into());
             }

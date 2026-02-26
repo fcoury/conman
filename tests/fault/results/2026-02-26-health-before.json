@@ -1,0 +1,1 @@
+{"status":"degraded","components":[{"name":"mongo","status":"healthy"},{"name":"gitaly","status":"unhealthy"},{"name":"job_runner","status":"healthy"}]}

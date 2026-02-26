@@ -120,7 +120,7 @@ impl EnvironmentRepo {
                     .and_then(|id| ObjectId::parse_str(id).ok());
                 EnvironmentDoc {
                     id: ObjectId::new(),
-                    app_id: app_id_obj.clone(),
+                    app_id: app_id_obj,
                     name: entry.name.clone(),
                     position: entry.position,
                     is_canonical: entry.is_canonical,

@@ -10,3 +10,6 @@ Expected environment variables:
 - `BASE_URL`
 - `APP_ID`
 - `TOKEN`
+
+Latest recorded run:
+- `tests/load/results/2026-02-26-report.md`

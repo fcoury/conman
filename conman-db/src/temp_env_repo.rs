@@ -10,6 +10,28 @@ use uuid::Uuid;
 
 use crate::EnsureIndexes;
 
+const SLUG_WORDS: &[&str] = &[
+    "amber", "atlas", "banyan", "birch", "brisk", "cedar", "cobalt", "coral", "crisp", "dawn",
+    "delta", "ember", "fable", "fjord", "flint", "forest", "glade", "golden", "harbor", "hazel",
+    "helium", "indigo", "jaguar", "juniper", "kepler", "lagoon", "linen", "lumen", "maple",
+    "meadow", "merlin", "mint", "nebula", "noble", "nova", "onyx", "opal", "orchid", "orbit",
+    "otter", "pearl", "pine", "pluto", "prairie", "quartz", "rain", "raven", "ridge", "river",
+    "sable", "sage", "scarlet", "sequoia", "solstice", "spruce", "summit", "sunny", "tango",
+    "topaz", "valley", "velvet", "violet", "willow", "zephyr",
+];
+
+fn readable_slug(uuid: Uuid) -> String {
+    let bytes = uuid.into_bytes();
+    let first = SLUG_WORDS[usize::from(bytes[0]) % SLUG_WORDS.len()];
+    let second = SLUG_WORDS[usize::from(bytes[1]) % SLUG_WORDS.len()];
+    let suffix = format!("{:02x}{:02x}", bytes[14], bytes[15]);
+    format!("{first}-{second}-{suffix}")
+}
+
+fn app_slug_prefix(app_id: &str) -> String {
+    app_id.chars().take(8).collect::<String>()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TempEnvDoc {
     #[serde(rename = "_id")]
@@ -107,17 +129,16 @@ impl TempEnvRepo {
         let now = Utc::now();
         let idle_ttl_seconds = 24 * 3600;
         let grace_ttl_seconds = 3600;
-        let short = Uuid::now_v7()
-            .to_string()
-            .split('-')
-            .next()
-            .unwrap_or("temp")
-            .to_string();
+        let short = readable_slug(Uuid::now_v7());
         let kind_label = match input.kind {
             TempEnvKind::Workspace => "ws",
             TempEnvKind::Changeset => "cs",
         };
-        let url = format!("{}-{kind_label}-{short}.{}", input.app_id, input.url_domain);
+        let url = format!(
+            "{}-{kind_label}-{short}.{}",
+            app_slug_prefix(&input.app_id),
+            input.url_domain
+        );
         let db_name = format!("tmp_{}_{}", input.app_id, short);
 
         let row = TempEnvDoc {
@@ -405,5 +426,23 @@ impl EnsureIndexes for TempEnvRepo {
                 message: format!("failed to ensure temp env indexes: {e}"),
             })?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn readable_slug_is_human_friendly() {
+        let slug = readable_slug(Uuid::now_v7());
+        assert!(slug.contains('-'));
+        assert!(slug.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
+    }
+
+    #[test]
+    fn app_slug_prefix_limits_length() {
+        assert_eq!(app_slug_prefix("1234567890abcdef"), "12345678");
+        assert_eq!(app_slug_prefix("abc"), "abc");
     }
 }

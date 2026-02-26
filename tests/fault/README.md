@@ -7,3 +7,6 @@ Track and execute these drills:
 - revalidation storm after release publish
 
 Record diagnosis time, recovery time, and follow-up actions for each run.
+
+Latest recorded run:
+- `tests/fault/results/2026-02-26-report.md`

@@ -15,11 +15,10 @@ Use this file as the live control plane for delivery.
 - Current wave: `E`
 - Current milestone: `M4`
 - Overall progress:
-  - Epics complete: `9 / 13`
+  - Epics complete: `10 / 13`
   - Gates passed: `2 / 5`
 - Active blockers:
-  - E11 still needs audit completeness assertions for critical mutations
-  - E12 still needs executed load/fault results and production dashboard wiring
+  - E12 still needs staged real-repo load/fault runs (with test gitaly + seeded repos)
 
 ## 2) Epic Tracker (Dependency Controlled)
 
@@ -41,8 +40,8 @@ Legend:
 | E08 Releases | worker-queue-release | E01, E06, E07 | C | done | master | 100 |  |
 | E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 92 | Drift/deploy gates are command-backed; provider-specific deployment executors remain app-specific |
 | E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 95 | Provision/expire hooks are command-backed and TTL/grace cleanup is active; provider integrations still app-specific |
-| E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 90 | Outbox drain + SMTP provider path shipped; full audit completeness assertions pending |
-| E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 78 | Metrics, throttling, runbooks, test scaffolding, security guards, alert/dashboard artifacts, and component-level health checks shipped; load/fault execution pending |
+| E11 Notifications & Audit | worker-observability | E05-E10 | E | done | master | 100 |  |
+| E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 88 | Local load/fault drills and dashboard provisioning wiring are done; staged real-repo load/fault runs remain |
 
 ## 3) Dependency Gate Rules (Hard Stop)
 
@@ -83,7 +82,7 @@ Do not merge when prerequisites are incomplete:
 - [x] E06 merged
 - [ ] End-to-end: author -> submit -> review path works
 - [x] Async jobs run and gate transitions
-- [ ] Required audit events emitted
+- [x] Required audit events emitted
 - Result: `pass | fail`
 - Date:
 - Notes:
@@ -110,14 +109,14 @@ Do not merge when prerequisites are incomplete:
 
 ## Gate E (M4: E11-E12)
 
-- [ ] E11 merged
+- [x] E11 merged
 - [ ] E12 merged
 - [ ] Notification coverage complete
-- [ ] Audit completeness validated
+- [x] Audit completeness validated
 - [ ] Hardening/runbooks/load/fault checks complete
 - Result: `pass | fail`
 - Date:
-- Notes:
+- Notes: Local load/fault drill artifacts and production dashboard provisioning files were added; staged real-repo drills remain open.
 
 ## 5) CI Quality Gates (Required for Merge)
 
