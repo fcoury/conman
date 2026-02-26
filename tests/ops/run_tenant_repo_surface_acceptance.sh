@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STRICT=0
+if [[ "${1:-}" == "--strict" ]]; then
+  STRICT=1
+fi
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+OPS_RESULTS_DIR="$ROOT/tests/ops/results"
+mkdir -p "$OPS_RESULTS_DIR"
+
+STAMP="$(date -u +%Y%m%d%H%M%S)"
+SUMMARY_FILE="$OPS_RESULTS_DIR/${STAMP}-tenant-repo-surface-acceptance-summary.md"
+
+BASE_URL="${CONMAN_BASE_URL:-http://127.0.0.1:3000}"
+TOKEN="${CONMAN_TOKEN:-}"
+REPO_PATH="${CONMAN_ACCEPTANCE_REPO_PATH:-}"
+INTEGRATION_BRANCH="${CONMAN_ACCEPTANCE_INTEGRATION_BRANCH:-main}"
+
+PASS_COUNT=0
+FAIL_COUNT=0
+WARN_COUNT=0
+RESULTS=()
+
+record_pass() {
+  PASS_COUNT=$((PASS_COUNT + 1))
+  RESULTS+=("| $1 | pass | $2 |")
+}
+
+record_fail() {
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+  RESULTS+=("| $1 | fail | $2 |")
+}
+
+record_warn() {
+  WARN_COUNT=$((WARN_COUNT + 1))
+  RESULTS+=("| $1 | warn | $2 |")
+}
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+require_cmd curl
+require_cmd jq
+
+api_call() {
+  local method="$1"
+  local path="$2"
+  local body="${3-}"
+  local tmp status
+  tmp="$(mktemp)"
+  if [[ -n "$body" ]]; then
+    status="$(curl -sS -o "$tmp" -w "%{http_code}" -X "$method" "$BASE_URL$path" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      --data "$body")"
+  else
+    status="$(curl -sS -o "$tmp" -w "%{http_code}" -X "$method" "$BASE_URL$path" \
+      -H "Authorization: Bearer $TOKEN")"
+  fi
+  echo "$status|$tmp"
+}
+
+expect_status_any() {
+  local label="$1"
+  local expected_csv="$2"
+  local method="$3"
+  local path="$4"
+  local body="${5-}"
+  local res status file ok
+  res="$(api_call "$method" "$path" "$body")"
+  status="${res%%|*}"
+  file="${res#*|}"
+  ok=0
+  IFS=',' read -r -a allowed <<<"$expected_csv"
+  for code in "${allowed[@]}"; do
+    if [[ "$status" == "$code" ]]; then
+      ok=1
+      break
+    fi
+  done
+  if [[ "$ok" -eq 0 ]]; then
+    record_fail "$label" "Expected HTTP $expected_csv, got $status for $method $path"
+    cat "$file" >&2 || true
+    rm -f "$file"
+    return 1
+  fi
+  echo "$file"
+}
+
+if [[ -z "$TOKEN" ]]; then
+  record_fail "Precondition: auth token" "Set CONMAN_TOKEN to a valid bearer token."
+fi
+
+if [[ -z "$REPO_PATH" ]]; then
+  record_fail "Precondition: repo path" "Set CONMAN_ACCEPTANCE_REPO_PATH to an existing Git repo path known to Conman/gitaly."
+fi
+
+if [[ "$FAIL_COUNT" -gt 0 ]]; then
+  {
+    echo "# Tenant/Repo/App Surface Acceptance"
+    echo
+    echo "- Generated at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
+    echo "- Base URL: \`$BASE_URL\`"
+    echo "- Strict mode: \`$STRICT\`"
+    echo "- Pass: \`$PASS_COUNT\`"
+    echo "- Warn: \`$WARN_COUNT\`"
+    echo "- Fail: \`$FAIL_COUNT\`"
+    echo
+    echo "| Check | Result | Notes |"
+    echo "|---|---|---|"
+    printf '%s\n' "${RESULTS[@]}"
+  } > "$SUMMARY_FILE"
+  echo "Wrote acceptance summary: $SUMMARY_FILE"
+  exit 1
+fi
+
+if file="$(expect_status_any "Health endpoint" "200" GET "/api/health")"; then
+  record_pass "TRS-AC-01a health endpoint" "\`/api/health\` reachable."
+  rm -f "$file"
+fi
+
+TENANT_SLUG="tenant-acceptance-${STAMP}"
+TENANT_NAME="Tenant Acceptance ${STAMP}"
+TENANT_PAYLOAD="$(jq -cn --arg n "$TENANT_NAME" --arg s "$TENANT_SLUG" '{name:$n,slug:$s}')"
+
+if file="$(expect_status_any "Create tenant" "200,201" POST "/api/tenants" "$TENANT_PAYLOAD")"; then
+  TENANT_ID="$(jq -r '.data.id // empty' "$file")"
+  if [[ -n "$TENANT_ID" ]]; then
+    record_pass "TRS-AC-01 tenant create" "Created tenant \`$TENANT_ID\`."
+  else
+    record_fail "TRS-AC-01 tenant create" "Response missing \`data.id\`."
+  fi
+  rm -f "$file"
+fi
+
+if [[ -n "${TENANT_ID:-}" ]]; then
+  if file="$(expect_status_any "Get tenant" "200" GET "/api/tenants/${TENANT_ID}")"; then
+    GOT_ID="$(jq -r '.data.id // empty' "$file")"
+    if [[ "$GOT_ID" == "$TENANT_ID" ]]; then
+      record_pass "TRS-AC-01 tenant read" "Tenant lookup returns matching id."
+    else
+      record_fail "TRS-AC-01 tenant read" "Tenant lookup id mismatch."
+    fi
+    rm -f "$file"
+  fi
+fi
+
+REPO_NAME="repo-acceptance-${STAMP}"
+REPO_PAYLOAD="$(jq -cn \
+  --arg n "$REPO_NAME" \
+  --arg p "$REPO_PATH" \
+  --arg b "$INTEGRATION_BRANCH" \
+  '{name:$n,repo_path:$p,integration_branch:$b}')"
+
+if [[ -n "${TENANT_ID:-}" ]]; then
+  if file="$(expect_status_any "Create repo under tenant" "200,201" POST "/api/tenants/${TENANT_ID}/repos" "$REPO_PAYLOAD")"; then
+    REPO_ID="$(jq -r '.data.id // empty' "$file")"
+    if [[ -n "$REPO_ID" ]]; then
+      record_pass "TRS-AC-02 repo create" "Created repo \`$REPO_ID\`."
+    else
+      record_fail "TRS-AC-02 repo create" "Response missing \`data.id\`."
+    fi
+    rm -f "$file"
+  fi
+fi
+
+if [[ -n "${REPO_ID:-}" ]]; then
+  if file="$(expect_status_any "Get repo by id" "200" GET "/api/repos/${REPO_ID}")"; then
+    GOT_ID="$(jq -r '.data.id // empty' "$file")"
+    if [[ "$GOT_ID" == "$REPO_ID" ]]; then
+      record_pass "TRS-AC-02 repo read" "\`/api/repos/:id\` returns expected repo."
+    else
+      record_fail "TRS-AC-02 repo read" "Repo id mismatch from \`/api/repos/:id\`."
+    fi
+    rm -f "$file"
+  fi
+
+  if file="$(expect_status_any "Compatibility get app by id" "200" GET "/api/apps/${REPO_ID}")"; then
+    GOT_ID="$(jq -r '.data.id // empty' "$file")"
+    if [[ "$GOT_ID" == "$REPO_ID" ]]; then
+      record_pass "TRS-AC-03 apps compatibility" "\`/api/apps/:id\` compatibility is intact."
+    else
+      record_fail "TRS-AC-03 apps compatibility" "Compatibility id mismatch."
+    fi
+    rm -f "$file"
+  fi
+
+  S1_PAYLOAD="$(jq -cn --arg key "lims" --arg title "LIMS" --arg d "lims-${STAMP}.example.test" \
+    '{key:$key,title:$title,domains:[$d]}')"
+  S2_PAYLOAD="$(jq -cn --arg key "portal" --arg title "Provider Portal" --arg d "portal-${STAMP}.example.test" \
+    '{key:$key,title:$title,domains:[$d]}')"
+
+  if file="$(expect_status_any "Create app surface lims" "200,201" POST "/api/repos/${REPO_ID}/surfaces" "$S1_PAYLOAD")"; then
+    SURFACE_1_ID="$(jq -r '.data.id // empty' "$file")"
+    rm -f "$file"
+  fi
+  if file="$(expect_status_any "Create app surface portal" "200,201" POST "/api/repos/${REPO_ID}/surfaces" "$S2_PAYLOAD")"; then
+    SURFACE_2_ID="$(jq -r '.data.id // empty' "$file")"
+    rm -f "$file"
+  fi
+
+  if [[ -n "${SURFACE_1_ID:-}" && -n "${SURFACE_2_ID:-}" ]]; then
+    record_pass "TRS-AC-04 surface create" "Created two surfaces for repo."
+  else
+    record_fail "TRS-AC-04 surface create" "Failed to create both required surfaces."
+  fi
+
+  if file="$(expect_status_any "List app surfaces" "200" GET "/api/repos/${REPO_ID}/surfaces")"; then
+    KEYS="$(jq -r '.data[]?.key' "$file" | sort | tr '\n' ' ')"
+    if [[ "$KEYS" == *"lims"* && "$KEYS" == *"portal"* ]]; then
+      record_pass "TRS-AC-04 surface list" "Surface list contains \`lims\` and \`portal\`."
+    else
+      record_fail "TRS-AC-04 surface list" "Surface list missing expected keys."
+    fi
+    rm -f "$file"
+  fi
+
+  PROFILE_PAYLOAD="$(jq -cn \
+    --arg name "Acceptance Dev ${STAMP}" \
+    --arg base "https://fallback-${STAMP}.example.test" \
+    --arg lims "https://lims-${STAMP}.example.test" \
+    --arg portal "https://portal-${STAMP}.example.test" \
+    '{
+      name:$name,
+      kind:"persistent_env",
+      base_url:$base,
+      surface_endpoints:{lims:$lims,portal:$portal},
+      env_vars:{FEATURE_X:{type:"boolean",value:true}},
+      secrets:{API_KEY:"acceptance-secret"},
+      database_engine:"mongodb",
+      connection_ref:"mongodb://dev-db:27017/conman_acceptance",
+      provisioning_mode:"managed",
+      migration_paths:["migrations"],
+      migration_command:"echo migrate"
+    }')"
+
+  if file="$(expect_status_any "Create runtime profile with surface endpoints" "200,201" POST "/api/apps/${REPO_ID}/runtime-profiles" "$PROFILE_PAYLOAD")"; then
+    PROFILE_ID="$(jq -r '.data.id // empty' "$file")"
+    if [[ -n "$PROFILE_ID" ]]; then
+      record_pass "TRS-AC-05 runtime profile create" "Created runtime profile \`$PROFILE_ID\`."
+    else
+      record_fail "TRS-AC-05 runtime profile create" "Runtime profile response missing id."
+    fi
+    rm -f "$file"
+  fi
+
+  if [[ -n "${PROFILE_ID:-}" ]]; then
+    if file="$(expect_status_any "Get runtime profile" "200" GET "/api/apps/${REPO_ID}/runtime-profiles/${PROFILE_ID}")"; then
+      LIMS_EP="$(jq -r '.data.surface_endpoints.lims // empty' "$file")"
+      PORTAL_EP="$(jq -r '.data.surface_endpoints.portal // empty' "$file")"
+      if [[ -n "$LIMS_EP" && -n "$PORTAL_EP" ]]; then
+        record_pass "TRS-AC-05 runtime profile read" "Runtime profile returns persisted \`surface_endpoints\`."
+      else
+        record_fail "TRS-AC-05 runtime profile read" "Missing \`surface_endpoints\` in runtime profile response."
+      fi
+      rm -f "$file"
+    fi
+
+    ENV_PAYLOAD="$(jq -cn --arg profile "$PROFILE_ID" '{
+      environments:[
+        {name:"dev",position:1,is_canonical:false,runtime_profile_id:$profile},
+        {name:"prod",position:2,is_canonical:true,runtime_profile_id:$profile}
+      ]
+    }')"
+    if file="$(expect_status_any "Patch environments with runtime profile" "200" PATCH "/api/apps/${REPO_ID}/environments" "$ENV_PAYLOAD")"; then
+      CNT="$(jq -r '.data | length' "$file")"
+      if [[ "${CNT:-0}" -ge 2 ]]; then
+        record_pass "TRS-AC-06 env profile linkage" "Environment set references runtime profile."
+      else
+        record_fail "TRS-AC-06 env profile linkage" "Environment patch did not return expected entries."
+      fi
+      rm -f "$file"
+    fi
+  fi
+fi
+
+if [[ "$FAIL_COUNT" -eq 0 ]]; then
+  record_warn "TRS-AC-07 lifecycle regression guard" "Run \`tests/e2e/run_full_staged_smoke.sh\` separately to validate full legacy lifecycle flow."
+fi
+
+{
+  echo "# Tenant/Repo/App Surface Acceptance"
+  echo
+  echo "- Generated at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
+  echo "- Base URL: \`$BASE_URL\`"
+  echo "- Repo path: \`$REPO_PATH\`"
+  echo "- Strict mode: \`$STRICT\`"
+  echo "- Pass: \`$PASS_COUNT\`"
+  echo "- Warn: \`$WARN_COUNT\`"
+  echo "- Fail: \`$FAIL_COUNT\`"
+  echo
+  echo "| Check | Result | Notes |"
+  echo "|---|---|---|"
+  printf '%s\n' "${RESULTS[@]}"
+} > "$SUMMARY_FILE"
+
+echo "Wrote acceptance summary: $SUMMARY_FILE"
+
+if [[ "$FAIL_COUNT" -gt 0 ]]; then
+  echo "Acceptance failed with $FAIL_COUNT hard failures."
+  exit 1
+fi
+
+if [[ "$STRICT" -eq 1 && "$WARN_COUNT" -gt 0 ]]; then
+  echo "Acceptance strict mode failed with $WARN_COUNT warnings."
+  exit 2
+fi
+
+echo "Acceptance checks completed."

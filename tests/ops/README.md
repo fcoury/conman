@@ -21,5 +21,9 @@ evidence artifacts.
   single gate for milestone completion that checks tracker/checklists,
   executes tests + clippy + docs build, and runs readiness checks; writes a
   timestamped summary report. Use `--strict` to fail on warnings.
+- `run_tenant_repo_surface_acceptance.sh`:
+  API-level acceptance checks for the tenant/repository/app-surface direction,
+  including compatibility with `/api/apps` and runtime profile
+  `surface_endpoints` persistence.
 
 Results are written to `tests/ops/results/`.

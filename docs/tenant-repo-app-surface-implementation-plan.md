@@ -174,3 +174,25 @@ Done when:
   `integration_branch`), so this change is mostly additive + naming clarity.
 - Because this is pre-production and single-user, we can keep the backfill
   lightweight and local without rollout orchestration.
+
+## Automated acceptance criteria
+
+When implementation is complete, these checks must pass.
+
+| ID | Criteria | Automated check |
+|---|---|---|
+| TRS-AC-01 | Tenant can be created and queried. | `run_tenant_repo_surface_acceptance.sh` |
+| TRS-AC-02 | Repository can be created under a tenant and queried via `/api/repos/:id`. | `run_tenant_repo_surface_acceptance.sh` |
+| TRS-AC-03 | `/api/apps/:id` compatibility still works for repo records. | `run_tenant_repo_surface_acceptance.sh` |
+| TRS-AC-04 | Two app surfaces can be created and listed for one repo. | `run_tenant_repo_surface_acceptance.sh` |
+| TRS-AC-05 | Runtime profile stores and returns `surface_endpoints`. | `run_tenant_repo_surface_acceptance.sh` |
+| TRS-AC-06 | Environment configuration can reference runtime profiles after model change. | `run_tenant_repo_surface_acceptance.sh` |
+| TRS-AC-07 | Existing lifecycle smoke remains functional after model change. | `tests/e2e/run_full_staged_smoke.sh` |
+
+### Acceptance command set
+
+1. `./tests/ops/run_tenant_repo_surface_acceptance.sh --strict`
+2. `./tests/e2e/run_full_staged_smoke.sh`
+
+The first command validates the new model contracts. The second command guards
+against regressions in the current app/workspace/changeset/release/deploy flow.
