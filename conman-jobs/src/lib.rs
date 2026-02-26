@@ -1,8 +1,14 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use conman_core::{ConmanError, Job, JobType};
-use conman_db::{EnqueueJobInput, JobRepo};
+use chrono::{Duration as ChronoDuration, Utc};
+use conman_core::{
+    ChangesetState, ConmanError, DeploymentState, Job, JobState, JobType, TempEnvState,
+};
+use conman_db::{
+    ChangesetProfileOverrideRepo, ChangesetRepo, DeploymentRepo, EnqueueJobInput, JobRepo,
+    ReleaseRepo, TempEnvRepo,
+};
 use serde_json::json;
 
 #[async_trait]
@@ -20,9 +26,222 @@ impl JobWorker for NoopWorker {
     }
 }
 
+pub struct ReleaseAssembleWorker {
+    releases: ReleaseRepo,
+}
+
+#[async_trait]
+impl JobWorker for ReleaseAssembleWorker {
+    async fn run(&self, job: &Job) -> Result<serde_json::Value, String> {
+        let release = self
+            .releases
+            .set_state(&job.entity_id, conman_core::ReleaseState::Validated)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(json!({
+            "status": "validated",
+            "release_id": release.id,
+            "state": release.state,
+        }))
+    }
+}
+
+pub struct DeployReleaseWorker {
+    deployments: DeploymentRepo,
+}
+
+#[async_trait]
+impl JobWorker for DeployReleaseWorker {
+    async fn run(&self, job: &Job) -> Result<serde_json::Value, String> {
+        self.deployments
+            .set_state(&job.entity_id, DeploymentState::Running)
+            .await
+            .map_err(|e| e.to_string())?;
+        let deployment = self
+            .deployments
+            .set_state(&job.entity_id, DeploymentState::Succeeded)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(json!({
+            "status": "deployed",
+            "deployment_id": deployment.id,
+            "state": deployment.state,
+        }))
+    }
+}
+
+pub struct TempEnvProvisionWorker {
+    temp_envs: TempEnvRepo,
+}
+
+#[async_trait]
+impl JobWorker for TempEnvProvisionWorker {
+    async fn run(&self, job: &Job) -> Result<serde_json::Value, String> {
+        let _temp_env = self
+            .temp_envs
+            .set_state(&job.entity_id, TempEnvState::Active, None)
+            .await
+            .map_err(|e| e.to_string())?;
+        let temp_env = self
+            .temp_envs
+            .touch_activity(&job.entity_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(json!({
+            "status": "active",
+            "temp_env_id": temp_env.id,
+            "url": temp_env.url,
+            "state": temp_env.state,
+        }))
+    }
+}
+
+pub struct TempEnvExpireWorker {
+    temp_envs: TempEnvRepo,
+}
+
+#[async_trait]
+impl JobWorker for TempEnvExpireWorker {
+    async fn run(&self, job: &Job) -> Result<serde_json::Value, String> {
+        let Some(temp_env) = self
+            .temp_envs
+            .find_by_id(&job.entity_id)
+            .await
+            .map_err(|e| e.to_string())?
+        else {
+            return Ok(json!({"status": "skipped", "reason": "not_found"}));
+        };
+        let now = Utc::now();
+        match temp_env.state {
+            TempEnvState::Provisioning | TempEnvState::Active => {
+                if temp_env.expires_at <= now {
+                    let grace = now + ChronoDuration::seconds(temp_env.grace_ttl_seconds);
+                    let row = self
+                        .temp_envs
+                        .set_state(&temp_env.id, TempEnvState::Expiring, Some(grace))
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    Ok(json!({
+                        "status": "expiring",
+                        "temp_env_id": row.id,
+                        "grace_expires_at": row.grace_expires_at,
+                    }))
+                } else {
+                    Ok(json!({"status": "skipped", "reason": "not_due"}))
+                }
+            }
+            TempEnvState::Expiring | TempEnvState::Deleted | TempEnvState::Expired => {
+                if temp_env.grace_expires_at.is_some_and(|grace| grace <= now) {
+                    self.temp_envs
+                        .hard_delete(&temp_env.id)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    Ok(json!({
+                        "status": "deleted",
+                        "temp_env_id": temp_env.id,
+                    }))
+                } else {
+                    Ok(json!({"status": "skipped", "reason": "in_grace"}))
+                }
+            }
+        }
+    }
+}
+
+pub struct RevalidateQueuedChangesetWorker {
+    changesets: ChangesetRepo,
+    overrides: ChangesetProfileOverrideRepo,
+}
+
+#[async_trait]
+impl JobWorker for RevalidateQueuedChangesetWorker {
+    async fn run(&self, job: &Job) -> Result<serde_json::Value, String> {
+        let Some(changeset) = self
+            .changesets
+            .find_by_id(&job.entity_id)
+            .await
+            .map_err(|e| e.to_string())?
+        else {
+            return Ok(json!({"status": "skipped", "reason": "not_found"}));
+        };
+        if changeset.state != ChangesetState::Queued {
+            return Ok(json!({"status": "skipped", "reason": "not_queued"}));
+        }
+
+        let current_overrides = self
+            .overrides
+            .list_by_changeset(&changeset.id)
+            .await
+            .map_err(|e| e.to_string())?;
+        let queued = self
+            .changesets
+            .list_queued_by_app(&changeset.app_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        let current_position = changeset.queue_position.unwrap_or(i64::MAX);
+
+        for other in queued {
+            if other.id == changeset.id {
+                continue;
+            }
+            if other.queue_position.unwrap_or(i64::MAX) >= current_position {
+                continue;
+            }
+            let other_overrides = self
+                .overrides
+                .list_by_changeset(&other.id)
+                .await
+                .map_err(|e| e.to_string())?;
+            for current in &current_overrides {
+                let conflict = other_overrides.iter().any(|existing| {
+                    current.key == existing.key
+                        && current.target_profile_id == existing.target_profile_id
+                        && current.value != existing.value
+                });
+                if conflict {
+                    let row = self
+                        .changesets
+                        .mark_conflicted(&changeset.id)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    return Ok(json!({
+                        "status": "conflicted",
+                        "changeset_id": row.id,
+                        "conflict_with": other.id,
+                    }));
+                }
+            }
+        }
+
+        let force_fail = job
+            .payload
+            .get("force_fail")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if force_fail {
+            let row = self
+                .changesets
+                .mark_needs_revalidation(&changeset.id)
+                .await
+                .map_err(|e| e.to_string())?;
+            return Ok(json!({
+                "status": "needs_revalidation",
+                "changeset_id": row.id,
+            }));
+        }
+
+        Ok(json!({
+            "status": "revalidated",
+            "changeset_id": changeset.id,
+            "state": changeset.state,
+        }))
+    }
+}
+
 #[derive(Clone)]
 pub struct JobRunner {
     repo: JobRepo,
+    temp_env_repo: TempEnvRepo,
     workers: Arc<HashMap<JobType, Arc<dyn JobWorker>>>,
     poll_interval: Duration,
 }
@@ -30,22 +249,45 @@ pub struct JobRunner {
 impl JobRunner {
     pub fn new(db: mongodb::Database) -> Self {
         let mut workers: HashMap<JobType, Arc<dyn JobWorker>> = HashMap::new();
-        for job_type in [
-            JobType::MsuiteSubmit,
-            JobType::MsuiteMerge,
-            JobType::MsuiteDeploy,
+        workers.insert(JobType::MsuiteSubmit, Arc::new(NoopWorker));
+        workers.insert(JobType::MsuiteMerge, Arc::new(NoopWorker));
+        workers.insert(JobType::MsuiteDeploy, Arc::new(NoopWorker));
+        workers.insert(
             JobType::RevalidateQueuedChangeset,
+            Arc::new(RevalidateQueuedChangesetWorker {
+                changesets: ChangesetRepo::new(db.clone()),
+                overrides: ChangesetProfileOverrideRepo::new(db.clone()),
+            }),
+        );
+        workers.insert(
             JobType::ReleaseAssemble,
+            Arc::new(ReleaseAssembleWorker {
+                releases: ReleaseRepo::new(db.clone()),
+            }),
+        );
+        workers.insert(
             JobType::DeployRelease,
-            JobType::RuntimeProfileDriftCheck,
+            Arc::new(DeployReleaseWorker {
+                deployments: DeploymentRepo::new(db.clone()),
+            }),
+        );
+        workers.insert(JobType::RuntimeProfileDriftCheck, Arc::new(NoopWorker));
+        workers.insert(
             JobType::TempEnvProvision,
+            Arc::new(TempEnvProvisionWorker {
+                temp_envs: TempEnvRepo::new(db.clone()),
+            }),
+        );
+        workers.insert(
             JobType::TempEnvExpire,
-        ] {
-            workers.insert(job_type, Arc::new(NoopWorker));
-        }
+            Arc::new(TempEnvExpireWorker {
+                temp_envs: TempEnvRepo::new(db.clone()),
+            }),
+        );
 
         Self {
-            repo: JobRepo::new(db),
+            repo: JobRepo::new(db.clone()),
+            temp_env_repo: TempEnvRepo::new(db),
             workers: Arc::new(workers),
             poll_interval: Duration::from_secs(1),
         }
@@ -66,6 +308,8 @@ impl JobRunner {
     }
 
     pub async fn tick(&self) -> Result<(), ConmanError> {
+        self.enqueue_due_temp_env_expiry_jobs().await?;
+
         let Some(job) = self.repo.reserve_next_queued().await? else {
             return Ok(());
         };
@@ -104,6 +348,40 @@ impl JobRunner {
             }
         }
 
+        Ok(())
+    }
+
+    async fn enqueue_due_temp_env_expiry_jobs(&self) -> Result<(), ConmanError> {
+        let due = self.temp_env_repo.list_due_for_expiry_scan(100).await?;
+        for temp_env in due {
+            let existing = self
+                .repo
+                .latest_for_entity(
+                    &temp_env.app_id,
+                    "temp_environment",
+                    &temp_env.id,
+                    JobType::TempEnvExpire,
+                )
+                .await?;
+            let has_inflight = existing
+                .map(|job| matches!(job.state, JobState::Queued | JobState::Running))
+                .unwrap_or(false);
+            if has_inflight {
+                continue;
+            }
+            self.repo
+                .enqueue(EnqueueJobInput {
+                    app_id: temp_env.app_id.clone(),
+                    job_type: JobType::TempEnvExpire,
+                    entity_type: "temp_environment".to_string(),
+                    entity_id: temp_env.id.clone(),
+                    payload: json!({"trigger": "idle_ttl_scan"}),
+                    max_retries: 1,
+                    timeout_ms: 10 * 60 * 1000,
+                    created_by: None,
+                })
+                .await?;
+        }
         Ok(())
     }
 

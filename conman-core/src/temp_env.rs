@@ -32,6 +32,7 @@ pub struct TempEnvironment {
     pub db_name: String,
     pub idle_ttl_seconds: i64,
     pub grace_ttl_seconds: i64,
+    pub last_activity_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub grace_expires_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,

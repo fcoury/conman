@@ -227,6 +227,9 @@ pub async fn deploy_environment(
         &auth.user_id,
     )
     .await?;
+    let deployment = conman_db::DeploymentRepo::new(state.db.clone())
+        .attach_job(&deployment.id, &job.id)
+        .await?;
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
@@ -329,6 +332,9 @@ pub async fn rollback_environment(
         &auth.user_id,
     )
     .await?;
+    let deployment = conman_db::DeploymentRepo::new(state.db.clone())
+        .attach_job(&deployment.id, &job.id)
+        .await?;
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),

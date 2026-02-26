@@ -340,9 +340,42 @@ pub async fn publish_release(
     let release = repo
         .publish(&release_id, published_sha, &auth.user_id)
         .await?;
-    conman_db::ChangesetRepo::new(state.db.clone())
+    let changeset_repo = conman_db::ChangesetRepo::new(state.db.clone());
+    changeset_repo
         .mark_released_batch(&release.ordered_changeset_ids)
         .await?;
+    let job_repo = conman_db::JobRepo::new(state.db.clone());
+    for queued in changeset_repo.list_queued_by_app(&app_id).await? {
+        let existing = job_repo
+            .latest_for_entity(
+                &app_id,
+                "changeset",
+                &queued.id,
+                JobType::RevalidateQueuedChangeset,
+            )
+            .await?;
+        let has_inflight = existing
+            .map(|job| matches!(job.state, JobState::Queued | JobState::Running))
+            .unwrap_or(false);
+        if has_inflight {
+            continue;
+        }
+        job_repo
+            .enqueue(conman_db::EnqueueJobInput {
+                app_id: app_id.clone(),
+                job_type: JobType::RevalidateQueuedChangeset,
+                entity_type: "changeset".to_string(),
+                entity_id: queued.id,
+                payload: serde_json::json!({
+                    "trigger": "post_release_publish",
+                    "release_id": release.id.clone(),
+                }),
+                max_retries: 1,
+                timeout_ms: 10 * 60 * 1000,
+                created_by: Some(auth.user_id.clone()),
+            })
+            .await?;
+    }
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),

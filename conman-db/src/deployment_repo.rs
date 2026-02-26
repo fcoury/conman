@@ -183,6 +183,104 @@ impl DeploymentRepo {
         }
         Ok((rows, total))
     }
+
+    pub async fn find_by_id(&self, id: &str) -> Result<Option<Deployment>, ConmanError> {
+        let id = ObjectId::parse_str(id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid deployment id: {e}"),
+        })?;
+        let row = self
+            .collection
+            .find_one(doc! {"_id": id})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to find deployment: {e}"),
+            })?;
+        Ok(row.map(Into::into))
+    }
+
+    pub async fn attach_job(
+        &self,
+        deployment_id: &str,
+        job_id: &str,
+    ) -> Result<Deployment, ConmanError> {
+        let deployment_id =
+            ObjectId::parse_str(deployment_id).map_err(|e| ConmanError::Validation {
+                message: format!("invalid deployment_id: {e}"),
+            })?;
+        let job_id = ObjectId::parse_str(job_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid job_id: {e}"),
+        })?;
+        let now = Utc::now();
+        let row = self
+            .collection
+            .find_one_and_update(
+                doc! {"_id": deployment_id},
+                doc! {"$set": {"job_id": job_id, "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+            )
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to attach deployment job: {e}"),
+            })?
+            .ok_or_else(|| ConmanError::NotFound {
+                entity: "deployment",
+                id: deployment_id.to_hex(),
+            })?;
+        Ok(row.into())
+    }
+
+    pub async fn set_state(
+        &self,
+        deployment_id: &str,
+        state: DeploymentState,
+    ) -> Result<Deployment, ConmanError> {
+        let deployment_id =
+            ObjectId::parse_str(deployment_id).map_err(|e| ConmanError::Validation {
+                message: format!("invalid deployment_id: {e}"),
+            })?;
+        let now = Utc::now();
+        let state_bson = mongodb::bson::to_bson(&state).map_err(|e| ConmanError::Internal {
+            message: format!("failed to encode deployment state: {e}"),
+        })?;
+        let started_at = if state == DeploymentState::Running {
+            Some(mongodb::bson::DateTime::from_millis(now.timestamp_millis()))
+        } else {
+            None
+        };
+        let finished_at = if matches!(
+            state,
+            DeploymentState::Succeeded | DeploymentState::Failed | DeploymentState::Canceled
+        ) {
+            Some(mongodb::bson::DateTime::from_millis(now.timestamp_millis()))
+        } else {
+            None
+        };
+
+        let mut set_doc = doc! {
+            "state": state_bson,
+            "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis()),
+        };
+        if let Some(started_at) = started_at {
+            set_doc.insert("started_at", started_at);
+        }
+        if let Some(finished_at) = finished_at {
+            set_doc.insert("finished_at", finished_at);
+        }
+
+        let row = self
+            .collection
+            .find_one_and_update(doc! {"_id": deployment_id}, doc! {"$set": set_doc})
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to set deployment state: {e}"),
+            })?
+            .ok_or_else(|| ConmanError::NotFound {
+                entity: "deployment",
+                id: deployment_id.to_hex(),
+            })?;
+        Ok(row.into())
+    }
 }
 
 #[async_trait::async_trait]

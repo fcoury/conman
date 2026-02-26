@@ -202,6 +202,9 @@ pub async fn undo_expire_temp_env(
     let temp_env = conman_db::TempEnvRepo::new(state.db.clone())
         .set_state(&temp_env_id, TempEnvState::Active, None)
         .await?;
+    let temp_env = conman_db::TempEnvRepo::new(state.db.clone())
+        .touch_activity(&temp_env.id)
+        .await?;
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),

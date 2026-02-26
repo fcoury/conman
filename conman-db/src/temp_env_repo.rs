@@ -25,6 +25,7 @@ struct TempEnvDoc {
     db_name: String,
     idle_ttl_seconds: i64,
     grace_ttl_seconds: i64,
+    last_activity_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     grace_expires_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
@@ -46,6 +47,7 @@ impl From<TempEnvDoc> for TempEnvironment {
             db_name: value.db_name,
             idle_ttl_seconds: value.idle_ttl_seconds,
             grace_ttl_seconds: value.grace_ttl_seconds,
+            last_activity_at: value.last_activity_at,
             expires_at: value.expires_at,
             grace_expires_at: value.grace_expires_at,
             created_at: value.created_at,
@@ -131,6 +133,7 @@ impl TempEnvRepo {
             db_name,
             idle_ttl_seconds,
             grace_ttl_seconds,
+            last_activity_at: now,
             expires_at: now + Duration::seconds(idle_ttl_seconds),
             grace_expires_at: None,
             created_at: now,
@@ -241,7 +244,7 @@ impl TempEnvRepo {
             .collection
             .find_one_and_update(
                 doc! {"_id": id},
-                doc! {"$set": {"expires_at": mongodb::bson::DateTime::from_millis((now + Duration::seconds(seconds)).timestamp_millis()), "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"last_activity_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis()), "expires_at": mongodb::bson::DateTime::from_millis((now + Duration::seconds(seconds)).timestamp_millis()), "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
             )
             .return_document(mongodb::options::ReturnDocument::After)
             .await
@@ -253,6 +256,118 @@ impl TempEnvRepo {
                 id: id.to_hex(),
             })?;
         Ok(row.into())
+    }
+
+    pub async fn touch_activity(&self, id: &str) -> Result<TempEnvironment, ConmanError> {
+        let id = ObjectId::parse_str(id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid temp_env_id: {e}"),
+        })?;
+
+        let current = self
+            .collection
+            .find_one(doc! {"_id": id})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to load temp env for touch: {e}"),
+            })?
+            .ok_or_else(|| ConmanError::NotFound {
+                entity: "temp_environment",
+                id: id.to_hex(),
+            })?;
+
+        let now = Utc::now();
+        let row = self
+            .collection
+            .find_one_and_update(
+                doc! {"_id": id},
+                doc! {"$set": {"last_activity_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis()), "expires_at": mongodb::bson::DateTime::from_millis((now + Duration::seconds(current.idle_ttl_seconds)).timestamp_millis()), "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+            )
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to touch temp env activity: {e}"),
+            })?
+            .ok_or_else(|| ConmanError::NotFound {
+                entity: "temp_environment",
+                id: id.to_hex(),
+            })?;
+        Ok(row.into())
+    }
+
+    pub async fn list_due_for_expiry_scan(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<TempEnvironment>, ConmanError> {
+        let now = mongodb::bson::DateTime::from_millis(Utc::now().timestamp_millis());
+        let active =
+            mongodb::bson::to_bson(&TempEnvState::Active).map_err(|e| ConmanError::Internal {
+                message: format!("failed to encode active temp env state: {e}"),
+            })?;
+        let provisioning = mongodb::bson::to_bson(&TempEnvState::Provisioning).map_err(|e| {
+            ConmanError::Internal {
+                message: format!("failed to encode provisioning temp env state: {e}"),
+            }
+        })?;
+        let expiring =
+            mongodb::bson::to_bson(&TempEnvState::Expiring).map_err(|e| ConmanError::Internal {
+                message: format!("failed to encode expiring temp env state: {e}"),
+            })?;
+        let deleted =
+            mongodb::bson::to_bson(&TempEnvState::Deleted).map_err(|e| ConmanError::Internal {
+                message: format!("failed to encode deleted temp env state: {e}"),
+            })?;
+        let expired =
+            mongodb::bson::to_bson(&TempEnvState::Expired).map_err(|e| ConmanError::Internal {
+                message: format!("failed to encode expired temp env state: {e}"),
+            })?;
+
+        let filter = doc! {
+            "$or": [
+                {
+                    "state": {"$in": [active, provisioning]},
+                    "expires_at": {"$lte": now}
+                },
+                {
+                    "state": {"$in": [expiring, deleted, expired]},
+                    "grace_expires_at": {"$ne": mongodb::bson::Bson::Null, "$lte": now}
+                }
+            ]
+        };
+        let mut cursor = self
+            .collection
+            .find(filter)
+            .sort(doc! {"updated_at": 1})
+            .limit(limit)
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to scan due temp environments: {e}"),
+            })?;
+        let mut rows = Vec::new();
+        while cursor.advance().await.map_err(|e| ConmanError::Internal {
+            message: format!("temp env due scan cursor error: {e}"),
+        })? {
+            let row: TempEnvDoc =
+                cursor
+                    .deserialize_current()
+                    .map_err(|e| ConmanError::Internal {
+                        message: format!("failed to decode due temp env: {e}"),
+                    })?;
+            rows.push(row.into());
+        }
+        Ok(rows)
+    }
+
+    pub async fn hard_delete(&self, id: &str) -> Result<(), ConmanError> {
+        let id = ObjectId::parse_str(id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid temp_env_id: {e}"),
+        })?;
+        self.collection
+            .delete_one(doc! {"_id": id})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to hard-delete temp environment: {e}"),
+            })?;
+        Ok(())
     }
 }
 
@@ -275,8 +390,16 @@ impl EnsureIndexes for TempEnvRepo {
                     .build(),
             )
             .build();
+        let by_expiry = IndexModel::builder()
+            .keys(doc! {"state": 1, "expires_at": 1, "grace_expires_at": 1})
+            .options(
+                IndexOptions::builder()
+                    .name("temp_env_expiry_scan".to_string())
+                    .build(),
+            )
+            .build();
         self.collection
-            .create_indexes(vec![by_app, by_owner])
+            .create_indexes(vec![by_app, by_owner, by_expiry])
             .await
             .map_err(|e| ConmanError::Internal {
                 message: format!("failed to ensure temp env indexes: {e}"),

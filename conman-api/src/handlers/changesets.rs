@@ -84,6 +84,10 @@ fn is_reviewer(role: Role) -> bool {
     matches!(role, Role::Reviewer | Role::ConfigManager | Role::AppAdmin)
 }
 
+fn overrides_conflict(a: &ChangesetProfileOverride, b: &ChangesetProfileOverride) -> bool {
+    a.key == b.key && a.target_profile_id == b.target_profile_id && a.value != b.value
+}
+
 async fn find_changeset_or_404(
     state: &AppState,
     changeset_id: &str,
@@ -428,6 +432,8 @@ pub async fn queue_changeset(
     Path((app_id, changeset_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<Changeset>>, ApiConmanError> {
     auth.require_role(&app_id, Role::ConfigManager)?;
+    let changeset_repo = conman_db::ChangesetRepo::new(state.db.clone());
+    let overrides_repo = conman_db::ChangesetProfileOverrideRepo::new(state.db.clone());
     let changeset = find_changeset_or_404(&state, &changeset_id).await?;
     if changeset.state != ChangesetState::Approved {
         return Err(ConmanError::Conflict {
@@ -456,12 +462,54 @@ pub async fn queue_changeset(
             .into());
         }
     }
-    let queue_position = conman_db::ChangesetRepo::new(state.db.clone())
-        .next_queue_position(&app_id)
-        .await?;
-    let queued = conman_db::ChangesetRepo::new(state.db.clone())
-        .queue(&changeset_id, queue_position)
-        .await?;
+    let queue_position = changeset_repo.next_queue_position(&app_id).await?;
+    let queued = changeset_repo.queue(&changeset_id, queue_position).await?;
+    let queued_overrides = overrides_repo.list_by_changeset(&queued.id).await?;
+    let maybe_conflict_with = if queued_overrides.is_empty() {
+        None
+    } else {
+        let mut conflict_with = None;
+        for other in changeset_repo.list_queued_by_app(&app_id).await? {
+            if other.id == queued.id {
+                continue;
+            }
+            let other_overrides = overrides_repo.list_by_changeset(&other.id).await?;
+            if queued_overrides.iter().any(|left| {
+                other_overrides
+                    .iter()
+                    .any(|right| overrides_conflict(left, right))
+            }) {
+                conflict_with = Some(other.id);
+                break;
+            }
+        }
+        conflict_with
+    };
+    let queued = if let Some(conflict_with) = maybe_conflict_with {
+        let conflicted = changeset_repo.mark_conflicted(&queued.id).await?;
+        if let Err(err) = emit_audit(
+            &state,
+            Some(&auth.user_id),
+            Some(&app_id),
+            "changeset",
+            &conflicted.id,
+            "auto_conflicted_override_collision",
+            None,
+            Some(serde_json::json!({
+                "changeset_id": conflicted.id,
+                "state": conflicted.state,
+                "conflict_with_changeset_id": conflict_with,
+            })),
+            conflicted.submitted_head_sha.as_deref(),
+        )
+        .await
+        {
+            tracing::warn!(error = %err, "failed to write audit event");
+        }
+        conflicted
+    } else {
+        queued
+    };
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),

@@ -393,6 +393,8 @@ impl ChangesetRepo {
             })?;
         row.state = transition_changeset(row.state, ChangesetAction::MoveToDraft)?;
         row.approvals.clear();
+        row.queue_position = None;
+        row.queued_at = None;
         row.updated_at = Utc::now();
         self.collection
             .replace_one(doc! {"_id": id_obj}, row.clone())
@@ -401,6 +403,16 @@ impl ChangesetRepo {
                 message: format!("failed to persist move_to_draft: {e}"),
             })?;
         Ok(row.into())
+    }
+
+    pub async fn mark_conflicted(&self, id: &str) -> Result<Changeset, ConmanError> {
+        self.apply_queue_revalidation_result(id, ChangesetAction::MarkConflicted)
+            .await
+    }
+
+    pub async fn mark_needs_revalidation(&self, id: &str) -> Result<Changeset, ConmanError> {
+        self.apply_queue_revalidation_result(id, ChangesetAction::MarkNeedsRevalidation)
+            .await
     }
 
     pub async fn list_queued_by_app(&self, app_id: &str) -> Result<Vec<Changeset>, ConmanError> {
@@ -517,6 +529,39 @@ impl ChangesetRepo {
                 message: format!("failed to insert changeset revision: {e}"),
             })?;
         Ok(())
+    }
+
+    async fn apply_queue_revalidation_result(
+        &self,
+        id: &str,
+        action: ChangesetAction,
+    ) -> Result<Changeset, ConmanError> {
+        let id_obj = ObjectId::parse_str(id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid changeset id: {e}"),
+        })?;
+        let mut row = self
+            .collection
+            .find_one(doc! {"_id": id_obj})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to load changeset for revalidation update: {e}"),
+            })?
+            .ok_or_else(|| ConmanError::NotFound {
+                entity: "changeset",
+                id: id.to_string(),
+            })?;
+        row.state = transition_changeset(row.state, action)?;
+        row.queue_position = None;
+        row.queued_at = None;
+        row.approvals.clear();
+        row.updated_at = Utc::now();
+        self.collection
+            .replace_one(doc! {"_id": id_obj}, row.clone())
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to persist changeset revalidation status: {e}"),
+            })?;
+        Ok(row.into())
     }
 }
 

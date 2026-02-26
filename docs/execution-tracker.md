@@ -12,14 +12,14 @@ Use this file as the live control plane for delivery.
 
 - Start date:
 - Target date:
-- Current wave: `A`
-- Current milestone: `M1`
+- Current wave: `E`
+- Current milestone: `M4`
 - Overall progress:
-  - Epics complete: `5 / 13`
+  - Epics complete: `6 / 13`
   - Gates passed: `0 / 5`
 - Active blockers:
   - E01 still needs concrete gitaly-rs RPC mappings beyond adapter stubs
-  - E06/E08 still need strict async completion checks for every publish/deploy edge case
+  - E11 still needs real email delivery worker/provider integration
 
 ## 2) Epic Tracker (Dependency Controlled)
 
@@ -36,13 +36,13 @@ Legend:
 | E03 App Setup | worker-app | E01, E02 | A | done | master | 100 |  |
 | E04 Workspaces | worker-workspace | E01, E03 | B | done | master | 100 |  |
 | E05 Changesets | worker-changeset | E02, E04 | B | done | master | 100 |  |
-| E06 Async Jobs | worker-jobs | E00, E05 | B | in_progress | master | 80 | Gate completion semantics need stricter end-to-end coverage |
-| E07 Queue Orchestration | worker-queue-release | E05, E06 | C | in_progress | master | 60 | Automatic post-release revalidation worker still pending |
-| E08 Releases | worker-queue-release | E01, E06, E07 | C | in_progress | master | 80 | Git composition/publish must be tied to gitaly operations |
-| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 80 | Drift-block edge cases + full approval policy matrix enforcement pending |
-| E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 80 | Idle detection + soft-delete grace automation pending |
-| E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 55 | Real email sender + full audit coverage assertions pending |
-| E12 Hardening | worker-observability | E08-E11 | E | not_started |  | 0 |  |
+| E06 Async Jobs | worker-jobs | E00, E05 | B | done | master | 100 |  |
+| E07 Queue Orchestration | worker-queue-release | E05, E06 | C | in_progress | master | 85 | Revalidation uses queue conflict + simulated gate flow; external msuite execution still noop |
+| E08 Releases | worker-queue-release | E01, E06, E07 | C | in_progress | master | 85 | Git composition/publish must be tied to gitaly operations |
+| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 85 | Drift checks and deploy approvals are enforced; real execution hooks are still noop |
+| E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 90 | Runtime cleanup worker is active; provider-side teardown hooks remain stubbed |
+| E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 60 | Real email sender + full audit coverage assertions pending |
+| E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 35 | Metrics + fixed-window throttling shipped; load/fault/runbooks pending |
 
 ## 3) Dependency Gate Rules (Hard Stop)
 
@@ -80,9 +80,9 @@ Do not merge when prerequisites are incomplete:
 
 - [x] E04 merged
 - [x] E05 merged
-- [ ] E06 merged
+- [x] E06 merged
 - [ ] End-to-end: author -> submit -> review path works
-- [ ] Async jobs run and gate transitions
+- [x] Async jobs run and gate transitions
 - [ ] Required audit events emitted
 - Result: `pass | fail`
 - Date:
