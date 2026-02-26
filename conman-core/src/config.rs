@@ -19,6 +19,12 @@ pub struct Config {
     pub smtp_username: Option<String>,
     pub smtp_password: Option<String>,
     pub smtp_from_email: Option<String>,
+    pub msuite_submit_cmd: String,
+    pub msuite_merge_cmd: String,
+    pub msuite_deploy_cmd: String,
+    pub runtime_profile_drift_check_cmd: String,
+    pub temp_env_provision_cmd: Option<String>,
+    pub temp_env_expire_cmd: Option<String>,
 }
 
 impl Config {
@@ -89,6 +95,17 @@ impl Config {
         let smtp_username = std::env::var("CONMAN_SMTP_USERNAME").ok();
         let smtp_password = std::env::var("CONMAN_SMTP_PASSWORD").ok();
         let smtp_from_email = std::env::var("CONMAN_SMTP_FROM_EMAIL").ok();
+        let msuite_submit_cmd =
+            std::env::var("CONMAN_MSUITE_SUBMIT_CMD").unwrap_or_else(|_| "true".to_string());
+        let msuite_merge_cmd =
+            std::env::var("CONMAN_MSUITE_MERGE_CMD").unwrap_or_else(|_| "true".to_string());
+        let msuite_deploy_cmd =
+            std::env::var("CONMAN_MSUITE_DEPLOY_CMD").unwrap_or_else(|_| "true".to_string());
+        let runtime_profile_drift_check_cmd =
+            std::env::var("CONMAN_RUNTIME_PROFILE_DRIFT_CHECK_CMD")
+                .unwrap_or_else(|_| "true".to_string());
+        let temp_env_provision_cmd = std::env::var("CONMAN_TEMP_ENV_PROVISION_CMD").ok();
+        let temp_env_expire_cmd = std::env::var("CONMAN_TEMP_ENV_EXPIRE_CMD").ok();
 
         if smtp_host.is_some() && smtp_from_email.is_none() {
             return Err(ConmanError::Validation {
@@ -121,6 +138,12 @@ impl Config {
             smtp_username,
             smtp_password,
             smtp_from_email,
+            msuite_submit_cmd,
+            msuite_merge_cmd,
+            msuite_deploy_cmd,
+            runtime_profile_drift_check_cmd,
+            temp_env_provision_cmd,
+            temp_env_expire_cmd,
         })
     }
 }
@@ -150,6 +173,12 @@ mod tests {
             "CONMAN_SMTP_USERNAME",
             "CONMAN_SMTP_PASSWORD",
             "CONMAN_SMTP_FROM_EMAIL",
+            "CONMAN_MSUITE_SUBMIT_CMD",
+            "CONMAN_MSUITE_MERGE_CMD",
+            "CONMAN_MSUITE_DEPLOY_CMD",
+            "CONMAN_RUNTIME_PROFILE_DRIFT_CHECK_CMD",
+            "CONMAN_TEMP_ENV_PROVISION_CMD",
+            "CONMAN_TEMP_ENV_EXPIRE_CMD",
         ] {
             unsafe { std::env::remove_var(key) };
         }
@@ -175,6 +204,12 @@ mod tests {
         assert_eq!(config.invite_expiry_days, 7);
         assert_eq!(config.http_rate_limit_per_second, 200);
         assert!(config.smtp_host.is_none());
+        assert_eq!(config.msuite_submit_cmd, "true");
+        assert_eq!(config.msuite_merge_cmd, "true");
+        assert_eq!(config.msuite_deploy_cmd, "true");
+        assert_eq!(config.runtime_profile_drift_check_cmd, "true");
+        assert!(config.temp_env_provision_cmd.is_none());
+        assert!(config.temp_env_expire_cmd.is_none());
     }
 
     #[test]

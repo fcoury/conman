@@ -16,6 +16,7 @@ use lettre::{
 };
 use metrics::{counter, gauge, histogram};
 use serde_json::json;
+use tokio::process::Command;
 
 #[async_trait]
 pub trait JobWorker: Send + Sync {
@@ -29,6 +30,65 @@ pub struct NoopWorker;
 impl JobWorker for NoopWorker {
     async fn run(&self, _job: &Job) -> Result<serde_json::Value, String> {
         Ok(json!({"status": "ok", "worker": "noop"}))
+    }
+}
+
+fn truncate_for_log(value: &str, max: usize) -> String {
+    if value.len() <= max {
+        return value.to_string();
+    }
+    format!("{}…", &value[..max])
+}
+
+async fn run_shell_command(
+    command: &str,
+    phase: &str,
+    job: &Job,
+) -> Result<serde_json::Value, String> {
+    let payload_json = job.payload.to_string();
+    let output = Command::new("sh")
+        .arg("-lc")
+        .arg(command)
+        .env("CONMAN_JOB_ID", &job.id)
+        .env("CONMAN_JOB_TYPE", format!("{:?}", job.job_type))
+        .env("CONMAN_APP_ID", &job.app_id)
+        .env("CONMAN_ENTITY_TYPE", &job.entity_type)
+        .env("CONMAN_ENTITY_ID", &job.entity_id)
+        .env("CONMAN_JOB_PAYLOAD", payload_json)
+        .output()
+        .await
+        .map_err(|e| format!("failed to execute command `{command}`: {e}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let exit_code = output.status.code().unwrap_or(-1);
+
+    if !output.status.success() {
+        return Err(format!(
+            "command `{command}` failed in phase `{phase}` with exit code {exit_code}: {}",
+            truncate_for_log(stderr.trim(), 2_000)
+        ));
+    }
+
+    Ok(json!({
+        "status": "ok",
+        "phase": phase,
+        "command": command,
+        "exit_code": exit_code,
+        "stdout": truncate_for_log(stdout.trim(), 4_000),
+        "stderr": truncate_for_log(stderr.trim(), 2_000),
+    }))
+}
+
+pub struct CommandWorker {
+    pub command: String,
+    pub phase: &'static str,
+}
+
+#[async_trait]
+impl JobWorker for CommandWorker {
+    async fn run(&self, job: &Job) -> Result<serde_json::Value, String> {
+        run_shell_command(&self.command, self.phase, job).await
     }
 }
 
@@ -157,11 +217,16 @@ impl JobWorker for DeployReleaseWorker {
 
 pub struct TempEnvProvisionWorker {
     temp_envs: TempEnvRepo,
+    hook_command: Option<String>,
 }
 
 #[async_trait]
 impl JobWorker for TempEnvProvisionWorker {
     async fn run(&self, job: &Job) -> Result<serde_json::Value, String> {
+        if let Some(command) = self.hook_command.as_deref() {
+            let _ = run_shell_command(command, "temp_env_provision_hook", job).await?;
+        }
+
         let _temp_env = self
             .temp_envs
             .set_state(&job.entity_id, TempEnvState::Active, None)
@@ -183,6 +248,7 @@ impl JobWorker for TempEnvProvisionWorker {
 
 pub struct TempEnvExpireWorker {
     temp_envs: TempEnvRepo,
+    hook_command: Option<String>,
 }
 
 #[async_trait]
@@ -217,6 +283,9 @@ impl JobWorker for TempEnvExpireWorker {
             }
             TempEnvState::Expiring | TempEnvState::Deleted | TempEnvState::Expired => {
                 if temp_env.grace_expires_at.is_some_and(|grace| grace <= now) {
+                    if let Some(command) = self.hook_command.as_deref() {
+                        let _ = run_shell_command(command, "temp_env_expire_hook", job).await?;
+                    }
                     self.temp_envs
                         .hard_delete(&temp_env.id)
                         .await
@@ -353,11 +422,29 @@ fn job_type_label(job_type: JobType) -> &'static str {
 }
 
 impl JobRunner {
-    pub fn new(db: mongodb::Database) -> Self {
+    pub fn new(db: mongodb::Database, config: &Config) -> Self {
         let mut workers: HashMap<JobType, Arc<dyn JobWorker>> = HashMap::new();
-        workers.insert(JobType::MsuiteSubmit, Arc::new(NoopWorker));
-        workers.insert(JobType::MsuiteMerge, Arc::new(NoopWorker));
-        workers.insert(JobType::MsuiteDeploy, Arc::new(NoopWorker));
+        workers.insert(
+            JobType::MsuiteSubmit,
+            Arc::new(CommandWorker {
+                command: config.msuite_submit_cmd.clone(),
+                phase: "msuite_submit",
+            }),
+        );
+        workers.insert(
+            JobType::MsuiteMerge,
+            Arc::new(CommandWorker {
+                command: config.msuite_merge_cmd.clone(),
+                phase: "msuite_merge",
+            }),
+        );
+        workers.insert(
+            JobType::MsuiteDeploy,
+            Arc::new(CommandWorker {
+                command: config.msuite_deploy_cmd.clone(),
+                phase: "msuite_deploy",
+            }),
+        );
         workers.insert(
             JobType::RevalidateQueuedChangeset,
             Arc::new(RevalidateQueuedChangesetWorker {
@@ -377,17 +464,25 @@ impl JobRunner {
                 deployments: DeploymentRepo::new(db.clone()),
             }),
         );
-        workers.insert(JobType::RuntimeProfileDriftCheck, Arc::new(NoopWorker));
+        workers.insert(
+            JobType::RuntimeProfileDriftCheck,
+            Arc::new(CommandWorker {
+                command: config.runtime_profile_drift_check_cmd.clone(),
+                phase: "runtime_profile_drift_check",
+            }),
+        );
         workers.insert(
             JobType::TempEnvProvision,
             Arc::new(TempEnvProvisionWorker {
                 temp_envs: TempEnvRepo::new(db.clone()),
+                hook_command: config.temp_env_provision_cmd.clone(),
             }),
         );
         workers.insert(
             JobType::TempEnvExpire,
             Arc::new(TempEnvExpireWorker {
                 temp_envs: TempEnvRepo::new(db.clone()),
+                hook_command: config.temp_env_expire_cmd.clone(),
             }),
         );
 

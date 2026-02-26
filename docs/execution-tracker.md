@@ -18,6 +18,8 @@ Use this file as the live control plane for delivery.
   - Epics complete: `7 / 13`
   - Gates passed: `1 / 5`
 - Active blockers:
+  - E08 still needs release composition/publish bound to real gitaly merge+tag operations
+  - E11 still needs audit completeness assertions for critical mutations
   - E12 still needs executed load/fault results and production dashboard wiring
 
 ## 2) Epic Tracker (Dependency Controlled)
@@ -36,10 +38,10 @@ Legend:
 | E04 Workspaces | worker-workspace | E01, E03 | B | done | master | 100 |  |
 | E05 Changesets | worker-changeset | E02, E04 | B | done | master | 100 |  |
 | E06 Async Jobs | worker-jobs | E00, E05 | B | done | master | 100 |  |
-| E07 Queue Orchestration | worker-queue-release | E05, E06 | C | in_progress | master | 85 | Revalidation uses queue conflict + simulated gate flow; external msuite execution still noop |
+| E07 Queue Orchestration | worker-queue-release | E05, E06 | C | in_progress | master | 92 | Queue revalidation is automated; release composition still not wired to git materialization |
 | E08 Releases | worker-queue-release | E01, E06, E07 | C | in_progress | master | 85 | Git composition/publish must be tied to gitaly operations |
-| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 85 | Drift checks and deploy approvals are enforced; real execution hooks are still noop |
-| E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 90 | Runtime cleanup worker is active; provider-side teardown hooks remain stubbed |
+| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 92 | Drift/deploy gates now execute configured commands; deploy still metadata-driven until E08 git publish is wired |
+| E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 95 | Provision/expire hooks are command-backed and TTL/grace cleanup is active; provider integrations still app-specific |
 | E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 90 | Outbox drain + SMTP provider path shipped; full audit completeness assertions pending |
 | E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 78 | Metrics, throttling, runbooks, test scaffolding, security guards, alert/dashboard artifacts, and component-level health checks shipped; load/fault execution pending |
 

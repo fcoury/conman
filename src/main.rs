@@ -90,7 +90,7 @@ async fn main() {
         ),
     };
 
-    let mut job_runner = JobRunner::new(state.db.clone());
+    let mut job_runner = JobRunner::new(state.db.clone(), &config);
     match conman_jobs::SmtpNotificationSender::from_config(&config) {
         Ok(Some(sender)) => {
             tracing::info!("smtp notification sender configured");
