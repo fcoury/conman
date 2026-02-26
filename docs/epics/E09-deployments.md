@@ -223,7 +223,7 @@ impl DeployApproval {
 use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-/// POST /api/apps/:appId/environments/:envId/deploy
+/// POST /api/repos/:appId/environments/:envId/deploy
 ///
 /// Deploy a published release to the specified environment.
 #[derive(Debug, Deserialize)]
@@ -248,7 +248,7 @@ pub struct DeployApprovalInput {
     pub user_id: ObjectId,
 }
 
-/// POST /api/apps/:appId/environments/:envId/promote
+/// POST /api/repos/:appId/environments/:envId/promote
 ///
 /// Promote the currently deployed release to the next environment in
 /// the pipeline. The release artifact is immutable; only the target
@@ -267,7 +267,7 @@ pub struct PromoteRequest {
     pub approvals: Vec<DeployApprovalInput>,
 }
 
-/// POST /api/apps/:appId/environments/:envId/rollback
+/// POST /api/repos/:appId/environments/:envId/rollback
 ///
 /// Roll back the environment to a previous state.
 #[derive(Debug, Deserialize)]
@@ -472,7 +472,7 @@ Rollback via redeploy prior tag:
 ### 5.1 Deploy Release
 
 ```
-POST /api/apps/:appId/environments/:envId/deploy
+POST /api/repos/:appId/environments/:envId/deploy
 ```
 
 **Auth:** `config_manager` or `app_admin` on the app.
@@ -523,7 +523,7 @@ POST /api/apps/:appId/environments/:envId/deploy
 ### 5.2 Promote Release
 
 ```
-POST /api/apps/:appId/environments/:envId/promote
+POST /api/repos/:appId/environments/:envId/promote
 ```
 
 **Auth:** `config_manager` or `app_admin` on the app.
@@ -560,7 +560,7 @@ POST /api/apps/:appId/environments/:envId/promote
 ### 5.3 Rollback
 
 ```
-POST /api/apps/:appId/environments/:envId/rollback
+POST /api/repos/:appId/environments/:envId/rollback
 ```
 
 **Auth:** `config_manager` or `app_admin` on the app.
@@ -598,7 +598,7 @@ POST /api/apps/:appId/environments/:envId/rollback
 ### 5.4 List Deployments
 
 ```
-GET /api/apps/:appId/deployments?page=&limit=
+GET /api/repos/:appId/deployments?page=&limit=
 ```
 
 **Auth:** Any member of the app (read access).
@@ -1183,12 +1183,12 @@ run test (passes), commit.
   otherwise.
 
 - [ ] **E09-S06** -- Implement deploy handler and worker.
-  Add `POST /api/apps/:appId/environments/:envId/deploy` handler. Create the
+  Add `POST /api/repos/:appId/environments/:envId/deploy` handler. Create the
   `deploy_release` job worker in `conman-jobs`. Write integration tests
   covering: successful deploy, lock conflict, invalid release state.
 
 - [ ] **E09-S07** -- Implement promote handler.
-  Add `POST /api/apps/:appId/environments/:envId/promote` handler. Write
+  Add `POST /api/repos/:appId/environments/:envId/promote` handler. Write
   integration tests covering: valid sequential promotion, skip-stage with
   approvals, promotion without prior deployment (error).
 
@@ -1198,7 +1198,7 @@ run test (passes), commit.
   no privileged user (error), < 2 approvals (error).
 
 - [ ] **E09-S09** -- Implement rollback mode B (redeploy prior tag).
-  Add `POST /api/apps/:appId/environments/:envId/rollback` handler for
+  Add `POST /api/repos/:appId/environments/:envId/rollback` handler for
   `redeploy_prior_tag` mode. Write integration tests: valid rollback, tag
   not found (error), no prior deployment (error).
 
@@ -1208,7 +1208,7 @@ run test (passes), commit.
   integration tests: successful revert, conflict on revert (error).
 
 - [ ] **E09-S11** -- Implement list deployments endpoint.
-  Add `GET /api/apps/:appId/deployments` handler with pagination. Write
+  Add `GET /api/repos/:appId/deployments` handler with pagination. Write
   integration tests for filtering and ordering.
 
 - [ ] **E09-S12** -- Add release state transitions for deployment events.
@@ -1595,7 +1595,7 @@ async fn deploy_emits_audit_event() {
 ## 10. Acceptance Criteria
 
 1. **Deploy creates an async job and records the deployment.**
-   - `POST /api/apps/:appId/environments/:envId/deploy` with a valid published
+   - `POST /api/repos/:appId/environments/:envId/deploy` with a valid published
      release returns 201 with a deployment in `pending` state.
    - The `deploy_release` job is enqueued and the deployment transitions through
      `pending -> running -> succeeded` (or `failed`).

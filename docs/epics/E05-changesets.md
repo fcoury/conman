@@ -608,7 +608,7 @@ db.changeset_comment_revisions.createIndex({ comment_id: 1, edited_at: -1 })
 
 ## 5. API Endpoints
 
-### `GET /api/apps/:appId/changesets`
+### `GET /api/repos/:appId/changesets`
 
 List changesets for an app with optional state filter.
 
@@ -623,7 +623,7 @@ List changesets for an app with optional state filter.
   ```
 - **Errors:** 403 Forbidden (not a member)
 
-### `POST /api/apps/:appId/changesets`
+### `POST /api/repos/:appId/changesets`
 
 Create a new changeset from a workspace. Enforces one open changeset per
 workspace.
@@ -640,7 +640,7 @@ workspace.
 - **Response 201:** `{ "data": ChangesetResponse }`
 - **Errors:** 409 Conflict (open changeset exists), 404 workspace not found, 403 Forbidden
 
-### `GET /api/apps/:appId/changesets/:changesetId`
+### `GET /api/repos/:appId/changesets/:changesetId`
 
 Get changeset details.
 
@@ -648,7 +648,7 @@ Get changeset details.
 - **Response 200:** `{ "data": ChangesetResponse }`
 - **Errors:** 404 Not Found
 
-### `PATCH /api/apps/:appId/changesets/:changesetId`
+### `PATCH /api/repos/:appId/changesets/:changesetId`
 
 Update changeset title/description. Only allowed in `Draft` state.
 
@@ -658,7 +658,7 @@ Update changeset title/description. Only allowed in `Draft` state.
 - **Response 200:** `{ "data": ChangesetResponse }`
 - **Errors:** 409 (wrong state), 403 Forbidden, 404 Not Found
 
-### `POST /api/apps/:appId/changesets/:changesetId/submit`
+### `POST /api/repos/:appId/changesets/:changesetId/submit`
 
 Submit a draft changeset for review. Freezes `head_sha` and creates the first
 revision record.
@@ -676,7 +676,7 @@ revision record.
 - **Response 200:** `{ "data": SubmitChangesetResponse }`
 - **Errors:** 409 (wrong state), 404
 
-### `POST /api/apps/:appId/changesets/:changesetId/resubmit`
+### `POST /api/repos/:appId/changesets/:changesetId/resubmit`
 
 Resubmit a changeset with new workspace changes. Creates a new revision, resets
 approvals to zero.
@@ -694,7 +694,7 @@ approvals to zero.
 - **Response 200:** `{ "data": SubmitChangesetResponse }`
 - **Errors:** 409 (wrong state), 400 (no changes)
 
-### `POST /api/apps/:appId/changesets/:changesetId/review`
+### `POST /api/repos/:appId/changesets/:changesetId/review`
 
 Submit a review decision on a changeset.
 
@@ -714,7 +714,7 @@ Submit a review decision on a changeset.
 - **Response 200:** `{ "data": ReviewResponse }`
 - **Errors:** 409 (wrong state), 403 (insufficient role)
 
-### `POST /api/apps/:appId/changesets/:changesetId/queue`
+### `POST /api/repos/:appId/changesets/:changesetId/queue`
 
 Move an approved changeset into the queue. Performed by config_manager+.
 
@@ -726,7 +726,7 @@ Move an approved changeset into the queue. Performed by config_manager+.
 - **Response 200:** `{ "data": ChangesetResponse }`
 - **Errors:** 409 (wrong state), 403 Forbidden
 
-### `POST /api/apps/:appId/changesets/:changesetId/move-to-draft`
+### `POST /api/repos/:appId/changesets/:changesetId/move-to-draft`
 
 Return a changeset to draft from `ChangesRequested`, `Conflicted`, or
 `NeedsRevalidation`.
@@ -740,7 +740,7 @@ Return a changeset to draft from `ChangesRequested`, `Conflicted`, or
 - **Response 200:** `{ "data": ChangesetResponse }`
 - **Errors:** 409 (wrong state), 403 Forbidden
 
-### `GET /api/apps/:appId/changesets/:changesetId/diff`
+### `GET /api/repos/:appId/changesets/:changesetId/diff`
 
 Retrieve diff between base_sha and head_sha.
 
@@ -759,7 +759,7 @@ Retrieve diff between base_sha and head_sha.
 - **Response 200:** `RawDiffResponse` or `SemanticDiffResponse` depending on mode.
 - **Errors:** 404, 502 (git error)
 
-### `GET /api/apps/:appId/changesets/:changesetId/comments`
+### `GET /api/repos/:appId/changesets/:changesetId/comments`
 
 List comments for a changeset, paginated.
 
@@ -773,7 +773,7 @@ List comments for a changeset, paginated.
   }
   ```
 
-### `POST /api/apps/:appId/changesets/:changesetId/comments`
+### `POST /api/repos/:appId/changesets/:changesetId/comments`
 
 Add a comment to a changeset. Supports inline (file+line) and threaded (parent)
 comments.
@@ -788,7 +788,7 @@ comments.
 - **Response 201:** `{ "data": CommentResponse }`
 - **Errors:** 404 (changeset or parent comment not found), 400 (validation)
 
-### `PATCH /api/apps/:appId/changesets/:changesetId/comments/:commentId`
+### `PATCH /api/repos/:appId/changesets/:changesetId/comments/:commentId`
 
 Edit a comment body or toggle resolved status. Stores prior body in revision
 history.
@@ -804,7 +804,7 @@ history.
 - **Response 200:** `{ "data": CommentResponse }`
 - **Errors:** 404, 403 (non-author editing body)
 
-### `POST /api/apps/:appId/changesets/:changesetId/analyze`
+### `POST /api/repos/:appId/changesets/:changesetId/analyze`
 
 AI analysis of changeset diff, scoped to the changeset's files.
 
@@ -817,7 +817,7 @@ AI analysis of changeset diff, scoped to the changeset's files.
 - **Response 200:** `{ "data": AnalyzeResponse }`
 - **Errors:** 502 (AI service error)
 
-### `POST /api/apps/:appId/changesets/:changesetId/chat`
+### `POST /api/repos/:appId/changesets/:changesetId/chat`
 
 AI chat scoped to the changeset or specific files within it.
 
@@ -911,7 +911,7 @@ Complete transition table with guard conditions:
 Enforced at two levels:
 
 1. **Database:** Partial unique index on `(app_id, workspace_id)` where `state NOT IN [released, rejected]`.
-2. **Application:** Pre-check in `POST /api/apps/:appId/changesets` handler queries for existing open changeset before insert.
+2. **Application:** Pre-check in `POST /api/repos/:appId/changesets` handler queries for existing open changeset before insert.
 
 The partial unique index provides a safety net against race conditions.
 
@@ -1185,10 +1185,10 @@ comparison.
 - [ ] Implement `check_approval_threshold()` helper
 - [ ] Add `ChangesetRepo` to `conman-db` with CRUD operations
 - [ ] Create `changesets` collection indexes (including partial unique index)
-- [ ] Add `POST /api/apps/:appId/changesets` handler
-- [ ] Add `GET /api/apps/:appId/changesets` handler with pagination + state filter
-- [ ] Add `GET /api/apps/:appId/changesets/:changesetId` handler
-- [ ] Add `PATCH /api/apps/:appId/changesets/:changesetId` handler
+- [ ] Add `POST /api/repos/:appId/changesets` handler
+- [ ] Add `GET /api/repos/:appId/changesets` handler with pagination + state filter
+- [ ] Add `GET /api/repos/:appId/changesets/:changesetId` handler
+- [ ] Add `PATCH /api/repos/:appId/changesets/:changesetId` handler
 - [ ] Add one-open-changeset-per-workspace pre-check
 - [ ] Add audit event emission for changeset creation
 - [ ] Unit tests for state machine transitions (all valid + all invalid)

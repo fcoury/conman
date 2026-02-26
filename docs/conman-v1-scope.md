@@ -7,7 +7,7 @@ DxFlow-style config repositories.
 
 Conman v1 model:
 
-- `Tenant` -> `Repository` -> `App Surface`
+- `Tenant` -> `Repository` -> `App`
 - Repository workflow: `Workspace` -> `Changeset` -> `Release`
 - Git is source of truth for files and history
 - MongoDB stores tenant/repository metadata, workflow state, and audit trails
@@ -16,10 +16,9 @@ Conman v1 model:
 ## 2) Domain Terminology
 
 - **Tenant**: Top-level customer/account boundary. Owns repositories.
-- **Repository**: A managed config repository (stored in `apps` in v1 for
-  compatibility).
-- **App surface**: A user-facing app within a repository (domain/branding/role
-  hints).
+- **Repository**: A managed config repository (stored in `apps` collection in
+  v1).
+- **App**: A user-facing app within a repository (domain/branding/role hints).
 - **Workspace**: A user-owned mutable branch used to edit repository files.
 - **Changeset**: A reviewable proposal from one workspace branch against the
   repository integration baseline.
@@ -28,8 +27,8 @@ Conman v1 model:
 - **Environment**: A deploy target stage (configurable per repository).
 - **Canonical user-facing environment**: The environment designated as
   production-facing for baseline calculations.
-- **Integration branch**: The repository-level branch where published releases are
-  applied (default `main`, configurable per app).
+- **Integration branch**: The repository-level branch where published releases
+  are applied (default `main`, configurable per repository).
 - **Baseline mode**: How new workspace baselines are resolved:
   `integration_head` or `canonical_env_release`.
 - **Runtime profile**: The runtime blueprint for an environment or temp env.
@@ -478,14 +477,11 @@ Base path: `/api`
 - `POST /api/tenants/:tenantId/repos`
 - `GET /api/repos?page=&limit=`
 - `GET /api/repos/:appId`
-- `GET /api/repos/:appId/surfaces`
-- `POST /api/repos/:appId/surfaces`
-- `PATCH /api/repos/:appId/surfaces/:surfaceId`
+- `GET /api/repos/:appId/apps`
+- `POST /api/repos/:appId/apps`
+- `PATCH /api/repos/:appId/apps/:surfaceId`
 
-## 8.2 Apps compatibility endpoints
-
-`/api/repos` remains available in v1 as a compatibility alias for repository
-records.
+## 8.2 Repository management endpoints
 
 - `GET /api/repos?page=&limit=`
 - `POST /api/repos`
@@ -609,7 +605,7 @@ interface SemanticDiffResponse {
 - `POST /api/repos/:appId/runtime-profiles/:profileId/secrets/:key/reveal`
   (`app_admin` only; audited)
 - `surface_endpoints` keys must reference existing
-  `/api/repos/:appId/surfaces` keys
+  `/api/repos/:appId/apps` keys
 
 `PATCH .../runtime-profiles/:profileId` allows direct emergency edits by
 `app_admin`; resulting drift still blocks deployment until revalidation.

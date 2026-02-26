@@ -1048,7 +1048,7 @@ Update the authenticated user's notification preferences.
 
 ---
 
-### 5.3 `GET /api/apps/:appId/audit?page=&limit=&entity_type=&entity_id=&action=&actor_user_id=`
+### 5.3 `GET /api/repos/:appId/audit?page=&limit=&entity_type=&entity_id=&action=&actor_user_id=`
 
 Read-only paginated query of the audit log for an app.
 
@@ -1172,8 +1172,8 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `workspace` | `created` | `POST /api/apps/:appId/workspaces` | E04 |
-| `workspace` | `updated` | `PATCH /api/apps/:appId/workspaces/:workspaceId` | E04 |
+| `workspace` | `created` | `POST /api/repos/:appId/workspaces` | E04 |
+| `workspace` | `updated` | `PATCH /api/repos/:appId/workspaces/:workspaceId` | E04 |
 | `workspace` | `reset` | `POST .../workspaces/:workspaceId/reset` | E04 |
 | `workspace` | `synced_integration` | `POST .../workspaces/:workspaceId/sync-integration` | E04 |
 
@@ -1189,7 +1189,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `changeset` | `created` | `POST /api/apps/:appId/changesets` | E05 |
+| `changeset` | `created` | `POST /api/repos/:appId/changesets` | E05 |
 | `changeset` | `updated` | `PATCH .../changesets/:changesetId` | E05 |
 | `changeset` | `submitted` | `POST .../changesets/:changesetId/submit` | E05 |
 | `changeset` | `resubmitted` | `POST .../changesets/:changesetId/resubmit` | E05 |
@@ -1212,7 +1212,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `release` | `created` | `POST /api/apps/:appId/releases` | E08 |
+| `release` | `created` | `POST /api/repos/:appId/releases` | E08 |
 | `release` | `changesets_modified` | `POST .../releases/:releaseId/changesets` | E08 |
 | `release` | `reordered` | `POST .../releases/:releaseId/reorder` | E08 |
 | `release` | `assembled` | `POST .../releases/:releaseId/assemble` | E08 |
@@ -1232,7 +1232,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `temp_environment` | `created` | `POST /api/apps/:appId/temp-envs` | E10 |
+| `temp_environment` | `created` | `POST /api/repos/:appId/temp-envs` | E10 |
 | `temp_environment` | `extended` | `POST .../temp-envs/:tempEnvId/extend` | E10 |
 | `temp_environment` | `expired` | TTL cleanup job | E10 |
 | `temp_environment` | `undo_expired` | `POST .../temp-envs/:tempEnvId/undo-expire` | E10 |
@@ -1242,15 +1242,15 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `app` | `created` | `POST /api/apps` | E03 |
-| `app` | `settings_updated` | `PATCH /api/apps/:appId/settings` | E03 |
-| `app` | `environments_updated` | `PATCH /api/apps/:appId/environments` | E03 |
+| `app` | `created` | `POST /api/repos` | E03 |
+| `app` | `settings_updated` | `PATCH /api/repos/:appId/settings` | E03 |
+| `app` | `environments_updated` | `PATCH /api/repos/:appId/environments` | E03 |
 
 **Membership and invites:**
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `invite` | `created` | `POST /api/apps/:appId/invites` | E02 |
+| `invite` | `created` | `POST /api/repos/:appId/invites` | E02 |
 | `invite` | `resent` | `POST .../invites/:inviteId/resend` | E02 |
 | `invite` | `revoked` | `DELETE .../invites/:inviteId` | E02 |
 | `invite` | `accepted` | `POST /api/auth/accept-invite` | E02 |
@@ -1358,7 +1358,7 @@ from MongoDB (audit events and notification preferences) and the email provider.
 - [ ] Add `AuditRepo` to `conman-db` with `ensure_indexes()`
 - [ ] Implement `emit()`: insert-only, fire-and-forget error handling
 - [ ] Implement `query()`: filtered, paginated, ordered by occurred_at desc
-- [ ] Add `GET /api/apps/:appId/audit` handler with RBAC (`app_admin` only)
+- [ ] Add `GET /api/repos/:appId/audit` handler with RBAC (`app_admin` only)
 - [ ] Add pagination and filter support (entity_type, entity_id, action, actor_user_id)
 - [ ] Verify `AuditRepo` has no public update or delete methods (code review gate)
 - [ ] Write unit test: `AuditEvent` serializes to expected JSON shape
@@ -1453,7 +1453,7 @@ from MongoDB (audit events and notification preferences) and the email provider.
   or a default with `email_enabled: true`.
 - [ ] `PATCH /api/me/notification-preferences` toggles the email preference and
   persists the change.
-- [ ] `GET /api/apps/:appId/audit` returns a paginated, filterable, read-only
+- [ ] `GET /api/repos/:appId/audit` returns a paginated, filterable, read-only
   audit log accessible only to `app_admin` users.
 - [ ] Every mutation handler in the system (as enumerated in section 6.3) emits
   an `AuditEvent` with correct `entity_type`, `action`, and `before`/`after`

@@ -450,7 +450,7 @@ Indexes:
 // Unique pair: one role per user per app
 { "user_id": 1, "app_id": 1 }  // unique: true
 
-// List all members of an app (used by GET /api/apps/:appId/members)
+// List all members of an app (used by GET /api/repos/:appId/members)
 { "app_id": 1 }
 
 // Load all memberships for a user (used by auth middleware on every request)
@@ -747,7 +747,7 @@ Errors:
 | 400 | `validation_error` | Password does not meet policy |
 | 409 | `conflict` | User already has a membership for this app |
 
-### `GET /api/apps/:appId/members?page=&limit=`
+### `GET /api/repos/:appId/members?page=&limit=`
 
 List members of an app with their roles. Paginated.
 
@@ -780,7 +780,7 @@ Errors:
 | 404 | `not_found` | App does not exist |
 | 403 | `forbidden` | User is not a member of this app |
 
-### `POST /api/apps/:appId/invites`
+### `POST /api/repos/:appId/invites`
 
 Create an invite for a new user. Only app admins can invite.
 
@@ -822,7 +822,7 @@ Errors:
 | 409 | `conflict` | User is already a member of this app |
 | 404 | `not_found` | App does not exist |
 
-### `POST /api/apps/:appId/invites/:inviteId/resend`
+### `POST /api/repos/:appId/invites/:inviteId/resend`
 
 Resend the invite email. Resets `expires_at` to 7 days from now.
 
@@ -856,7 +856,7 @@ Errors:
 | 404 | `not_found` | Invite does not exist |
 | 400 | `invite_invalid` | Invite already accepted |
 
-### `DELETE /api/apps/:appId/invites/:inviteId`
+### `DELETE /api/repos/:appId/invites/:inviteId`
 
 Revoke a pending invite.
 
@@ -1022,7 +1022,7 @@ pub fn validate_token(token: &str, config: &JwtConfig) -> Result<Claims, ConmanE
 ### Invite flow
 
 ```
-1. app_admin calls POST /api/apps/:appId/invites { email, role }
+1. app_admin calls POST /api/repos/:appId/invites { email, role }
 2. Server validates:
    - Caller has InviteUsers capability (app_admin role)
    - No pending invite exists for this email+app
@@ -1194,10 +1194,10 @@ tested independently.
 - [ ] **E02-S16**: Implement `POST /api/auth/forgot-password` handler. Integration test: existing email creates token, nonexistent email still returns 200.
 - [ ] **E02-S17**: Implement `POST /api/auth/reset-password` handler. Integration test: valid token updates password, expired token returns 410, used token returns 400.
 - [ ] **E02-S18**: Implement `POST /api/auth/accept-invite` handler. Integration test: valid invite creates user + membership + returns JWT, expired invite returns 410, already-accepted returns 400.
-- [ ] **E02-S19**: Implement `GET /api/apps/:appId/members` handler with pagination. Integration test: returns members with roles, respects pagination, non-member returns 403.
-- [ ] **E02-S20**: Implement `POST /api/apps/:appId/invites` handler. Integration test: app_admin can invite, non-admin returns 403, duplicate invite returns 409.
-- [ ] **E02-S21**: Implement `POST /api/apps/:appId/invites/:inviteId/resend` handler. Integration test: resets expiry, already-accepted returns 400.
-- [ ] **E02-S22**: Implement `DELETE /api/apps/:appId/invites/:inviteId` handler. Integration test: deletes pending invite, already-accepted returns 400.
+- [ ] **E02-S19**: Implement `GET /api/repos/:appId/members` handler with pagination. Integration test: returns members with roles, respects pagination, non-member returns 403.
+- [ ] **E02-S20**: Implement `POST /api/repos/:appId/invites` handler. Integration test: app_admin can invite, non-admin returns 403, duplicate invite returns 409.
+- [ ] **E02-S21**: Implement `POST /api/repos/:appId/invites/:inviteId/resend` handler. Integration test: resets expiry, already-accepted returns 400.
+- [ ] **E02-S22**: Implement `DELETE /api/repos/:appId/invites/:inviteId` handler. Integration test: deletes pending invite, already-accepted returns 400.
 - [ ] **E02-S23**: Implement `GET /api/me/notification-preferences` handler. Integration test: returns defaults for new user, returns saved preferences.
 - [ ] **E02-S24**: Implement `PATCH /api/me/notification-preferences` handler. Integration test: updates toggle, subsequent GET reflects change.
 - [ ] **E02-S25**: Add audit event emission to all mutation handlers (invite_created, invite_accepted, invite_revoked, invite_resent, password_reset_requested, password_changed, membership_created, notification_preferences_updated). Verify audit documents in integration tests.

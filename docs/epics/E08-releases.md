@@ -243,7 +243,7 @@ use bson::oid::ObjectId;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-/// POST /api/apps/:appId/releases
+/// POST /api/repos/:appId/releases
 ///
 /// Creates a draft release. The tag is auto-generated as `rYYYY.MM.DD.N`.
 /// Optionally accepts an initial set of changeset IDs to include.
@@ -254,7 +254,7 @@ pub struct CreateReleaseRequest {
     pub changeset_ids: Vec<String>,
 }
 
-/// POST /api/apps/:appId/releases/:releaseId/changesets
+/// POST /api/repos/:appId/releases/:releaseId/changesets
 ///
 /// Add or remove changesets from a draft release. Only valid when release
 /// is in `draft_release` state.
@@ -268,7 +268,7 @@ pub struct AddChangesetsRequest {
     pub remove: Vec<String>,
 }
 
-/// POST /api/apps/:appId/releases/:releaseId/reorder
+/// POST /api/repos/:appId/releases/:releaseId/reorder
 ///
 /// Set the explicit merge order for changesets in a draft release.
 #[derive(Debug, Deserialize)]
@@ -294,7 +294,7 @@ pub struct ReleaseResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-/// List query parameters for GET /api/apps/:appId/releases
+/// List query parameters for GET /api/repos/:appId/releases
 #[derive(Debug, Deserialize)]
 pub struct ReleaseListQuery {
     #[serde(default = "super::default_page")]
@@ -481,7 +481,7 @@ async fn ensure_indexes(&self) -> Result<(), ConmanError> {
 
 ## 5. API Endpoints
 
-All endpoints are scoped under `/api/apps/:appId/releases`. Authentication
+All endpoints are scoped under `/api/repos/:appId/releases`. Authentication
 is required. Role checks are noted per endpoint.
 
 ---
@@ -489,7 +489,7 @@ is required. Role checks are noted per endpoint.
 ### 5.1 List Releases
 
 ```
-GET /api/apps/:appId/releases?page=&limit=&state=
+GET /api/repos/:appId/releases?page=&limit=&state=
 ```
 
 **Role:** Any app member (read access).
@@ -528,7 +528,7 @@ GET /api/apps/:appId/releases?page=&limit=&state=
 **Handler:**
 
 ```rust
-/// GET /api/apps/:appId/releases
+/// GET /api/repos/:appId/releases
 ///
 /// List releases for the app, optionally filtered by state.
 /// Sorted by created_at descending (most recent first).
@@ -558,7 +558,7 @@ pub async fn list_releases(
 ### 5.2 Create Draft Release
 
 ```
-POST /api/apps/:appId/releases
+POST /api/repos/:appId/releases
 ```
 
 **Role:** `config_manager` or `app_admin`.
@@ -608,7 +608,7 @@ POST /api/apps/:appId/releases
 ### 5.3 Get Release Detail
 
 ```
-GET /api/apps/:appId/releases/:releaseId
+GET /api/repos/:appId/releases/:releaseId
 ```
 
 **Role:** Any app member.
@@ -646,7 +646,7 @@ with per-changeset detail:
 ### 5.4 Add/Remove Changesets
 
 ```
-POST /api/apps/:appId/releases/:releaseId/changesets
+POST /api/repos/:appId/releases/:releaseId/changesets
 ```
 
 **Role:** `config_manager` or `app_admin`.
@@ -680,7 +680,7 @@ POST /api/apps/:appId/releases/:releaseId/changesets
 ### 5.5 Reorder Changesets
 
 ```
-POST /api/apps/:appId/releases/:releaseId/reorder
+POST /api/repos/:appId/releases/:releaseId/reorder
 ```
 
 **Role:** `config_manager` or `app_admin`.
@@ -716,7 +716,7 @@ POST /api/apps/:appId/releases/:releaseId/reorder
 ### 5.6 Assemble Release
 
 ```
-POST /api/apps/:appId/releases/:releaseId/assemble
+POST /api/repos/:appId/releases/:releaseId/assemble
 ```
 
 **Role:** `config_manager` or `app_admin`.
@@ -847,7 +847,7 @@ async fn execute_release_assemble(job: &Job, ctx: &WorkerContext) -> Result<(), 
 ### 5.7 Publish Release
 
 ```
-POST /api/apps/:appId/releases/:releaseId/publish
+POST /api/repos/:appId/releases/:releaseId/publish
 ```
 
 **Role:** `config_manager` or `app_admin`.
@@ -1508,27 +1508,27 @@ run test (passes), commit.
   Add to `conman-core` or a service layer. Write unit tests for first tag
   of the day, incrementing, and date boundary behavior.
 
-- [ ] **E08-S08** -- Implement `POST /api/apps/:appId/releases` handler.
+- [ ] **E08-S08** -- Implement `POST /api/repos/:appId/releases` handler.
   Create draft release with tag generation, changeset validation, and
   `ReleaseChangeset` insertion. Write integration test: create release with
   two queued changesets, verify 201 response and database state.
 
-- [ ] **E08-S09** -- Implement `GET /api/apps/:appId/releases` handler.
+- [ ] **E08-S09** -- Implement `GET /api/repos/:appId/releases` handler.
   List with pagination and optional state filter. Write integration tests
   for pagination, state filtering, and empty results.
 
-- [ ] **E08-S10** -- Implement `GET /api/apps/:appId/releases/:releaseId` handler.
+- [ ] **E08-S10** -- Implement `GET /api/repos/:appId/releases/:releaseId` handler.
   Return release detail with `changesets` array. Write integration test.
 
-- [ ] **E08-S11** -- Implement `POST /api/apps/:appId/releases/:releaseId/changesets` handler.
+- [ ] **E08-S11** -- Implement `POST /api/repos/:appId/releases/:releaseId/changesets` handler.
   Add/remove changesets from draft. Write integration tests for add, remove,
   state guard rejection, and duplicate detection.
 
-- [ ] **E08-S12** -- Implement `POST /api/apps/:appId/releases/:releaseId/reorder` handler.
+- [ ] **E08-S12** -- Implement `POST /api/repos/:appId/releases/:releaseId/reorder` handler.
   Validate permutation and update positions. Write integration tests for
   valid reorder, non-permutation rejection, and state guard.
 
-- [ ] **E08-S13** -- Implement `POST /api/apps/:appId/releases/:releaseId/assemble` handler.
+- [ ] **E08-S13** -- Implement `POST /api/repos/:appId/releases/:releaseId/assemble` handler.
   Transition to `Assembling`, create job, return 202. Write integration test
   verifying state transition and job creation.
 
@@ -1542,7 +1542,7 @@ run test (passes), commit.
   `create_release_tag`, `find_tag`, `list_all_tags`, `find_commit`.
   Write unit tests with mock gRPC server for each method.
 
-- [ ] **E08-S16** -- Implement `POST /api/apps/:appId/releases/:releaseId/publish` handler.
+- [ ] **E08-S16** -- Implement `POST /api/repos/:appId/releases/:releaseId/publish` handler.
   Full publish flow: merge to the integration branch, create tag, persist metadata, mark
   changesets released, trigger revalidation. Write integration tests with
   mock gitaly for success and race condition (expected_old_oid mismatch).
@@ -1736,7 +1736,7 @@ async fn create_release_returns_201_with_tag() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases"))
+            .uri(&format!("/api/repos/{app_id}/releases"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1762,7 +1762,7 @@ async fn create_release_rejects_non_queued_changesets() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases"))
+            .uri(&format!("/api/repos/{app_id}/releases"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1782,7 +1782,7 @@ async fn create_release_rejects_user_role() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases"))
+            .uri(&format!("/api/repos/{app_id}/releases"))
             .header("content-type", "application/json")
             .header("authorization", user_token()) // not config_manager
             .body(Body::from(json!({ "changeset_ids": [] }).to_string()))
@@ -1805,7 +1805,7 @@ async fn add_changeset_to_draft_release() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/changesets"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/changesets"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1832,7 +1832,7 @@ async fn modify_changesets_rejected_for_non_draft_release() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/changesets"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/changesets"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1857,7 +1857,7 @@ async fn reorder_changesets_updates_positions() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/reorder"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/reorder"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1881,7 +1881,7 @@ async fn reorder_rejects_non_permutation() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/reorder"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/reorder"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1971,7 +1971,7 @@ async fn publish_creates_tag_and_updates_main() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/publish"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/publish"))
             .header("authorization", config_manager_token())
             .body(Body::empty())
             .unwrap()
@@ -2001,7 +2001,7 @@ async fn publish_fails_on_race_condition() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/publish"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/publish"))
             .header("authorization", config_manager_token())
             .body(Body::empty())
             .unwrap()
@@ -2019,7 +2019,7 @@ async fn publish_rejects_non_validated_release() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/publish"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/publish"))
             .header("authorization", config_manager_token())
             .body(Body::empty())
             .unwrap()
@@ -2041,7 +2041,7 @@ async fn published_release_rejects_changeset_modification() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/changesets"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/changesets"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({ "add": ["aabbcc"], "remove": [] }).to_string()))
@@ -2059,7 +2059,7 @@ async fn published_release_rejects_reorder() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/reorder"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/reorder"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({ "ordered_changeset_ids": [] }).to_string()))
@@ -2077,7 +2077,7 @@ async fn published_release_rejects_re_assembly() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/apps/{app_id}/releases/{release_id}/assemble"))
+            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/assemble"))
             .header("authorization", config_manager_token())
             .body(Body::empty())
             .unwrap()

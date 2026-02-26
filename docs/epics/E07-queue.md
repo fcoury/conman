@@ -203,7 +203,7 @@ Add to `ChangesetRepo::ensure_indexes()`:
 
 ```rust
 // Compound index for ordered queue listing per app.
-// Supports: GET /api/apps/:appId/queue (list queued changesets in order).
+// Supports: GET /api/repos/:appId/queue (list queued changesets in order).
 IndexModel::builder()
     .keys(doc! {
         "app_id": 1,
@@ -228,7 +228,7 @@ compact. Queries filter on `app_id` + `state: "queued"` and sort by
 
 ## 5. API Endpoints
 
-### 5.1 `POST /api/apps/:appId/changesets/:changesetId/queue`
+### 5.1 `POST /api/repos/:appId/changesets/:changesetId/queue`
 
 Move an approved changeset into the queue.
 
@@ -258,7 +258,7 @@ Move an approved changeset into the queue.
 - `409 Conflict` if changeset branch is not up to date with the integration branch.
 - `404 Not Found` if changeset or app does not exist.
 
-### 5.2 `GET /api/apps/:appId/queue?page=&limit=`
+### 5.2 `GET /api/repos/:appId/queue?page=&limit=`
 
 List queued changesets in queue-position order. Convenience endpoint that
 filters `state == queued` and sorts by `queue_position ASC`.
@@ -287,7 +287,7 @@ filters `state == queued` and sorts by `queue_position ASC`.
 }
 ```
 
-### 5.3 `POST /api/apps/:appId/queue/reorder`
+### 5.3 `POST /api/repos/:appId/queue/reorder`
 
 Reorder the entire queue for an app. The request must include every
 currently-queued changeset ID exactly once, in the desired new order.
@@ -320,7 +320,7 @@ currently-queued changeset ID exactly once, in the desired new order.
 
 **Audit:** emits `queue_reordered` audit event with before/after position maps.
 
-### 5.4 `POST /api/apps/:appId/changesets/:changesetId/move-to-draft`
+### 5.4 `POST /api/repos/:appId/changesets/:changesetId/move-to-draft`
 
 Return a conflicted or needs_revalidation changeset to draft state so the
 author can address the issues.
@@ -707,7 +707,7 @@ message Repository {
 - [ ] Implement `resolve_integration_head` in `conman-git` using `FindCommit`.
 - [ ] Add queue-position assignment logic in `conman-db` (atomic
       find-max-and-increment).
-- [ ] Create handler `POST /api/apps/:appId/changesets/:changesetId/queue` in
+- [ ] Create handler `POST /api/repos/:appId/changesets/:changesetId/queue` in
       `conman-api`.
 - [ ] Emit `changeset_queued` audit event.
 - [ ] Add queue index to `ChangesetRepo::ensure_indexes()`.
@@ -716,8 +716,8 @@ message Repository {
 
 - [ ] Create `QueueEntry` DTO in `conman-api`.
 - [ ] Create `ReorderRequest` DTO in `conman-api`.
-- [ ] Implement handler `GET /api/apps/:appId/queue` with pagination.
-- [ ] Implement handler `POST /api/apps/:appId/queue/reorder` with RBAC
+- [ ] Implement handler `GET /api/repos/:appId/queue` with pagination.
+- [ ] Implement handler `POST /api/repos/:appId/queue/reorder` with RBAC
       (config_manager+).
 - [ ] Validate reorder request: exact permutation of current queue.
 - [ ] Atomic bulk position update via MongoDB `bulkWrite`.
@@ -746,7 +746,7 @@ message Repository {
 
 ### E07-05: Move-to-draft
 
-- [ ] Implement handler `POST /api/apps/:appId/changesets/:changesetId/move-to-draft`.
+- [ ] Implement handler `POST /api/repos/:appId/changesets/:changesetId/move-to-draft`.
 - [ ] RBAC: author can move own; config_manager/app_admin can move any.
 - [ ] Clear queue metadata (`queue_position`, `queued_at`).
 - [ ] Clear revalidation metadata.
@@ -832,7 +832,7 @@ message Repository {
 1. **Queue entry:** Approved changesets can transition to Queued only when their
    branch is up to date with the integration branch. Queue position is assigned monotonically.
 
-2. **Queue ordering:** The `GET /api/apps/:appId/queue` endpoint returns
+2. **Queue ordering:** The `GET /api/repos/:appId/queue` endpoint returns
    changesets sorted by `queue_position` in ascending order.
 
 3. **Reorder:** Config managers and app admins can reorder the queue. The

@@ -101,11 +101,12 @@ impl TenantRepo {
         while cursor.advance().await.map_err(|e| ConmanError::Internal {
             message: format!("tenant cursor error: {e}"),
         })? {
-            let doc: TenantDoc = cursor
-                .deserialize_current()
-                .map_err(|e| ConmanError::Internal {
-                    message: format!("failed to decode tenant: {e}"),
-                })?;
+            let doc: TenantDoc =
+                cursor
+                    .deserialize_current()
+                    .map_err(|e| ConmanError::Internal {
+                        message: format!("failed to decode tenant: {e}"),
+                    })?;
             items.push(doc.into());
         }
 
@@ -134,4 +135,3 @@ impl EnsureIndexes for TenantRepo {
         Ok(())
     }
 }
-

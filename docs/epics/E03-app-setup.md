@@ -5,7 +5,7 @@
 Deliver tenant/repository setup, repository settings management, environment
 pipeline metadata, and membership listing/role assignment. After this epic, an
 authenticated app admin can create a tenant, create a repository under that
-tenant, define app surfaces, configure baseline mode, define the environment
+tenant, define apps, configure baseline mode, define the environment
 promotion pipeline, and manage team membership. This epic also establishes
 runtime profiles (including per-surface endpoints) and links them to
 environments.
@@ -13,9 +13,8 @@ environments.
 **Issues:**
 
 - E03-01: `tenants` create/list/get.
-- E03-02: `repos` create under tenant + list/get (with `/api/apps`
-  compatibility retained).
-- E03-03: `app_surfaces` create/list/update per repository.
+- E03-02: `repos` create under tenant + list/get.
+- E03-03: `app_surfaces` create/list/update per repository app.
 - E03-04: Settings API for baseline mode, canonical env, commit mode default,
   blocked paths, file size limit.
 - E03-05: Environment stage CRUD with canonical user-facing environment flag.
@@ -24,7 +23,7 @@ environments.
   profile approval policy settings.
 - E03-08: Runtime profile typed env-var validation + secret visibility policy
   (`app_admin` reveal, others masked).
-- E03-09: Runtime profile `surface_endpoints` validation against app-surface
+- E03-09: Runtime profile `surface_endpoints` validation against app
   keys.
 - E03-10: Direct app-admin runtime profile emergency edits (audited).
 
@@ -399,7 +398,7 @@ pub struct UpdateMemberRoleRequest {
 
 ## 5. API Endpoints
 
-### 5.1 `GET /api/apps?page=&limit=`
+### 5.1 `GET /api/repos?page=&limit=`
 
 List apps visible to the authenticated user.
 
@@ -443,7 +442,7 @@ List apps visible to the authenticated user.
 
 ---
 
-### 5.2 `POST /api/apps`
+### 5.2 `POST /api/repos`
 
 Create a new app and register its Git repository.
 
@@ -511,7 +510,7 @@ Create a new app and register its Git repository.
 
 ---
 
-### 5.3 `GET /api/apps/:appId`
+### 5.3 `GET /api/repos/:appId`
 
 Get a single app by id.
 
@@ -522,7 +521,7 @@ Get a single app by id.
 
 **Response 200:**
 
-Same shape as individual item in `GET /api/apps` list.
+Same shape as individual item in `GET /api/repos` list.
 
 **Errors:**
 
@@ -533,7 +532,7 @@ Same shape as individual item in `GET /api/apps` list.
 
 ---
 
-### 5.4 `PATCH /api/apps/:appId/settings`
+### 5.4 `PATCH /api/repos/:appId/settings`
 
 Update app settings. Partial update — only supplied fields are changed.
 
@@ -565,7 +564,7 @@ Update app settings. Partial update — only supplied fields are changed.
 
 **Response 200:**
 
-Full updated app object (same shape as `GET /api/apps/:appId`).
+Full updated app object (same shape as `GET /api/repos/:appId`).
 
 **Side effects:**
 
@@ -581,7 +580,7 @@ Full updated app object (same shape as `GET /api/apps/:appId`).
 
 ---
 
-### 5.5 `GET /api/apps/:appId/environments`
+### 5.5 `GET /api/repos/:appId/environments`
 
 List environments for an app, ordered by position.
 
@@ -644,7 +643,7 @@ List environments for an app, ordered by position.
 
 ---
 
-### 5.6 `PATCH /api/apps/:appId/environments`
+### 5.6 `PATCH /api/repos/:appId/environments`
 
 Replace the full environment pipeline. Supports add, rename, reorder, remove,
 and canonical flag reassignment in a single atomic operation.
@@ -700,7 +699,7 @@ Full list of environments after update (same shape as `GET .../environments`).
 
 ---
 
-### 5.7 `GET /api/apps/:appId/members?page=&limit=`
+### 5.7 `GET /api/repos/:appId/members?page=&limit=`
 
 List members of an app with their roles.
 
@@ -830,7 +829,7 @@ Two RPCs from `RepositoryService` are needed for app creation.
 
 ### 7.1 RepositoryService.RepositoryExists
 
-Used during `POST /api/apps` to verify the repo path is valid before
+Used during `POST /api/repos` to verify the repo path is valid before
 persisting the app record.
 
 **Proto definitions** (from `gitaly/proto/repository.proto` and
@@ -903,7 +902,7 @@ impl GitalyClient {
 
 ### 7.2 RepositoryService.CreateRepository
 
-Used during `POST /api/apps` when the repo does not yet exist.
+Used during `POST /api/repos` when the repo does not yet exist.
 
 ```protobuf
 // repository.proto
@@ -986,20 +985,19 @@ impl GitalyClient {
   `apps.tenant_id` indexed).
 - [ ] Add `POST/GET /api/tenants`, `GET /api/tenants/:tenantId`, and
   `POST /api/tenants/:tenantId/repos` handlers.
-- [ ] Keep `/api/apps` create/list/get functional as compatibility alias.
 - [ ] Emit audit events for tenant/repository creation.
 
-### E03-02: App-surface model
+### E03-02: App model
 
 - [ ] Add `AppSurface` model and `AppSurfaceRepo` (`repo_id + key` unique).
-- [ ] Add `GET/POST /api/repos/:appId/surfaces` and
-  `PATCH /api/repos/:appId/surfaces/:surfaceId` handlers.
+- [ ] Add `GET/POST /api/repos/:appId/apps` and
+  `PATCH /api/repos/:appId/apps/:surfaceId` handlers.
 - [ ] Enforce `surface.key` validation and repo ownership checks.
 - [ ] Emit audit events for surface create/update.
 
 ### E03-03: Repository settings API
 
-- [ ] Add `PATCH /api/apps/:appId/settings` handler.
+- [ ] Add `PATCH /api/repos/:appId/settings` handler.
 - [ ] Validate `canonical_env_id` references an existing environment in this
   repository.
 - [ ] Validate `baseline_mode` + `canonical_env_id` consistency.
@@ -1010,14 +1008,14 @@ impl GitalyClient {
 
 - [ ] Add/maintain `Environment` repo with unique `(app_id, name)` and
   `(app_id, position)` indexes.
-- [ ] Add `GET /api/apps/:appId/environments`.
-- [ ] Add `PATCH /api/apps/:appId/environments` (full replacement).
+- [ ] Add `GET /api/repos/:appId/environments`.
+- [ ] Add `PATCH /api/repos/:appId/environments` (full replacement).
 - [ ] Validate contiguous positions, unique names, exactly one canonical env.
 - [ ] Auto-update `app.settings.canonical_env_id` on canonical changes.
 
 ### E03-05: Membership and runtime profiles
 
-- [ ] Add `GET /api/apps/:appId/members` and member assignment APIs.
+- [ ] Add `GET /api/repos/:appId/members` and member assignment APIs.
 - [ ] Add runtime profile CRUD/revision APIs with typed env vars and masked
   secret previews.
 - [ ] Validate runtime profile `surface_endpoints` keys against existing app

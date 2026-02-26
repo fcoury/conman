@@ -64,154 +64,152 @@ pub fn build_router(state: AppState) -> Router {
             "/api/tenants/{tenantId}/repos",
             post(create_repo_under_tenant),
         )
-        .route("/api/repos", get(list_apps))
-        .route("/api/repos/{appId}", get(get_app))
         .route(
-            "/api/repos/{appId}/surfaces",
+            "/api/repos/{appId}/apps",
             get(list_repo_surfaces).post(create_repo_surface),
         )
         .route(
-            "/api/repos/{appId}/surfaces/{surfaceId}",
+            "/api/repos/{appId}/apps/{surfaceId}",
             patch(update_repo_surface),
         )
-        .route("/api/apps", get(list_apps).post(create_app))
-        .route("/api/apps/{appId}", get(get_app))
-        .route("/api/apps/{appId}/settings", patch(update_app_settings))
+        .route("/api/repos", get(list_apps).post(create_app))
+        .route("/api/repos/{appId}", get(get_app))
+        .route("/api/repos/{appId}/settings", patch(update_app_settings))
         .route(
-            "/api/apps/{appId}/members",
+            "/api/repos/{appId}/members",
             get(list_members).post(assign_member),
         )
-        .route("/api/apps/{appId}/invites", post(create_invite))
+        .route("/api/repos/{appId}/invites", post(create_invite))
         .route(
-            "/api/apps/{appId}/workspaces",
+            "/api/repos/{appId}/workspaces",
             get(list_workspaces).post(create_workspace),
         )
         .route(
-            "/api/apps/{appId}/workspaces/{workspaceId}",
+            "/api/repos/{appId}/workspaces/{workspaceId}",
             get(get_workspace).patch(update_workspace),
         )
         .route(
-            "/api/apps/{appId}/workspaces/{workspaceId}/reset",
+            "/api/repos/{appId}/workspaces/{workspaceId}/reset",
             post(reset_workspace),
         )
         .route(
-            "/api/apps/{appId}/workspaces/{workspaceId}/sync-integration",
+            "/api/repos/{appId}/workspaces/{workspaceId}/sync-integration",
             post(sync_workspace_integration),
         )
         .route(
-            "/api/apps/{appId}/workspaces/{workspaceId}/files",
+            "/api/repos/{appId}/workspaces/{workspaceId}/files",
             get(get_workspace_file_or_tree)
                 .put(write_workspace_file)
                 .delete(delete_workspace_file),
         )
         .route(
-            "/api/apps/{appId}/workspaces/{workspaceId}/checkpoints",
+            "/api/repos/{appId}/workspaces/{workspaceId}/checkpoints",
             post(create_workspace_checkpoint),
         )
         .route(
-            "/api/apps/{appId}/changesets",
+            "/api/repos/{appId}/changesets",
             get(list_changesets).post(create_changeset),
         )
         .route(
-            "/api/apps/{appId}/changesets/{changesetId}",
+            "/api/repos/{appId}/changesets/{changesetId}",
             get(get_changeset).patch(update_changeset),
         )
         .route(
-            "/api/apps/{appId}/changesets/{changesetId}/submit",
+            "/api/repos/{appId}/changesets/{changesetId}/submit",
             post(submit_changeset),
         )
         .route(
-            "/api/apps/{appId}/changesets/{changesetId}/resubmit",
+            "/api/repos/{appId}/changesets/{changesetId}/resubmit",
             post(resubmit_changeset),
         )
         .route(
-            "/api/apps/{appId}/changesets/{changesetId}/review",
+            "/api/repos/{appId}/changesets/{changesetId}/review",
             post(review_changeset),
         )
         .route(
-            "/api/apps/{appId}/changesets/{changesetId}/queue",
+            "/api/repos/{appId}/changesets/{changesetId}/queue",
             post(queue_changeset),
         )
         .route(
-            "/api/apps/{appId}/changesets/{changesetId}/move-to-draft",
+            "/api/repos/{appId}/changesets/{changesetId}/move-to-draft",
             post(move_changeset_to_draft),
         )
         .route(
-            "/api/apps/{appId}/changesets/{changesetId}/diff",
+            "/api/repos/{appId}/changesets/{changesetId}/diff",
             get(get_changeset_diff),
         )
         .route(
-            "/api/apps/{appId}/changesets/{changesetId}/comments",
+            "/api/repos/{appId}/changesets/{changesetId}/comments",
             get(list_changeset_comments).post(create_changeset_comment),
         )
         .route(
-            "/api/apps/{appId}/releases",
+            "/api/repos/{appId}/releases",
             get(list_releases).post(create_release),
         )
-        .route("/api/apps/{appId}/releases/{releaseId}", get(get_release))
+        .route("/api/repos/{appId}/releases/{releaseId}", get(get_release))
         .route(
-            "/api/apps/{appId}/releases/{releaseId}/changesets",
+            "/api/repos/{appId}/releases/{releaseId}/changesets",
             post(set_release_changesets),
         )
         .route(
-            "/api/apps/{appId}/releases/{releaseId}/reorder",
+            "/api/repos/{appId}/releases/{releaseId}/reorder",
             post(reorder_release_changesets),
         )
         .route(
-            "/api/apps/{appId}/releases/{releaseId}/assemble",
+            "/api/repos/{appId}/releases/{releaseId}/assemble",
             post(assemble_release),
         )
         .route(
-            "/api/apps/{appId}/releases/{releaseId}/publish",
+            "/api/repos/{appId}/releases/{releaseId}/publish",
             post(publish_release),
         )
         .route(
-            "/api/apps/{appId}/environments",
+            "/api/repos/{appId}/environments",
             get(list_environments).patch(replace_environments),
         )
         .route(
-            "/api/apps/{appId}/runtime-profiles",
+            "/api/repos/{appId}/runtime-profiles",
             get(list_runtime_profiles).post(create_runtime_profile),
         )
         .route(
-            "/api/apps/{appId}/runtime-profiles/{profileId}",
+            "/api/repos/{appId}/runtime-profiles/{profileId}",
             get(get_runtime_profile).patch(update_runtime_profile),
         )
         .route(
-            "/api/apps/{appId}/runtime-profiles/{profileId}/secrets/{key}/reveal",
+            "/api/repos/{appId}/runtime-profiles/{profileId}/secrets/{key}/reveal",
             post(reveal_runtime_profile_secret),
         )
         .route(
-            "/api/apps/{appId}/environments/{envId}/deploy",
+            "/api/repos/{appId}/environments/{envId}/deploy",
             post(deploy_environment),
         )
         .route(
-            "/api/apps/{appId}/environments/{envId}/promote",
+            "/api/repos/{appId}/environments/{envId}/promote",
             post(promote_environment),
         )
         .route(
-            "/api/apps/{appId}/environments/{envId}/rollback",
+            "/api/repos/{appId}/environments/{envId}/rollback",
             post(rollback_environment),
         )
-        .route("/api/apps/{appId}/deployments", get(list_deployments))
+        .route("/api/repos/{appId}/deployments", get(list_deployments))
         .route(
-            "/api/apps/{appId}/temp-envs",
+            "/api/repos/{appId}/temp-envs",
             get(list_temp_envs).post(create_temp_env),
         )
         .route(
-            "/api/apps/{appId}/temp-envs/{tempEnvId}/extend",
+            "/api/repos/{appId}/temp-envs/{tempEnvId}/extend",
             post(extend_temp_env),
         )
         .route(
-            "/api/apps/{appId}/temp-envs/{tempEnvId}/undo-expire",
+            "/api/repos/{appId}/temp-envs/{tempEnvId}/undo-expire",
             post(undo_expire_temp_env),
         )
         .route(
-            "/api/apps/{appId}/temp-envs/{tempEnvId}",
+            "/api/repos/{appId}/temp-envs/{tempEnvId}",
             delete(delete_temp_env),
         )
-        .route("/api/apps/{appId}/jobs", get(list_jobs))
-        .route("/api/apps/{appId}/jobs/{jobId}", get(get_job))
+        .route("/api/repos/{appId}/jobs", get(list_jobs))
+        .route("/api/repos/{appId}/jobs/{jobId}", get(get_job))
         .route(
             "/api/me/notification-preferences",
             get(get_notification_preferences).patch(update_notification_preferences),

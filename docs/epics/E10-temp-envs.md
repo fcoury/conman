@@ -223,7 +223,7 @@ API-facing types, distinct from the domain `TempEnvironment` struct.
 ```rust
 use serde::{Deserialize, Serialize};
 
-/// Request body for `POST /api/apps/:appId/temp-envs`.
+/// Request body for `POST /api/repos/:appId/temp-envs`.
 ///
 /// Exactly one of `workspace_id` or `changeset_id` must be provided.
 /// The `kind` field is inferred from which ID is present.
@@ -274,7 +274,7 @@ pub struct TempEnvResponse {
     pub updated_at: String,
 }
 
-/// Request body for `POST /api/apps/:appId/temp-envs/:tempEnvId/extend`.
+/// Request body for `POST /api/repos/:appId/temp-envs/:tempEnvId/extend`.
 ///
 /// Allows the user to add additional hours to the current TTL.
 /// The extension is capped at 72h total from the original creation time
@@ -476,7 +476,7 @@ impl TempEnvRepo {
 ### 5.1 Create Temp Environment
 
 ```
-POST /api/apps/:appId/temp-envs
+POST /api/repos/:appId/temp-envs
 ```
 
 **Auth:** Any role (`user`, `reviewer`, `config_manager`, `app_admin`).
@@ -536,7 +536,7 @@ or:
 ### 5.2 List Temp Environments
 
 ```
-GET /api/apps/:appId/temp-envs?page=&limit=
+GET /api/repos/:appId/temp-envs?page=&limit=
 ```
 
 **Auth:** Any role.
@@ -574,7 +574,7 @@ GET /api/apps/:appId/temp-envs?page=&limit=
 ### 5.3 Extend TTL
 
 ```
-POST /api/apps/:appId/temp-envs/:tempEnvId/extend
+POST /api/repos/:appId/temp-envs/:tempEnvId/extend
 ```
 
 **Auth:** Any role. The user must be the creator of the temp environment, or
@@ -617,7 +617,7 @@ hold `config_manager`/`app_admin` role on the app.
 ### 5.4 Undo Expire
 
 ```
-POST /api/apps/:appId/temp-envs/:tempEnvId/undo-expire
+POST /api/repos/:appId/temp-envs/:tempEnvId/undo-expire
 ```
 
 **Auth:** Same as extend (creator, `config_manager`, or `app_admin`).
@@ -654,7 +654,7 @@ POST /api/apps/:appId/temp-envs/:tempEnvId/undo-expire
 ### 5.5 Delete Temp Environment
 
 ```
-DELETE /api/apps/:appId/temp-envs/:tempEnvId
+DELETE /api/repos/:appId/temp-envs/:tempEnvId
 ```
 
 **Auth:** Creator, `config_manager`, or `app_admin`.
@@ -1106,13 +1106,13 @@ run test (passes), commit.
   `From<TempEnvironment>` conversion. Write unit tests for serialization and
   validation (e.g., mutually exclusive workspace_id/changeset_id).
 
-- [ ] **E10-S04** -- Implement `POST /api/apps/:appId/temp-envs` handler.
+- [ ] **E10-S04** -- Implement `POST /api/repos/:appId/temp-envs` handler.
   Validate input, check for existing active temp env, insert document, enqueue
   `temp_env_provision` job, emit audit event, return 201.
   Write integration tests: happy path (workspace), happy path (changeset),
   missing both IDs (400), duplicate active env (409), nonexistent source (404).
 
-- [ ] **E10-S05** -- Implement `GET /api/apps/:appId/temp-envs` handler.
+- [ ] **E10-S05** -- Implement `GET /api/repos/:appId/temp-envs` handler.
   Query with pagination, exclude deleted. Write integration tests: empty list,
   populated list, pagination boundaries.
 
@@ -1225,7 +1225,7 @@ async fn create_workspace_temp_env() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/apps/664f0a1b2c3d4e5f6a7b8c9d/temp-envs")
+                .uri("/api/repos/664f0a1b2c3d4e5f6a7b8c9d/temp-envs")
                 .header("content-type", "application/json")
                 .header("authorization", "Bearer <valid_token>")
                 .body(Body::from(r#"{"workspace_id":"665012ab3c4d5e6f7a8b9c0d"}"#))
@@ -1255,7 +1255,7 @@ async fn create_temp_env_rejects_duplicate() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/apps/664f0a1b2c3d4e5f6a7b8c9d/temp-envs")
+                .uri("/api/repos/664f0a1b2c3d4e5f6a7b8c9d/temp-envs")
                 .header("content-type", "application/json")
                 .header("authorization", "Bearer <valid_token>")
                 .body(Body::from(r#"{"workspace_id":"665012ab3c4d5e6f7a8b9c0d"}"#))
@@ -1282,7 +1282,7 @@ async fn create_temp_env_rejects_both_ids() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/apps/664f0a1b2c3d4e5f6a7b8c9d/temp-envs")
+                .uri("/api/repos/664f0a1b2c3d4e5f6a7b8c9d/temp-envs")
                 .header("content-type", "application/json")
                 .header("authorization", "Bearer <valid_token>")
                 .body(Body::from(
@@ -1309,7 +1309,7 @@ async fn extend_ttl_succeeds() {
             Request::builder()
                 .method("POST")
                 .uri(&format!(
-                    "/api/apps/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}/extend"
+                    "/api/repos/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}/extend"
                 ))
                 .header("content-type", "application/json")
                 .header("authorization", "Bearer <valid_token>")
@@ -1341,7 +1341,7 @@ async fn extend_ttl_rejects_over_max_lifetime() {
             Request::builder()
                 .method("POST")
                 .uri(&format!(
-                    "/api/apps/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}/extend"
+                    "/api/repos/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}/extend"
                 ))
                 .header("content-type", "application/json")
                 .header("authorization", "Bearer <valid_token>")
@@ -1373,7 +1373,7 @@ async fn undo_expire_reactivates_env() {
             Request::builder()
                 .method("POST")
                 .uri(&format!(
-                    "/api/apps/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}/undo-expire"
+                    "/api/repos/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}/undo-expire"
                 ))
                 .header("authorization", "Bearer <valid_token>")
                 .body(Body::empty())
@@ -1403,7 +1403,7 @@ async fn undo_expire_fails_after_grace() {
             Request::builder()
                 .method("POST")
                 .uri(&format!(
-                    "/api/apps/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}/undo-expire"
+                    "/api/repos/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}/undo-expire"
                 ))
                 .header("authorization", "Bearer <valid_token>")
                 .body(Body::empty())
@@ -1428,7 +1428,7 @@ async fn delete_active_temp_env() {
             Request::builder()
                 .method("DELETE")
                 .uri(&format!(
-                    "/api/apps/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}"
+                    "/api/repos/664f0a1b2c3d4e5f6a7b8c9d/temp-envs/{temp_env_id}"
                 ))
                 .header("authorization", "Bearer <valid_token>")
                 .body(Body::empty())
@@ -1540,9 +1540,9 @@ async fn touch_activity_extends_expiry() {
 ## 10. Acceptance Criteria
 
 1. **Temp environments can be created on demand from a workspace or changeset.**
-   - `POST /api/apps/:appId/temp-envs` with `workspace_id` creates a workspace
+   - `POST /api/repos/:appId/temp-envs` with `workspace_id` creates a workspace
      temp env in `Provisioning` state and returns 201.
-   - `POST /api/apps/:appId/temp-envs` with `changeset_id` creates a changeset
+   - `POST /api/repos/:appId/temp-envs` with `changeset_id` creates a changeset
      temp env in `Provisioning` state and returns 201.
    - The provisioning job creates an isolated database and (for workspace kind)
      a snapshot Git branch, then transitions state to `Active`.
@@ -1585,7 +1585,7 @@ async fn touch_activity_extends_expiry() {
    - Notifications respect the per-user toggle (E11).
 
 7. **Explicit delete tears down immediately.**
-   - `DELETE /api/apps/:appId/temp-envs/:tempEnvId` transitions state to
+   - `DELETE /api/repos/:appId/temp-envs/:tempEnvId` transitions state to
      `Deleted` and enqueues a cleanup job.
    - Allowed from `Active` or `Expiring` state.
    - Returns 204 on success.

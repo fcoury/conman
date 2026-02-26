@@ -94,7 +94,7 @@ conman (binary)
 **`conman-api`** — HTTP layer. Contains:
 
 - Axum router with all route definitions
-- Handler functions (resources include tenants, repos/surfaces, apps-compat,
+- Handler functions (resources include tenants, repos/apps,
   workspaces, changesets, etc.)
 - Middleware: auth extraction, request ID injection, error mapping
 - Request/response types (API-facing DTOs, not domain types)
@@ -317,8 +317,8 @@ Loaded from environment variables with `CONMAN_` prefix:
 | Term            | Definition                                                                                    |
 | --------------- | --------------------------------------------------------------------------------------------- |
 | Tenant          | Top-level customer/account boundary for repositories                                           |
-| Repository      | Managed config repository (stored in `App`; `/api/repos` primary, `/api/repos` compatibility) |
-| App Surface     | User-facing app within a repository (domains/branding/role hints)                             |
+| Repository      | Managed config repository (stored in `App`; exposed by `/api/repos`)                           |
+| App             | User-facing app within a repository (domains/branding/role hints)                              |
 | Workspace       | User-owned mutable branch (`ws/<user>/<app>`)                                                 |
 | Changeset       | Reviewable proposal: workspace HEAD vs integration baseline                                   |
 | Release         | Immutable Git tag (`rYYYY.MM.DD.N`) of composed changesets                                    |
@@ -413,7 +413,7 @@ Runtime profile rules in v1:
 
 - Profiles are versioned and tied to releases.
 - Precedence is `app defaults < environment profile < temp overrides`.
-- `surface_endpoints` keys must map to existing app-surface keys for that repo.
+- `surface_endpoints` keys must map to existing app keys for that repo.
 - Secrets are encrypted at rest via envelope encryption (master key from
   config, per-record data keys).
 - Secret plaintext reveal is `app_admin`-only; other roles get masked previews.

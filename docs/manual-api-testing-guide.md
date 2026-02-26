@@ -82,7 +82,7 @@ wait_job() {
   local job_id="$2"
   while true; do
     local state
-    state=$(api GET "/api/apps/$app_id/jobs/$job_id" | jq -r '.data.job.state')
+    state=$(api GET "/api/repos/$app_id/jobs/$job_id" | jq -r '.data.job.state')
     echo "job $job_id state=$state"
     case "$state" in
       succeeded|failed|canceled) break ;;
@@ -136,10 +136,10 @@ api GET /api/repos | jq
 api GET "/api/repos/$APP_ID" | jq
 
 # Compatibility alias still available.
-api GET /api/apps | jq
-api GET "/api/apps/$APP_ID" | jq
+api GET /api/repos | jq
+api GET "/api/repos/$APP_ID" | jq
 
-api PATCH "/api/apps/$APP_ID/settings" -d '{
+api PATCH "/api/repos/$APP_ID/settings" -d '{
   "baseline_mode": "canonical_env_release",
   "commit_mode_default": "submit_commit",
   "blocked_paths": [".git/**", ".gitignore", ".github/**"],
@@ -148,22 +148,22 @@ api PATCH "/api/apps/$APP_ID/settings" -d '{
 }' | jq
 ```
 
-## 7. Create app surfaces
+## 7. Create apps
 
 ```bash
-api POST "/api/repos/$APP_ID/surfaces" -d '{
+api POST "/api/repos/$APP_ID/apps" -d '{
   "key": "portal",
   "title": "Patient Portal",
   "domains": ["portal.example.test"]
 }' | jq
 
-api POST "/api/repos/$APP_ID/surfaces" -d '{
+api POST "/api/repos/$APP_ID/apps" -d '{
   "key": "admin",
   "title": "Admin Console",
   "domains": ["admin.example.test"]
 }' | jq
 
-api GET "/api/repos/$APP_ID/surfaces" | jq
+api GET "/api/repos/$APP_ID/apps" | jq
 ```
 
 ## 8. Runtime profiles and environments
@@ -171,7 +171,7 @@ api GET "/api/repos/$APP_ID/surfaces" | jq
 Create two persistent runtime profiles:
 
 ```bash
-DEV_PROFILE_JSON=$(api POST "/api/apps/$APP_ID/runtime-profiles" -d '{
+DEV_PROFILE_JSON=$(api POST "/api/repos/$APP_ID/runtime-profiles" -d '{
   "name": "Development",
   "kind": "persistent_env",
   "base_url": "https://dev.example.test",
@@ -194,7 +194,7 @@ DEV_PROFILE_JSON=$(api POST "/api/apps/$APP_ID/runtime-profiles" -d '{
 }')
 export DEV_PROFILE_ID=$(echo "$DEV_PROFILE_JSON" | jq -r '.data.id')
 
-PROD_PROFILE_JSON=$(api POST "/api/apps/$APP_ID/runtime-profiles" -d '{
+PROD_PROFILE_JSON=$(api POST "/api/repos/$APP_ID/runtime-profiles" -d '{
   "name": "Production",
   "kind": "persistent_env",
   "base_url": "https://app.example.test",
@@ -216,18 +216,18 @@ PROD_PROFILE_JSON=$(api POST "/api/apps/$APP_ID/runtime-profiles" -d '{
 }')
 export PROD_PROFILE_ID=$(echo "$PROD_PROFILE_JSON" | jq -r '.data.id')
 
-api GET "/api/apps/$APP_ID/runtime-profiles" | jq
-api GET "/api/apps/$APP_ID/runtime-profiles/$DEV_PROFILE_ID" | jq
-api PATCH "/api/apps/$APP_ID/runtime-profiles/$DEV_PROFILE_ID" -d '{
+api GET "/api/repos/$APP_ID/runtime-profiles" | jq
+api GET "/api/repos/$APP_ID/runtime-profiles/$DEV_PROFILE_ID" | jq
+api PATCH "/api/repos/$APP_ID/runtime-profiles/$DEV_PROFILE_ID" -d '{
   "base_url": "https://dev2.example.test"
 }' | jq
-api POST "/api/apps/$APP_ID/runtime-profiles/$DEV_PROFILE_ID/secrets/API_KEY/reveal" | jq
+api POST "/api/repos/$APP_ID/runtime-profiles/$DEV_PROFILE_ID/secrets/API_KEY/reveal" | jq
 ```
 
 Replace environment set and mark canonical env:
 
 ```bash
-ENV_JSON=$(api PATCH "/api/apps/$APP_ID/environments" -d "{
+ENV_JSON=$(api PATCH "/api/repos/$APP_ID/environments" -d "{
   \"environments\": [
     {\"name\":\"dev\",  \"position\":1, \"is_canonical\":false, \"runtime_profile_id\":\"$DEV_PROFILE_ID\"},
     {\"name\":\"qa\",   \"position\":2, \"is_canonical\":false, \"runtime_profile_id\":\"$DEV_PROFILE_ID\"},
@@ -240,13 +240,13 @@ export DEV_ENV_ID=$(echo "$ENV_JSON" | jq -r '.data[] | select(.name=="dev") | .
 export QA_ENV_ID=$(echo "$ENV_JSON" | jq -r '.data[] | select(.name=="qa") | .id')
 export PROD_ENV_ID=$(echo "$ENV_JSON" | jq -r '.data[] | select(.name=="prod") | .id')
 
-api GET "/api/apps/$APP_ID/environments" | jq
+api GET "/api/repos/$APP_ID/environments" | jq
 ```
 
 ## 9. Members and invites (create reviewer user)
 
 ```bash
-INVITE_JSON=$(api POST "/api/apps/$APP_ID/invites" -d '{
+INVITE_JSON=$(api POST "/api/repos/$APP_ID/invites" -d '{
   "email": "reviewer@example.com",
   "role": "reviewer"
 }')
@@ -262,36 +262,36 @@ export REVIEWER_TOKEN=$(echo "$REVIEWER_LOGIN" | jq -r '.data.token')
 export REVIEWER_USER_ID=$(echo "$REVIEWER_LOGIN" | jq -r '.data.user.id')
 
 # Optional explicit role assignment endpoint.
-api POST "/api/apps/$APP_ID/members" -d "{\"user_id\":\"$REVIEWER_USER_ID\",\"role\":\"reviewer\"}" | jq
-api GET "/api/apps/$APP_ID/members" | jq
+api POST "/api/repos/$APP_ID/members" -d "{\"user_id\":\"$REVIEWER_USER_ID\",\"role\":\"reviewer\"}" | jq
+api GET "/api/repos/$APP_ID/members" | jq
 ```
 
 ## 10. Workspace and file operations
 
 ```bash
-WS_JSON=$(api POST "/api/apps/$APP_ID/workspaces" -d '{"title":"Main Workspace"}')
+WS_JSON=$(api POST "/api/repos/$APP_ID/workspaces" -d '{"title":"Main Workspace"}')
 export WORKSPACE_ID=$(echo "$WS_JSON" | jq -r '.data.id')
 
 echo "$WS_JSON" | jq
-api GET "/api/apps/$APP_ID/workspaces" | jq
-api GET "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID" | jq
-api PATCH "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID" -d '{"title":"Main Workspace v2"}' | jq
+api GET "/api/repos/$APP_ID/workspaces" | jq
+api GET "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID" | jq
+api PATCH "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID" -d '{"title":"Main Workspace v2"}' | jq
 
 # Write file (content must be base64).
 FILE_B64=$(printf 'feature:\n  enabled: true\n' | base64)
-api PUT "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/files" -d "{
+api PUT "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files" -d "{
   \"path\": \"config/app.yaml\",
   \"content\": \"$FILE_B64\",
   \"message\": \"add config\"
 }" | jq
 
-api GET "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/files?path=config/app.yaml" | jq
-api GET "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/files?path=config" | jq
+api GET "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files?path=config/app.yaml" | jq
+api GET "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files?path=config" | jq
 
-api POST "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/checkpoints" -d '{"message":"checkpoint 1"}' | jq
-api POST "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/sync-integration" -d '{}' | jq
-api DELETE "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/files" -d '{"path":"config/app.yaml"}' | jq
-api POST "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/reset" -d '{}' | jq
+api POST "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/checkpoints" -d '{"message":"checkpoint 1"}' | jq
+api POST "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/sync-integration" -d '{}' | jq
+api DELETE "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files" -d '{"path":"config/app.yaml"}' | jq
+api POST "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/reset" -d '{}' | jq
 ```
 
 ## 11. Changesets: create -> submit -> review -> queue
@@ -300,7 +300,7 @@ Create a fresh file change first:
 
 ```bash
 FILE_B64=$(printf 'feature:\n  enabled: false\n' | base64)
-api PUT "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/files" -d "{
+api PUT "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files" -d "{
   \"path\": \"config/app.yaml\",
   \"content\": \"$FILE_B64\",
   \"message\": \"toggle feature\"
@@ -310,7 +310,7 @@ api PUT "/api/apps/$APP_ID/workspaces/$WORKSPACE_ID/files" -d "{
 Create and submit changeset:
 
 ```bash
-CS_JSON=$(api POST "/api/apps/$APP_ID/changesets" -d "{
+CS_JSON=$(api POST "/api/repos/$APP_ID/changesets" -d "{
   \"workspace_id\": \"$WORKSPACE_ID\",
   \"title\": \"Toggle feature\",
   \"description\": \"Manual API test changeset\"
@@ -318,11 +318,11 @@ CS_JSON=$(api POST "/api/apps/$APP_ID/changesets" -d "{
 export CHANGESET_ID=$(echo "$CS_JSON" | jq -r '.data.id')
 
 echo "$CS_JSON" | jq
-api GET "/api/apps/$APP_ID/changesets?page=1&limit=20" | jq
-api GET "/api/apps/$APP_ID/changesets/$CHANGESET_ID" | jq
-api PATCH "/api/apps/$APP_ID/changesets/$CHANGESET_ID" -d '{"description":"Updated description"}' | jq
+api GET "/api/repos/$APP_ID/changesets?page=1&limit=20" | jq
+api GET "/api/repos/$APP_ID/changesets/$CHANGESET_ID" | jq
+api PATCH "/api/repos/$APP_ID/changesets/$CHANGESET_ID" -d '{"description":"Updated description"}' | jq
 
-SUBMIT_JSON=$(api POST "/api/apps/$APP_ID/changesets/$CHANGESET_ID/submit" -d "{
+SUBMIT_JSON=$(api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/submit" -d "{
   \"profile_overrides\": [
     {\"key\":\"FEATURE_X\",\"value\":{\"type\":\"boolean\",\"value\":true},\"target_profile_id\":\"$DEV_PROFILE_ID\"}
   ]
@@ -336,23 +336,23 @@ wait_job "$APP_ID" "$SUBMIT_JOB_ID"
 Review (as reviewer) and queue (as admin/config manager):
 
 ```bash
-curl -sS -X POST "$BASE/api/apps/$APP_ID/changesets/$CHANGESET_ID/review" \
+curl -sS -X POST "$BASE/api/repos/$APP_ID/changesets/$CHANGESET_ID/review" \
   -H "authorization: Bearer $REVIEWER_TOKEN" \
   -H 'content-type: application/json' \
   -d '{"action":"approve"}' | jq
 
-api POST "/api/apps/$APP_ID/changesets/$CHANGESET_ID/queue" -d '{}' | jq
+api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/queue" -d '{}' | jq
 
 # Diff + comments.
-api GET "/api/apps/$APP_ID/changesets/$CHANGESET_ID/diff?format=semantic" | jq
-api GET "/api/apps/$APP_ID/changesets/$CHANGESET_ID/diff?format=raw" | jq
-api POST "/api/apps/$APP_ID/changesets/$CHANGESET_ID/comments" -d '{"body":"looks good"}' | jq
-api GET "/api/apps/$APP_ID/changesets/$CHANGESET_ID/comments" | jq
+api GET "/api/repos/$APP_ID/changesets/$CHANGESET_ID/diff?format=semantic" | jq
+api GET "/api/repos/$APP_ID/changesets/$CHANGESET_ID/diff?format=raw" | jq
+api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/comments" -d '{"body":"looks good"}' | jq
+api GET "/api/repos/$APP_ID/changesets/$CHANGESET_ID/comments" | jq
 
 # Optional draft transition from queued state.
-api POST "/api/apps/$APP_ID/changesets/$CHANGESET_ID/move-to-draft" -d '{}' | jq
+api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/move-to-draft" -d '{}' | jq
 # Re-submit path (after moving draft and making additional edit).
-api POST "/api/apps/$APP_ID/changesets/$CHANGESET_ID/resubmit" -d '{"profile_overrides":[]}' | jq
+api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/resubmit" -d '{"profile_overrides":[]}' | jq
 ```
 
 ## 12. Release flow (queue-first)
@@ -360,32 +360,32 @@ api POST "/api/apps/$APP_ID/changesets/$CHANGESET_ID/resubmit" -d '{"profile_ove
 Make sure the changeset is approved + queued before continuing.
 
 ```bash
-REL_JSON=$(api POST "/api/apps/$APP_ID/releases" -d '{}')
+REL_JSON=$(api POST "/api/repos/$APP_ID/releases" -d '{}')
 export RELEASE_ID=$(echo "$REL_JSON" | jq -r '.data.id')
 
 echo "$REL_JSON" | jq
-api GET "/api/apps/$APP_ID/releases?page=1&limit=20" | jq
-api GET "/api/apps/$APP_ID/releases/$RELEASE_ID" | jq
+api GET "/api/repos/$APP_ID/releases?page=1&limit=20" | jq
+api GET "/api/repos/$APP_ID/releases/$RELEASE_ID" | jq
 
-api POST "/api/apps/$APP_ID/releases/$RELEASE_ID/changesets" -d "{
+api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/changesets" -d "{
   \"changeset_ids\": [\"$CHANGESET_ID\"]
 }" | jq
 
-api POST "/api/apps/$APP_ID/releases/$RELEASE_ID/reorder" -d "{
+api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/reorder" -d "{
   \"changeset_ids\": [\"$CHANGESET_ID\"]
 }" | jq
 
-ASM_JSON=$(api POST "/api/apps/$APP_ID/releases/$RELEASE_ID/assemble" -d '{}')
+ASM_JSON=$(api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/assemble" -d '{}')
 ASM_JOB_ID=$(echo "$ASM_JSON" | jq -r '.data.job.id')
 wait_job "$APP_ID" "$ASM_JOB_ID"
 
 # Publish can return 409 first time if merge gate job gets enqueued.
-PUBLISH_STATUS=$(api POST "/api/apps/$APP_ID/releases/$RELEASE_ID/publish" -d '{}' | tee /tmp/publish.json | jq -r '.data.release.id // empty')
+PUBLISH_STATUS=$(api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/publish" -d '{}' | tee /tmp/publish.json | jq -r '.data.release.id // empty')
 if [ -z "$PUBLISH_STATUS" ]; then
   echo "publish returned non-success; poll jobs and retry"
-  api GET "/api/apps/$APP_ID/jobs?page=1&limit=50" | jq
+  api GET "/api/repos/$APP_ID/jobs?page=1&limit=50" | jq
   # Retry publish until success:
-  api POST "/api/apps/$APP_ID/releases/$RELEASE_ID/publish" -d '{}' | jq
+  api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/publish" -d '{}' | jq
 else
   cat /tmp/publish.json | jq
 fi
@@ -398,7 +398,7 @@ Deploy uses gate jobs (drift check and msuite deploy). First deploy calls may re
 
 ```bash
 # Attempt deploy to dev.
-api POST "/api/apps/$APP_ID/environments/$DEV_ENV_ID/deploy" -d "{
+api POST "/api/repos/$APP_ID/environments/$DEV_ENV_ID/deploy" -d "{
   \"release_id\": \"$RELEASE_ID\",
   \"is_skip_stage\": false,
   \"is_concurrent_batch\": false,
@@ -406,10 +406,10 @@ api POST "/api/apps/$APP_ID/environments/$DEV_ENV_ID/deploy" -d "{
 }" | jq
 
 # Inspect/poll jobs, then retry deploy until you get data.deployment + data.job.
-api GET "/api/apps/$APP_ID/jobs?page=1&limit=50" | jq
+api GET "/api/repos/$APP_ID/jobs?page=1&limit=50" | jq
 
 # Promote to QA.
-api POST "/api/apps/$APP_ID/environments/$QA_ENV_ID/promote" -d "{
+api POST "/api/repos/$APP_ID/environments/$QA_ENV_ID/promote" -d "{
   \"release_id\": \"$RELEASE_ID\",
   \"is_skip_stage\": false,
   \"is_concurrent_batch\": false,
@@ -418,7 +418,7 @@ api POST "/api/apps/$APP_ID/environments/$QA_ENV_ID/promote" -d "{
 
 # Exceptional concurrent/skip-stage deploy example (requires two distinct approvers,
 # with at least one config_manager/app_admin).
-api POST "/api/apps/$APP_ID/environments/$PROD_ENV_ID/deploy" -d "{
+api POST "/api/repos/$APP_ID/environments/$PROD_ENV_ID/deploy" -d "{
   \"release_id\": \"$RELEASE_ID\",
   \"is_skip_stage\": true,
   \"is_concurrent_batch\": false,
@@ -426,19 +426,19 @@ api POST "/api/apps/$APP_ID/environments/$PROD_ENV_ID/deploy" -d "{
 }" | jq
 
 # Rollback (mode: revert_and_release or redeploy_prior_tag).
-api POST "/api/apps/$APP_ID/environments/$PROD_ENV_ID/rollback" -d "{
+api POST "/api/repos/$APP_ID/environments/$PROD_ENV_ID/rollback" -d "{
   \"release_id\": \"$RELEASE_ID\",
   \"mode\": \"revert_and_release\",
   \"approvals\": [\"$REVIEWER_USER_ID\", \"$ADMIN_USER_ID\"]
 }" | jq
 
-api GET "/api/apps/$APP_ID/deployments?page=1&limit=50" | jq
+api GET "/api/repos/$APP_ID/deployments?page=1&limit=50" | jq
 ```
 
 ## 14. Temp environments
 
 ```bash
-TEMP_JSON=$(api POST "/api/apps/$APP_ID/temp-envs" -d "{
+TEMP_JSON=$(api POST "/api/repos/$APP_ID/temp-envs" -d "{
   \"kind\": \"workspace\",
   \"source_id\": \"$WORKSPACE_ID\",
   \"base_profile_id\": \"$DEV_PROFILE_ID\"
@@ -449,20 +449,20 @@ export TEMP_ENV_ID=$(echo "$TEMP_JSON" | jq -r '.data.temp_env.id')
 export TEMP_JOB_ID=$(echo "$TEMP_JSON" | jq -r '.data.job.id')
 wait_job "$APP_ID" "$TEMP_JOB_ID"
 
-api GET "/api/apps/$APP_ID/temp-envs?page=1&limit=20" | jq
-api POST "/api/apps/$APP_ID/temp-envs/$TEMP_ENV_ID/extend" -d '{"seconds":7200}' | jq
-api DELETE "/api/apps/$APP_ID/temp-envs/$TEMP_ENV_ID" -d '{}' | jq
-api POST "/api/apps/$APP_ID/temp-envs/$TEMP_ENV_ID/undo-expire" -d '{}' | jq
+api GET "/api/repos/$APP_ID/temp-envs?page=1&limit=20" | jq
+api POST "/api/repos/$APP_ID/temp-envs/$TEMP_ENV_ID/extend" -d '{"seconds":7200}' | jq
+api DELETE "/api/repos/$APP_ID/temp-envs/$TEMP_ENV_ID" -d '{}' | jq
+api POST "/api/repos/$APP_ID/temp-envs/$TEMP_ENV_ID/undo-expire" -d '{}' | jq
 ```
 
 ## 15. Jobs endpoint usage for all async flows
 
 ```bash
-api GET "/api/apps/$APP_ID/jobs?page=1&limit=100" | jq
+api GET "/api/repos/$APP_ID/jobs?page=1&limit=100" | jq
 
 # Pick one job id and inspect logs.
-JOB_ID=$(api GET "/api/apps/$APP_ID/jobs?page=1&limit=1" | jq -r '.data[0].id')
-api GET "/api/apps/$APP_ID/jobs/$JOB_ID" | jq
+JOB_ID=$(api GET "/api/repos/$APP_ID/jobs?page=1&limit=1" | jq -r '.data[0].id')
+api GET "/api/repos/$APP_ID/jobs/$JOB_ID" | jq
 ```
 
 ## 16. Endpoint coverage checklist

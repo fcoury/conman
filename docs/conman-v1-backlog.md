@@ -96,9 +96,8 @@ Goal: Manage tenant/repo setup, repository-level configuration, and baseline beh
 Issues:
 
 1. E03-01: `tenants` create/list/get APIs.
-2. E03-02: Repository creation under tenant + `repos` list/get APIs, with
-   `/api/repos` compatibility alias preserved.
-3. E03-03: App-surface CRUD/list APIs per repository.
+2. E03-02: Repository creation under tenant + `repos` list/get APIs.
+3. E03-03: App CRUD/list APIs per repository.
 4. E03-04: Settings API for baseline mode, canonical env, commit mode default,
    blocked paths, file size limit.
 5. E03-05: Environment stage CRUD with canonical user-facing environment flag.
@@ -108,12 +107,12 @@ Issues:
 8. E03-08: Runtime profile secret visibility rules (`app_admin` reveal endpoint,
    masked previews for other roles) and typed env var schema validation.
 9. E03-09: Runtime profile `surface_endpoints` persistence and validation
-   against app-surface keys.
+   against app keys.
 10. E03-10: Direct app-admin runtime profile emergency edit flow (audited).
 
 Acceptance:
 
-- App admin can create tenants, repositories, and app surfaces before
+- App admin can create tenants, repositories, and apps before
   workspace/changeset flow.
 - Repository admin can configure baseline mode (`integration_head` or
   `canonical_env_release`).

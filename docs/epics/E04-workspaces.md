@@ -146,7 +146,7 @@ use serde::{Deserialize, Serialize};
 
 // -- Requests ------------------------------------------------------------
 
-/// POST /api/apps/:appId/workspaces
+/// POST /api/repos/:appId/workspaces
 #[derive(Debug, Deserialize)]
 pub struct CreateWorkspaceRequest {
     /// Optional title. Omit for default workspace.
@@ -155,13 +155,13 @@ pub struct CreateWorkspaceRequest {
     pub branch_name: Option<String>,
 }
 
-/// PATCH /api/apps/:appId/workspaces/:workspaceId
+/// PATCH /api/repos/:appId/workspaces/:workspaceId
 #[derive(Debug, Deserialize)]
 pub struct UpdateWorkspaceRequest {
     pub title: Option<String>,
 }
 
-/// PUT /api/apps/:appId/workspaces/:workspaceId/files
+/// PUT /api/repos/:appId/workspaces/:workspaceId/files
 #[derive(Debug, Deserialize)]
 pub struct WriteFileRequest {
     /// Relative path from repo root.
@@ -172,7 +172,7 @@ pub struct WriteFileRequest {
     pub message: Option<String>,
 }
 
-/// DELETE /api/apps/:appId/workspaces/:workspaceId/files
+/// DELETE /api/repos/:appId/workspaces/:workspaceId/files
 #[derive(Debug, Deserialize)]
 pub struct DeleteFileRequest {
     /// Relative path from repo root.
@@ -181,7 +181,7 @@ pub struct DeleteFileRequest {
     pub message: Option<String>,
 }
 
-/// POST /api/apps/:appId/workspaces/:workspaceId/checkpoints
+/// POST /api/repos/:appId/workspaces/:workspaceId/checkpoints
 #[derive(Debug, Deserialize)]
 pub struct CreateCheckpointRequest {
     /// Commit message for the checkpoint.
@@ -323,21 +323,21 @@ All endpoints require `Authorization: Bearer <token>` and at minimum `Role::User
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
-| `GET` | `/api/apps/:appId/workspaces?page=&limit=` | `list_workspaces` | List workspaces for the app. Paginated. |
-| `POST` | `/api/apps/:appId/workspaces` | `create_workspace` | Create a new workspace. Creates Git branch. Returns `201`. |
-| `GET` | `/api/apps/:appId/workspaces/:workspaceId` | `get_workspace` | Get single workspace by ID. |
-| `PATCH` | `/api/apps/:appId/workspaces/:workspaceId` | `update_workspace` | Update workspace title. |
-| `POST` | `/api/apps/:appId/workspaces/:workspaceId/reset` | `reset_workspace` | Reset workspace branch to baseline. |
-| `POST` | `/api/apps/:appId/workspaces/:workspaceId/sync-integration` | `sync_workspace` | Rebase/merge workspace onto current integration branch. |
+| `GET` | `/api/repos/:appId/workspaces?page=&limit=` | `list_workspaces` | List workspaces for the app. Paginated. |
+| `POST` | `/api/repos/:appId/workspaces` | `create_workspace` | Create a new workspace. Creates Git branch. Returns `201`. |
+| `GET` | `/api/repos/:appId/workspaces/:workspaceId` | `get_workspace` | Get single workspace by ID. |
+| `PATCH` | `/api/repos/:appId/workspaces/:workspaceId` | `update_workspace` | Update workspace title. |
+| `POST` | `/api/repos/:appId/workspaces/:workspaceId/reset` | `reset_workspace` | Reset workspace branch to baseline. |
+| `POST` | `/api/repos/:appId/workspaces/:workspaceId/sync-integration` | `sync_workspace` | Rebase/merge workspace onto current integration branch. |
 
 ### 5.2 File Operations
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
-| `GET` | `/api/apps/:appId/workspaces/:workspaceId/files?path=` | `get_files` | If `path` is a directory: list tree entries. If `path` is a file: return content. |
-| `PUT` | `/api/apps/:appId/workspaces/:workspaceId/files` | `write_file` | Create or update a file. Body: `{ path, content, message? }`. |
-| `DELETE` | `/api/apps/:appId/workspaces/:workspaceId/files` | `delete_file` | Delete a file. Body: `{ path, message? }`. |
-| `POST` | `/api/apps/:appId/workspaces/:workspaceId/checkpoints` | `create_checkpoint` | Commit current working state (for `manual_checkpoint` mode). |
+| `GET` | `/api/repos/:appId/workspaces/:workspaceId/files?path=` | `get_files` | If `path` is a directory: list tree entries. If `path` is a file: return content. |
+| `PUT` | `/api/repos/:appId/workspaces/:workspaceId/files` | `write_file` | Create or update a file. Body: `{ path, content, message? }`. |
+| `DELETE` | `/api/repos/:appId/workspaces/:workspaceId/files` | `delete_file` | Delete a file. Body: `{ path, message? }`. |
+| `POST` | `/api/repos/:appId/workspaces/:workspaceId/checkpoints` | `create_checkpoint` | Commit current working state (for `manual_checkpoint` mode). |
 
 ### 5.3 Ownership and authorization rules
 
@@ -352,7 +352,7 @@ All endpoints require `Authorization: Bearer <token>` and at minimum `Role::User
 
 ### 6.1 Default workspace creation
 
-When a user calls `POST /api/apps/:appId/workspaces` without specifying a
+When a user calls `POST /api/repos/:appId/workspaces` without specifying a
 `branch_name`, or when any file/changeset operation references a workspace
 that does not yet exist:
 
@@ -1247,9 +1247,9 @@ test suite before moving to the next.
 - [ ] **8.10** Implement `resolve_commit()` in `conman-git` using `FindCommit`. Integration test.
 - [ ] **8.11** Implement `rebase_workspace_onto_integration()` in `conman-git` using `UserRebaseToRef`. Integration test.
 - [ ] **8.12** Implement `detect_conflicting_paths()` in `conman-git` using `FindChangedPaths` / `CommitDiff`. Integration test.
-- [ ] **8.13** Wire up `POST /api/apps/:appId/workspaces` handler with default workspace creation logic.
-- [ ] **8.14** Wire up `GET /api/apps/:appId/workspaces` and `GET .../workspaces/:workspaceId` handlers.
-- [ ] **8.15** Wire up `PATCH /api/apps/:appId/workspaces/:workspaceId` handler.
+- [ ] **8.13** Wire up `POST /api/repos/:appId/workspaces` handler with default workspace creation logic.
+- [ ] **8.14** Wire up `GET /api/repos/:appId/workspaces` and `GET .../workspaces/:workspaceId` handlers.
+- [ ] **8.15** Wire up `PATCH /api/repos/:appId/workspaces/:workspaceId` handler.
 - [ ] **8.16** Wire up `GET .../workspaces/:workspaceId/files?path=` handler (tree listing + file read).
 - [ ] **8.17** Wire up `PUT .../workspaces/:workspaceId/files` handler with blocked-path and size guardrails.
 - [ ] **8.18** Wire up `DELETE .../workspaces/:workspaceId/files` handler with blocked-path guardrail.

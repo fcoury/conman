@@ -70,15 +70,15 @@ build_page \
   "style.css"
 
 build_page \
-  "$SRC_DIR/tenant-repo-app-surface-model.md" \
-  "$DIST_DIR/tenant-repo-app-surface-model.html" \
-  "Tenant, Repo, and App Surface Model" \
+  "$SRC_DIR/tenant-repo-app-model.md" \
+  "$DIST_DIR/tenant-repo-app-model.html" \
+  "Tenant, Repo, and App Model" \
   "style.css"
 
 build_page \
-  "$SRC_DIR/tenant-repo-app-surface-implementation-plan.md" \
-  "$DIST_DIR/tenant-repo-app-surface-implementation-plan.html" \
-  "Tenant/Repo/App Surface Implementation Plan" \
+  "$SRC_DIR/tenant-repo-app-implementation-plan.md" \
+  "$DIST_DIR/tenant-repo-app-implementation-plan.html" \
+  "Tenant/Repo/App Implementation Plan" \
   "style.css"
 
 build_page \
@@ -151,13 +151,13 @@ cat > "$DIST_DIR/index.html" <<EOF
           <p class="card-title">Runtime Profiles Draft</p>
           <p class="card-desc">Profile model for URLs, env vars, secrets, database, and data lifecycle.</p>
         </a>
-        <a class="doc-card" href="./tenant-repo-app-surface-model.html">
-          <p class="card-title">Tenant/Repo/App Surface Model</p>
-          <p class="card-desc">Domain model update for multi-app repositories with tenant and app-surface layers.</p>
+        <a class="doc-card" href="./tenant-repo-app-model.html">
+          <p class="card-title">Tenant/Repo/App Model</p>
+          <p class="card-desc">Domain model update for multi-app repositories with tenant and app layers.</p>
         </a>
-        <a class="doc-card" href="./tenant-repo-app-surface-implementation-plan.html">
+        <a class="doc-card" href="./tenant-repo-app-implementation-plan.html">
           <p class="card-title">Tenant Model Implementation Plan</p>
-          <p class="card-desc">Concrete execution order and tasks to implement tenant/repo/surface support.</p>
+          <p class="card-desc">Concrete execution order and tasks to implement tenant/repo/app support.</p>
         </a>
         <a class="doc-card" href="./execution-plan.html">
           <p class="card-title">Execution Plan</p>

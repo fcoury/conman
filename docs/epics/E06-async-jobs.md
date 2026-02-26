@@ -359,7 +359,7 @@ use conman_core::{JobType, JobState, LogLevel};
 
 // ── API Response DTOs ───────────────────────────────────────────────────
 
-/// GET /api/apps/:appId/jobs/:jobId response body.
+/// GET /api/repos/:appId/jobs/:jobId response body.
 #[derive(Debug, Serialize)]
 pub struct JobResponse {
     pub id: String,
@@ -390,7 +390,7 @@ pub struct JobLogResponse {
     pub timestamp: DateTime<Utc>,
 }
 
-/// Query parameters for GET /api/apps/:appId/jobs
+/// Query parameters for GET /api/repos/:appId/jobs
 #[derive(Debug, Deserialize)]
 pub struct ListJobsQuery {
     #[serde(default = "default_page")]
@@ -516,7 +516,7 @@ fn default_limit() -> u64 { 20 }
 
 ## 5. API Endpoints
 
-### `GET /api/apps/:appId/jobs/:jobId`
+### `GET /api/repos/:appId/jobs/:jobId`
 
 Retrieve a single job by ID, including its current state, result, and error.
 
@@ -560,7 +560,7 @@ Retrieve a single job by ID, including its current state, result, and error.
 | 404 | `not_found` | Job does not exist or belongs to a different app |
 | 403 | `forbidden` | User is not a member of the app |
 
-### `GET /api/apps/:appId/jobs?page=&limit=&type=&state=`
+### `GET /api/repos/:appId/jobs?page=&limit=&type=&state=`
 
 List jobs for an app with optional filters and pagination.
 
@@ -827,8 +827,8 @@ E09).
 ### E06-04: API endpoints
 
 - [ ] Add `JobResponse`, `JobLogResponse`, `ListJobsQuery` to `conman-api`
-- [ ] Implement `GET /api/apps/:appId/jobs/:jobId` handler
-- [ ] Implement `GET /api/apps/:appId/jobs` handler with filters + pagination
+- [ ] Implement `GET /api/repos/:appId/jobs/:jobId` handler
+- [ ] Implement `GET /api/repos/:appId/jobs` handler with filters + pagination
 - [ ] Add routes to Axum router
 - [ ] Integration test: get job by id returns correct response
 - [ ] Integration test: list jobs with type/state filters
@@ -921,14 +921,14 @@ E09).
     3 entries returned in chronological order with correct levels and messages.
 
 15. **API: get job returns 404 for wrong app.** Create a job under `app_a`.
-    Request `GET /api/apps/:app_b/jobs/:jobId`. Verify 404.
+    Request `GET /api/repos/:app_b/jobs/:jobId`. Verify 404.
 
 16. **API: list jobs with type filter.** Create 3 jobs (2 MsuiteSubmit, 1
-    DeployRelease). Request `GET /api/apps/:appId/jobs?type=msuite_submit`.
+    DeployRelease). Request `GET /api/repos/:appId/jobs?type=msuite_submit`.
     Verify 2 results.
 
 17. **API: list jobs with state filter.** Create 3 jobs (1 Queued, 1 Running, 1
-    Succeeded). Request `GET /api/apps/:appId/jobs?state=queued`. Verify 1
+    Succeeded). Request `GET /api/repos/:appId/jobs?state=queued`. Verify 1
     result.
 
 18. **API: list jobs pagination.** Create 25 jobs. Request with
@@ -951,7 +951,7 @@ E09).
    has not succeeded. Workflow transitions are blocked until the mandatory
    check passes.
 
-4. **Pollable status.** Clients can poll `GET /api/apps/:appId/jobs/:jobId` to
+4. **Pollable status.** Clients can poll `GET /api/repos/:appId/jobs/:jobId` to
    observe job progress and retrieve the terminal result/error.
 
 5. **Structured logs.** Workers emit real-time log entries to `job_logs`.

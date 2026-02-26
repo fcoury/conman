@@ -128,7 +128,7 @@ fi
 
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   {
-    echo "# Tenant/Repo/App Surface Acceptance"
+    echo "# Tenant/Repo/App Acceptance"
     echo
     echo "- Generated at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
     echo "- Base URL: \`$BASE_URL\`"
@@ -224,46 +224,35 @@ if [[ -n "${REPO_ID:-}" ]]; then
     rm -f "$file"
   fi
 
-  if expect_status_any "Compatibility get app by id" "200" GET "/api/apps/${REPO_ID}"; then
-    file="$LAST_RESPONSE_FILE"
-    GOT_ID="$(jq -r '.data.id // empty' "$file")"
-    if [[ "$GOT_ID" == "$REPO_ID" ]]; then
-      record_pass "TRS-AC-03 apps compatibility" "\`/api/apps/:id\` compatibility is intact."
-    else
-      record_fail "TRS-AC-03 apps compatibility" "Compatibility id mismatch."
-    fi
-    rm -f "$file"
-  fi
-
   S1_PAYLOAD="$(jq -cn --arg key "lims" --arg title "LIMS" --arg d "lims-${STAMP}.example.test" \
     '{key:$key,title:$title,domains:[$d]}')"
   S2_PAYLOAD="$(jq -cn --arg key "portal" --arg title "Provider Portal" --arg d "portal-${STAMP}.example.test" \
     '{key:$key,title:$title,domains:[$d]}')"
 
-  if expect_status_any "Create app surface lims" "200,201" POST "/api/repos/${REPO_ID}/surfaces" "$S1_PAYLOAD"; then
+  if expect_status_any "Create app lims" "200,201" POST "/api/repos/${REPO_ID}/apps" "$S1_PAYLOAD"; then
     file="$LAST_RESPONSE_FILE"
     SURFACE_1_ID="$(jq -r '.data.id // empty' "$file")"
     rm -f "$file"
   fi
-  if expect_status_any "Create app surface portal" "200,201" POST "/api/repos/${REPO_ID}/surfaces" "$S2_PAYLOAD"; then
+  if expect_status_any "Create app portal" "200,201" POST "/api/repos/${REPO_ID}/apps" "$S2_PAYLOAD"; then
     file="$LAST_RESPONSE_FILE"
     SURFACE_2_ID="$(jq -r '.data.id // empty' "$file")"
     rm -f "$file"
   fi
 
   if [[ -n "${SURFACE_1_ID:-}" && -n "${SURFACE_2_ID:-}" ]]; then
-    record_pass "TRS-AC-04 surface create" "Created two surfaces for repo."
+    record_pass "TRS-AC-04 app create" "Created two apps for repo."
   else
-    record_fail "TRS-AC-04 surface create" "Failed to create both required surfaces."
+    record_fail "TRS-AC-04 app create" "Failed to create both required apps."
   fi
 
-  if expect_status_any "List app surfaces" "200" GET "/api/repos/${REPO_ID}/surfaces"; then
+  if expect_status_any "List apps" "200" GET "/api/repos/${REPO_ID}/apps"; then
     file="$LAST_RESPONSE_FILE"
     KEYS="$(jq -r '.data[]?.key' "$file" | sort | tr '\n' ' ')"
     if [[ "$KEYS" == *"lims"* && "$KEYS" == *"portal"* ]]; then
-      record_pass "TRS-AC-04 surface list" "Surface list contains \`lims\` and \`portal\`."
+      record_pass "TRS-AC-04 app list" "App list contains \`lims\` and \`portal\`."
     else
-      record_fail "TRS-AC-04 surface list" "Surface list missing expected keys."
+      record_fail "TRS-AC-04 app list" "App list missing expected keys."
     fi
     rm -f "$file"
   fi
@@ -287,7 +276,7 @@ if [[ -n "${REPO_ID:-}" ]]; then
       migration_command:"echo migrate"
     }')"
 
-  if expect_status_any "Create runtime profile with surface endpoints" "200,201" POST "/api/apps/${REPO_ID}/runtime-profiles" "$PROFILE_PAYLOAD"; then
+  if expect_status_any "Create runtime profile with surface endpoints" "200,201" POST "/api/repos/${REPO_ID}/runtime-profiles" "$PROFILE_PAYLOAD"; then
     file="$LAST_RESPONSE_FILE"
     PROFILE_ID="$(jq -r '.data.id // empty' "$file")"
     if [[ -n "$PROFILE_ID" ]]; then
@@ -299,7 +288,7 @@ if [[ -n "${REPO_ID:-}" ]]; then
   fi
 
   if [[ -n "${PROFILE_ID:-}" ]]; then
-    if expect_status_any "Get runtime profile" "200" GET "/api/apps/${REPO_ID}/runtime-profiles/${PROFILE_ID}"; then
+    if expect_status_any "Get runtime profile" "200" GET "/api/repos/${REPO_ID}/runtime-profiles/${PROFILE_ID}"; then
       file="$LAST_RESPONSE_FILE"
       LIMS_EP="$(jq -r '.data.surface_endpoints.lims // empty' "$file")"
       PORTAL_EP="$(jq -r '.data.surface_endpoints.portal // empty' "$file")"
@@ -317,7 +306,7 @@ if [[ -n "${REPO_ID:-}" ]]; then
         {name:"prod",position:2,is_canonical:true,runtime_profile_id:$profile}
       ]
     }')"
-    if expect_status_any "Patch environments with runtime profile" "200" PATCH "/api/apps/${REPO_ID}/environments" "$ENV_PAYLOAD"; then
+    if expect_status_any "Patch environments with runtime profile" "200" PATCH "/api/repos/${REPO_ID}/environments" "$ENV_PAYLOAD"; then
       file="$LAST_RESPONSE_FILE"
       CNT="$(jq -r '.data | length' "$file")"
       if [[ "${CNT:-0}" -ge 2 ]]; then
@@ -339,7 +328,7 @@ if [[ "$FAIL_COUNT" -eq 0 ]]; then
 fi
 
 {
-  echo "# Tenant/Repo/App Surface Acceptance"
+  echo "# Tenant/Repo/App Acceptance"
   echo
   echo "- Generated at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
   echo "- Base URL: \`$BASE_URL\`"

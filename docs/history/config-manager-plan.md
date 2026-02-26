@@ -119,7 +119,7 @@ Three sections:
 - **Impact Analysis** — table of affected areas with severity badges (`info` / `warning` / `critical`)
 - **Suggestions** — actionable items with severity: `!` (potential error), `?` (needs verification), `i` (improvement idea)
 
-Generated via `POST /api/apps/:appId/changesets/:csId/analyze` using the same OpenRouter + AI SDK infrastructure as Studio, with a DxFlow-domain-aware system prompt.
+Generated via `POST /api/repos/:appId/changesets/:csId/analyze` using the same OpenRouter + AI SDK infrastructure as Studio, with a DxFlow-domain-aware system prompt.
 
 ### 5. Review Interface
 
@@ -245,42 +245,42 @@ Draft ──[Submit]──> Submitted ──[Start Review]──> In Review
 
 ```
 # Applications
-GET    /api/apps                                    List applications
-POST   /api/apps                                    Register application
-GET    /api/apps/:appId                             Get application detail
-PUT    /api/apps/:appId/settings                    Update approval/env stages
+GET    /api/repos                                    List applications
+POST   /api/repos                                    Register application
+GET    /api/repos/:appId                             Get application detail
+PUT    /api/repos/:appId/settings                    Update approval/env stages
 
 # Changesets
-GET    /api/apps/:appId/changesets                  List (filter by status)
-POST   /api/apps/:appId/changesets                  Create (captures base snapshot)
-GET    /api/apps/:appId/changesets/:csId             Detail + file tree
-PATCH  /api/apps/:appId/changesets/:csId             Update title/description/status
-DELETE /api/apps/:appId/changesets/:csId             Delete draft
+GET    /api/repos/:appId/changesets                  List (filter by status)
+POST   /api/repos/:appId/changesets                  Create (captures base snapshot)
+GET    /api/repos/:appId/changesets/:csId             Detail + file tree
+PATCH  /api/repos/:appId/changesets/:csId             Update title/description/status
+DELETE /api/repos/:appId/changesets/:csId             Delete draft
 
 # Changeset Files
-GET    /api/apps/:appId/changesets/:csId/files       File tree with change markers
-GET    /api/apps/:appId/changesets/:csId/files/:path  File content
-PUT    /api/apps/:appId/changesets/:csId/files/:path  Save file edit
-DELETE /api/apps/:appId/changesets/:csId/files/:path  Mark file deleted
+GET    /api/repos/:appId/changesets/:csId/files       File tree with change markers
+GET    /api/repos/:appId/changesets/:csId/files/:path  File content
+PUT    /api/repos/:appId/changesets/:csId/files/:path  Save file edit
+DELETE /api/repos/:appId/changesets/:csId/files/:path  Mark file deleted
 
 # Diffs
-GET    /api/apps/:appId/changesets/:csId/diff         Raw diff (all changed files)
-GET    /api/apps/:appId/changesets/:csId/semantic-diff Semantic diff
+GET    /api/repos/:appId/changesets/:csId/diff         Raw diff (all changed files)
+GET    /api/repos/:appId/changesets/:csId/semantic-diff Semantic diff
 
 # AI
-POST   /api/apps/:appId/changesets/:csId/analyze      Generate AI analysis
-POST   /api/apps/:appId/changesets/:csId/chat          AI chat (streaming)
+POST   /api/repos/:appId/changesets/:csId/analyze      Generate AI analysis
+POST   /api/repos/:appId/changesets/:csId/chat          AI chat (streaming)
 
 # Reviews
-POST   /api/apps/:appId/changesets/:csId/submit        Submit for review
-POST   /api/apps/:appId/changesets/:csId/review        Approve/reject/request changes
-GET    /api/apps/:appId/changesets/:csId/comments       List comments
-POST   /api/apps/:appId/changesets/:csId/comments       Add comment
+POST   /api/repos/:appId/changesets/:csId/submit        Submit for review
+POST   /api/repos/:appId/changesets/:csId/review        Approve/reject/request changes
+GET    /api/repos/:appId/changesets/:csId/comments       List comments
+POST   /api/repos/:appId/changesets/:csId/comments       Add comment
 
 # Environments
-GET    /api/apps/:appId/environments                   List with deployed versions
-POST   /api/apps/:appId/environments/:envId/deploy     Deploy changeset
-GET    /api/apps/:appId/deployments                    Deployment history
+GET    /api/repos/:appId/environments                   List with deployed versions
+POST   /api/repos/:appId/environments/:envId/deploy     Deploy changeset
+GET    /api/repos/:appId/deployments                    Deployment history
 ```
 
 ---

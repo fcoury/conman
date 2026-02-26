@@ -9,8 +9,8 @@ Conman is a Git-backed configuration manager backend (Rust, API-first).
 It models and orchestrates:
 
 - tenants
-- repositories (Git-backed, exposed by `/api/repos`; `/api/repos` is kept as a compatibility alias)
-- app surfaces (multiple user-facing apps per repository)
+- repositories (Git-backed, exposed by `/api/repos`)
+- apps (multiple user-facing apps per repository)
 - workspaces (user editing branches)
 - changesets (reviewable proposals)
 - releases (queue-first, publishable artifacts)
@@ -28,8 +28,8 @@ plan are documented and continuously refined in `docs/`.
 - Implementation guide: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 - Backlog: [docs/conman-v1-backlog.md](docs/conman-v1-backlog.md)
 - Runtime profiles draft: [docs/runtime-profiles-draft.md](docs/runtime-profiles-draft.md)
-- Tenant/repo/app-surface model: [docs/tenant-repo-app-surface-model.md](docs/tenant-repo-app-surface-model.md)
-- Tenant/repo/app-surface implementation plan: [docs/tenant-repo-app-surface-implementation-plan.md](docs/tenant-repo-app-surface-implementation-plan.md)
+- Tenant/repo/app model: [docs/tenant-repo-app-model.md](docs/tenant-repo-app-model.md)
+- Tenant/repo/app implementation plan: [docs/tenant-repo-app-implementation-plan.md](docs/tenant-repo-app-implementation-plan.md)
 - Epics: [docs/epics/](docs/epics/)
 
 ## Repository Layout

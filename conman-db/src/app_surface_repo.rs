@@ -118,11 +118,12 @@ impl AppSurfaceRepo {
         while cursor.advance().await.map_err(|e| ConmanError::Internal {
             message: format!("app surface cursor error: {e}"),
         })? {
-            let doc: AppSurfaceDoc = cursor
-                .deserialize_current()
-                .map_err(|e| ConmanError::Internal {
-                    message: format!("failed to decode app surface: {e}"),
-                })?;
+            let doc: AppSurfaceDoc =
+                cursor
+                    .deserialize_current()
+                    .map_err(|e| ConmanError::Internal {
+                        message: format!("failed to decode app surface: {e}"),
+                    })?;
             items.push(doc.into());
         }
         Ok(items)
@@ -226,4 +227,3 @@ impl EnsureIndexes for AppSurfaceRepo {
         Ok(())
     }
 }
-

@@ -1,10 +1,10 @@
-# Tenant/Repo/App Surface Implementation Plan
+# Tenant/Repo/App Implementation Plan
 
 ## Goal
 
 Implement the new domain direction:
 
-- `Tenant -> Config Repository -> App Surface`
+- `Tenant -> Config Repository -> App`
 - Keep Git lifecycle repo-scoped (`workspace -> changeset -> release -> deploy`)
 - Add multi-surface support for URLs/runtime profile context
 
@@ -14,9 +14,8 @@ This plan is optimized for current reality: pre-production and one active user.
 
 1. Current `App` becomes a repository concept in practice.
 2. Add first-class `Tenant`.
-3. Add first-class `App Surface` under each repository.
-4. Keep existing `/api/repos` working (backward-compatible) while adding clearer
-   `/api/repos` and `/api/tenants` APIs.
+3. Add first-class `App` under each repository.
+4. Keep `/api/repos` and `/api/tenants` as the canonical API surfaces.
 5. Runtime profiles gain surface endpoint mapping.
 
 ## What stays the same
@@ -55,7 +54,7 @@ Done when:
 - service boots with new collections/indexes
 - existing app/repo flows still work
 
-## Step 2: API surface (tenant + repo + app-surface)
+## Step 2: API surface (tenant + repo + app)
 
 Crates/files:
 
@@ -74,11 +73,10 @@ Tasks:
    - `POST /api/tenants/:tenantId/repos`
    - `GET /api/repos`
    - `GET /api/repos/:repoId`
-3. Keep `/api/repos` endpoints functional as compatibility alias.
-4. Add app-surface endpoints:
-   - `POST /api/repos/:repoId/surfaces`
-   - `GET /api/repos/:repoId/surfaces`
-   - `PATCH /api/repos/:repoId/surfaces/:surfaceId`
+3. Add app endpoints:
+   - `POST /api/repos/:repoId/apps`
+   - `GET /api/repos/:repoId/apps`
+   - `PATCH /api/repos/:repoId/apps/:surfaceId`
 
 Done when:
 
@@ -104,7 +102,7 @@ Tasks:
 
 Done when:
 
-- environment profile can define endpoints for multiple app surfaces
+- environment profile can define endpoints for multiple apps
 - temp env creation keeps endpoint map and applies overrides correctly
 
 ## Step 4: Changeset/release visibility for surfaces
@@ -184,7 +182,7 @@ When implementation is complete, these checks must pass.
 | TRS-AC-01 | Tenant can be created and queried. | `run_tenant_repo_surface_acceptance.sh` |
 | TRS-AC-02 | Repository can be created under a tenant and queried via `/api/repos/:id`. | `run_tenant_repo_surface_acceptance.sh` |
 | TRS-AC-03 | `/api/repos/:id` compatibility still works for repo records. | `run_tenant_repo_surface_acceptance.sh` |
-| TRS-AC-04 | Two app surfaces can be created and listed for one repo. | `run_tenant_repo_surface_acceptance.sh` |
+| TRS-AC-04 | Two apps can be created and listed for one repo. | `run_tenant_repo_surface_acceptance.sh` |
 | TRS-AC-05 | Runtime profile stores and returns `surface_endpoints`. | `run_tenant_repo_surface_acceptance.sh` |
 | TRS-AC-06 | Environment configuration can reference runtime profiles after model change. | `run_tenant_repo_surface_acceptance.sh` |
 | TRS-AC-07 | Existing lifecycle smoke remains functional after model change. | `tests/e2e/run_full_staged_smoke.sh` |

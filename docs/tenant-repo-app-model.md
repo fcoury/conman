@@ -1,17 +1,17 @@
-# Tenant, Repo, and App Surface Model
+# Tenant, Repo, and App Model
 
 ## 1) Why this change
 
 Conman currently models one "App" as one Git repository.
 
 That assumption breaks for real config repos like `hepquant-config`, where one
-tenant has multiple user-facing app surfaces in the same repo, each with its
+tenant has multiple user-facing apps in the same repo, each with its
 own URL/domain and access model.
 
 Examples observed in current config repos:
 
 - Tenant is top-level (`config/tenant.yml`).
-- Multiple app surfaces are nested under tenant `app`.
+- Multiple apps are nested under tenant `app`.
 - Config files target surfaces using `allowedApps`.
 - Environment settings include multiple base URLs for different surfaces.
 
@@ -21,13 +21,13 @@ Use three layers:
 
 - **Tenant**: customer/account boundary.
 - **Config Repository**: Git boundary (workspace, changeset, release, tag).
-- **App Surface**: user-facing app within a repo (domain, branding, roles).
+- **App**: user-facing app within a repo (domain, branding, roles).
 
 Cardinality:
 
 - Tenant `1..N` Config Repositories
-- Config Repository `1..N` App Surfaces
-- App Surface belongs to exactly one Config Repository
+- Config Repository `1..N` Apps
+- App belongs to exactly one Config Repository
 
 ## 3) Scope boundaries (important)
 
@@ -39,7 +39,7 @@ Repo-scoped concerns stay repo-scoped:
 - integration branch + tags
 - git history and conflict handling
 
-Surface-scoped concerns move to app-surface level:
+App-scoped concerns move to app level:
 
 - domains / URLs
 - branding metadata
@@ -69,7 +69,7 @@ Current Conman "App" is effectively a repo object (`repo_path`,
 `integration_branch`). To reduce confusion:
 
 - Domain rename in docs/spec: **App -> Config Repository**.
-- Introduce **Tenant** and **App Surface** resources.
+- Introduce **Tenant** and **App** resources.
 
 Suggested API shape (incremental):
 
@@ -77,14 +77,13 @@ Suggested API shape (incremental):
 - `GET /api/tenants/:tenantId`
 - `POST /api/tenants/:tenantId/repos`
 - `GET /api/repos/:repoId`
-- `POST /api/repos/:repoId/surfaces`
-- `GET /api/repos/:repoId/surfaces`
+- `POST /api/repos/:repoId/apps`
+- `GET /api/repos/:repoId/apps`
 
-Compatibility strategy for v1 implementation:
+API strategy for v1 implementation:
 
-- Keep existing `/api/repos` endpoints as repo endpoints for now.
-- Add a documented alias plan in v2 (`/api/repos` primary, `/api/repos`
-  compatibility layer/deprecated alias).
+- `/api/repos` is the repository surface.
+- Nested apps are managed through `/api/repos/:repoId/apps`.
 
 ## 6) Data model changes (minimum)
 
@@ -146,10 +145,10 @@ Phase 3:
 
 - Add top-level **Tenant** concept.
 - Keep one repo as the Git/release unit.
-- Support multiple user-facing app surfaces inside one repo.
+- Support multiple user-facing apps inside one repo.
 - Do **not** split releases/workspaces by surface in v1.
 - Keep one configurable integration branch per repo (no per-environment Git
   branches).
 
 Implementation plan:
-[`docs/tenant-repo-app-surface-implementation-plan.md`](./tenant-repo-app-surface-implementation-plan.md)
+[`docs/tenant-repo-app-implementation-plan.md`](./tenant-repo-app-implementation-plan.md)

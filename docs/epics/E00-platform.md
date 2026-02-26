@@ -615,55 +615,55 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/auth/accept-invite", axum::routing::post(not_implemented))
 
         // Apps stubs (E03)
-        .route("/api/apps", get(not_implemented).post(not_implemented))
-        .route("/api/apps/:appId", get(not_implemented))
-        .route("/api/apps/:appId/settings", axum::routing::patch(not_implemented))
-        .route("/api/apps/:appId/members", get(not_implemented))
-        .route("/api/apps/:appId/invites", axum::routing::post(not_implemented))
+        .route("/api/repos", get(not_implemented).post(not_implemented))
+        .route("/api/repos/:appId", get(not_implemented))
+        .route("/api/repos/:appId/settings", axum::routing::patch(not_implemented))
+        .route("/api/repos/:appId/members", get(not_implemented))
+        .route("/api/repos/:appId/invites", axum::routing::post(not_implemented))
 
         // Workspaces stubs (E04)
-        .route("/api/apps/:appId/workspaces", get(not_implemented).post(not_implemented))
-        .route("/api/apps/:appId/workspaces/:workspaceId", get(not_implemented).patch(not_implemented))
-        .route("/api/apps/:appId/workspaces/:workspaceId/reset", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/workspaces/:workspaceId/sync-integration", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/workspaces/:workspaceId/files", get(not_implemented).put(not_implemented).delete(not_implemented))
-        .route("/api/apps/:appId/workspaces/:workspaceId/checkpoints", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/workspaces", get(not_implemented).post(not_implemented))
+        .route("/api/repos/:appId/workspaces/:workspaceId", get(not_implemented).patch(not_implemented))
+        .route("/api/repos/:appId/workspaces/:workspaceId/reset", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/workspaces/:workspaceId/sync-integration", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/workspaces/:workspaceId/files", get(not_implemented).put(not_implemented).delete(not_implemented))
+        .route("/api/repos/:appId/workspaces/:workspaceId/checkpoints", axum::routing::post(not_implemented))
 
         // Changesets stubs (E05)
-        .route("/api/apps/:appId/changesets", get(not_implemented).post(not_implemented))
-        .route("/api/apps/:appId/changesets/:changesetId", get(not_implemented).patch(not_implemented))
-        .route("/api/apps/:appId/changesets/:changesetId/submit", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/changesets/:changesetId/resubmit", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/changesets/:changesetId/review", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/changesets/:changesetId/queue", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/changesets/:changesetId/move-to-draft", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/changesets/:changesetId/diff", get(not_implemented))
-        .route("/api/apps/:appId/changesets/:changesetId/comments", get(not_implemented).post(not_implemented))
+        .route("/api/repos/:appId/changesets", get(not_implemented).post(not_implemented))
+        .route("/api/repos/:appId/changesets/:changesetId", get(not_implemented).patch(not_implemented))
+        .route("/api/repos/:appId/changesets/:changesetId/submit", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/changesets/:changesetId/resubmit", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/changesets/:changesetId/review", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/changesets/:changesetId/queue", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/changesets/:changesetId/move-to-draft", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/changesets/:changesetId/diff", get(not_implemented))
+        .route("/api/repos/:appId/changesets/:changesetId/comments", get(not_implemented).post(not_implemented))
 
         // Releases stubs (E08)
-        .route("/api/apps/:appId/releases", get(not_implemented).post(not_implemented))
-        .route("/api/apps/:appId/releases/:releaseId", get(not_implemented))
-        .route("/api/apps/:appId/releases/:releaseId/changesets", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/releases/:releaseId/reorder", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/releases/:releaseId/assemble", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/releases/:releaseId/publish", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/releases", get(not_implemented).post(not_implemented))
+        .route("/api/repos/:appId/releases/:releaseId", get(not_implemented))
+        .route("/api/repos/:appId/releases/:releaseId/changesets", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/releases/:releaseId/reorder", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/releases/:releaseId/assemble", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/releases/:releaseId/publish", axum::routing::post(not_implemented))
 
         // Environments + deployments stubs (E09)
-        .route("/api/apps/:appId/environments", get(not_implemented).patch(not_implemented))
-        .route("/api/apps/:appId/environments/:envId/deploy", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/environments/:envId/promote", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/environments/:envId/rollback", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/deployments", get(not_implemented))
+        .route("/api/repos/:appId/environments", get(not_implemented).patch(not_implemented))
+        .route("/api/repos/:appId/environments/:envId/deploy", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/environments/:envId/promote", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/environments/:envId/rollback", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/deployments", get(not_implemented))
 
         // Temp environments stubs (E10)
-        .route("/api/apps/:appId/temp-envs", get(not_implemented).post(not_implemented))
-        .route("/api/apps/:appId/temp-envs/:tempEnvId/extend", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/temp-envs/:tempEnvId/undo-expire", axum::routing::post(not_implemented))
-        .route("/api/apps/:appId/temp-envs/:tempEnvId", axum::routing::delete(not_implemented))
+        .route("/api/repos/:appId/temp-envs", get(not_implemented).post(not_implemented))
+        .route("/api/repos/:appId/temp-envs/:tempEnvId/extend", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/temp-envs/:tempEnvId/undo-expire", axum::routing::post(not_implemented))
+        .route("/api/repos/:appId/temp-envs/:tempEnvId", axum::routing::delete(not_implemented))
 
         // Jobs stubs (E06)
-        .route("/api/apps/:appId/jobs", get(not_implemented))
-        .route("/api/apps/:appId/jobs/:jobId", get(not_implemented))
+        .route("/api/repos/:appId/jobs", get(not_implemented))
+        .route("/api/repos/:appId/jobs/:jobId", get(not_implemented))
 
         // Notification preferences stubs (E11)
         .route("/api/me/notification-preferences", get(not_implemented).patch(not_implemented))
@@ -1244,7 +1244,7 @@ async fn stub_route_returns_501_envelope() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/apps")
+                .uri("/api/repos")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -1267,8 +1267,8 @@ async fn stub_route_returns_501_envelope() {
      MongoDB is running.
    - `GET /api/health` returns `503 {"status":"degraded","mongo":"disconnected"}`
      when MongoDB is unreachable.
-   - `GET /api/apps` returns `501 {"error":{"code":"not_implemented",...}}`.
-   - `POST /api/apps` returns `501 {"error":{"code":"not_implemented",...}}`.
+   - `GET /api/repos` returns `501 {"error":{"code":"not_implemented",...}}`.
+   - `POST /api/repos` returns `501 {"error":{"code":"not_implemented",...}}`.
    - `GET /api/nonexistent` returns `404 {"error":{"code":"not_found",...}}`.
    - All responses include `X-Request-Id` header.
 
