@@ -1,0 +1,8 @@
+[package]
+name = "conman-jobs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+conman-core = { path = "../conman-core" }
+conman-db = { path = "../conman-db" }

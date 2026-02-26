@@ -1,6 +1,42 @@
+[workspace]
+members = [
+  "conman-core",
+  "conman-api",
+  "conman-db",
+  "conman-git",
+  "conman-auth",
+  "conman-jobs",
+]
+resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1"
+async-trait = "0.1"
+axum = { version = "0.8", features = ["macros"] }
+chrono = { version = "0.4", features = ["serde"] }
+http = "1"
+mongodb = "3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tonic = { version = "0.12", features = ["transport"] }
+tower = { version = "0.5", features = ["util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+uuid = { version = "1", features = ["v7", "serde"] }
+
 [package]
 name = "conman"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+axum.workspace = true
+conman-api = { path = "./conman-api" }
+conman-core = { path = "./conman-core" }
+conman-db = { path = "./conman-db" }
+tokio.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

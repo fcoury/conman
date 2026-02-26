@@ -12,13 +12,13 @@ Use this file as the live control plane for delivery.
 
 - Start date:
 - Target date:
-- Current wave: `A | B | C | D | E`
-- Current milestone: `M1 | M2 | M3 | M4`
+- Current wave: `A`
+- Current milestone: `M1`
 - Overall progress:
-  - Epics complete: `0 / 13`
+  - Epics complete: `1 / 13`
   - Gates passed: `0 / 5`
 - Active blockers:
-  - None
+  - None (E00 complete, proceeding to E01/E02)
 
 ## 2) Epic Tracker (Dependency Controlled)
 
@@ -29,7 +29,7 @@ Legend:
 
 | Epic | Owner | Depends On | Gate | Status | PR/Branch | Checklist % | Blocker |
 |---|---|---|---|---|---|---:|---|
-| E00 Platform Foundation | worker-platform | none | A | not_started |  | 0 |  |
+| E00 Platform Foundation | worker-platform | none | A | done | master | 100 |  |
 | E01 Git Adapter | worker-git | E00 | A | not_started |  | 0 |  |
 | E02 Auth & RBAC | worker-auth | E00 | A | not_started |  | 0 |  |
 | E03 App Setup | worker-app | E01, E02 | A | not_started |  | 0 |  |
