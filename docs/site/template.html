@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>$title$ — Conman Docs</title>
+$for(css)$
+  <link rel="stylesheet" href="$css$" />
+$endfor$
+$for(header-includes)$
+  $header-includes$
+$endfor$
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+$if(toc)$
+      <h2 class="toc-title">$toc-title$</h2>
+      $table-of-contents$
+$endif$
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">$title$</h1>
+      </header>
+      $body$
+    </main>
+  </div>
+</body>
+</html>
