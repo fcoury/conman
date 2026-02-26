@@ -26,8 +26,11 @@ struct ChangesetDoc {
     revision: u32,
     approvals: Vec<Approval>,
     queue_position: Option<i64>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime_optional")]
     queued_at: Option<DateTime<Utc>>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -38,6 +41,7 @@ struct ChangesetRevisionDoc {
     changeset_id: ObjectId,
     revision: u32,
     head_sha: String,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
 }
 
@@ -465,7 +469,7 @@ impl ChangesetRepo {
         self.collection
             .update_many(
                 doc! {"_id": {"$in": ids}},
-                doc! {"$set": {"state": released, "updated_at": mongodb::bson::DateTime::from_millis(Utc::now().timestamp_millis())}},
+                doc! {"$set": {"state": released, "updated_at": Utc::now()}},
             )
             .await
             .map_err(|e| ConmanError::Internal {

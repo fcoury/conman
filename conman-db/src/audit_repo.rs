@@ -13,6 +13,7 @@ use crate::EnsureIndexes;
 struct AuditDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     occurred_at: DateTime<Utc>,
     actor_user_id: Option<ObjectId>,
     app_id: Option<ObjectId>,

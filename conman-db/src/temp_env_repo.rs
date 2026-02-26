@@ -47,10 +47,15 @@ struct TempEnvDoc {
     db_name: String,
     idle_ttl_seconds: i64,
     grace_ttl_seconds: i64,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     last_activity_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     expires_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime_optional")]
     grace_expires_at: Option<DateTime<Utc>>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -242,7 +247,7 @@ impl TempEnvRepo {
             .collection
             .find_one_and_update(
                 doc! {"_id": id},
-                doc! {"$set": {"state": state_bson, "grace_expires_at": grace_expires_at.map(|v| mongodb::bson::DateTime::from_millis(v.timestamp_millis())), "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"state": state_bson, "grace_expires_at": grace_expires_at, "updated_at": now}},
             )
             .return_document(mongodb::options::ReturnDocument::After)
             .await
@@ -265,7 +270,7 @@ impl TempEnvRepo {
             .collection
             .find_one_and_update(
                 doc! {"_id": id},
-                doc! {"$set": {"last_activity_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis()), "expires_at": mongodb::bson::DateTime::from_millis((now + Duration::seconds(seconds)).timestamp_millis()), "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"last_activity_at": now, "expires_at": now + Duration::seconds(seconds), "updated_at": now}},
             )
             .return_document(mongodb::options::ReturnDocument::After)
             .await
@@ -301,7 +306,7 @@ impl TempEnvRepo {
             .collection
             .find_one_and_update(
                 doc! {"_id": id},
-                doc! {"$set": {"last_activity_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis()), "expires_at": mongodb::bson::DateTime::from_millis((now + Duration::seconds(current.idle_ttl_seconds)).timestamp_millis()), "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"last_activity_at": now, "expires_at": now + Duration::seconds(current.idle_ttl_seconds), "updated_at": now}},
             )
             .return_document(mongodb::options::ReturnDocument::After)
             .await
@@ -319,7 +324,7 @@ impl TempEnvRepo {
         &self,
         limit: i64,
     ) -> Result<Vec<TempEnvironment>, ConmanError> {
-        let now = mongodb::bson::DateTime::from_millis(Utc::now().timestamp_millis());
+        let now = Utc::now();
         let active =
             mongodb::bson::to_bson(&TempEnvState::Active).map_err(|e| ConmanError::Internal {
                 message: format!("failed to encode active temp env state: {e}"),

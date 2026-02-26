@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 async-trait.workspace = true
+bson.workspace = true
 chrono.workspace = true
 conman-auth = { path = "../conman-auth" }
 conman-core = { path = "../conman-core" }

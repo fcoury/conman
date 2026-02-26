@@ -25,9 +25,13 @@ struct JobDoc {
     max_retries: u32,
     timeout_ms: u64,
     created_by: Option<ObjectId>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime_optional")]
     started_at: Option<DateTime<Utc>>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime_optional")]
     finished_at: Option<DateTime<Utc>>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -63,6 +67,7 @@ struct JobLogDoc {
     job_id: ObjectId,
     level: String,
     message: String,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     timestamp: DateTime<Utc>,
 }
 
@@ -160,7 +165,7 @@ impl JobRepo {
             .jobs
             .find_one_and_update(
                 doc! {"state": queued},
-                doc! {"$set": {"state": running, "started_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis()), "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"state": running, "started_at": now, "updated_at": now}},
             )
             .sort(doc! {"created_at": 1})
             .return_document(ReturnDocument::After)
@@ -222,8 +227,8 @@ impl JobRepo {
                         "state": state_bson,
                         "result": result_bson,
                         "error_message": error_bson,
-                        "finished_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis()),
-                        "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())
+                        "finished_at": now,
+                        "updated_at": now
                     }
                 },
             )

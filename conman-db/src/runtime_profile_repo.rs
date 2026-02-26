@@ -29,7 +29,9 @@ struct RuntimeProfileDoc {
     migration_paths: Vec<String>,
     migration_command: Option<String>,
     revision: u32,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -41,6 +43,7 @@ struct RuntimeProfileRevisionDoc {
     app_id: ObjectId,
     revision: u32,
     snapshot: RuntimeProfileDoc,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
 }
 

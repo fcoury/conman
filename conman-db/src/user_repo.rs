@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use conman_core::{ConmanError, User};
 use mongodb::{
     Collection, Database, IndexModel,
-    bson::{self, doc, oid::ObjectId},
+    bson::{doc, oid::ObjectId},
     options::IndexOptions,
 };
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,9 @@ struct UserDoc {
     email: String,
     password_hash: String,
     name: String,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -111,7 +113,7 @@ impl UserRepo {
         self.collection
             .update_one(
                 doc! {"_id": id},
-                doc! {"$set": {"password_hash": password_hash, "updated_at": bson::DateTime::from_millis(Utc::now().timestamp_millis())}},
+                doc! {"$set": {"password_hash": password_hash, "updated_at": Utc::now()}},
             )
             .await
             .map_err(|e| ConmanError::Internal {

@@ -41,7 +41,7 @@ Legend:
 | E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 96 | Command-backed deploy executor and stricter exceptional approval validation are in; full staged E2E remains blocked by upstream workspace write path |
 | E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 95 | Provision/expire hooks are command-backed and TTL/grace cleanup is active; provider integrations still app-specific |
 | E11 Notifications & Audit | worker-observability | E05-E10 | E | done | master | 100 |  |
-| E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 90 | Local load/fault drills and dashboard provisioning wiring are done; staged full-flow run is blocked by gitaly `UserCommitFiles` response semantics |
+| E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 92 | Local load/fault drills and dashboard provisioning wiring are done; staged full-flow run is blocked by gitaly `UserCommitFiles` response semantics |
 
 ## 3) Dependency Gate Rules (Hard Stop)
 
@@ -85,7 +85,7 @@ Do not merge when prerequisites are incomplete:
 - [x] Required audit events emitted
 - Result: `pass | fail`
 - Date:
-- Notes: staged attempt reached workspace creation against live gitaly, but write step is blocked by `commit_files returned empty branch update`.
+- Notes: staged attempt reached workspace creation against live gitaly, but write step is blocked by `commit_files returned empty branch update`; Mongo timestamp decode regression in job runner was fixed and validated (see `tests/e2e/results/20260226040124-timestamp-fix-summary.md`).
 
 ## Gate C (M2: E07-E08)
 
@@ -116,7 +116,7 @@ Do not merge when prerequisites are incomplete:
 - [ ] Hardening/runbooks/load/fault checks complete
 - Result: `pass | fail`
 - Date:
-- Notes: Local load/fault drill artifacts and production dashboard provisioning files were added; staged full-flow execution remains blocked by gitaly `UserCommitFiles` (see `tests/e2e/results/2026-02-26T03-45-43-staged-gitaly-attempt.md`).
+- Notes: Local load/fault drill artifacts and production dashboard provisioning files were added; BSON/chrono job decoding was stabilized in staged flow (`tests/e2e/results/20260226040124-timestamp-fix-summary.md`), and staged full-flow execution remains blocked by gitaly `UserCommitFiles` (`tests/e2e/results/20260226040124-write-check.log`).
 
 ## 5) CI Quality Gates (Required for Merge)
 

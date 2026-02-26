@@ -21,7 +21,9 @@ struct WorkspaceDoc {
     base_ref_type: BaseRefType,
     base_ref_value: String,
     head_sha: String,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -185,7 +187,7 @@ impl WorkspaceRepo {
         self.collection
             .update_one(
                 doc! {"_id": workspace_id},
-                doc! {"$set": {"title": title, "updated_at": mongodb::bson::DateTime::from_millis(Utc::now().timestamp_millis())}},
+                doc! {"$set": {"title": title, "updated_at": Utc::now()}},
             )
             .await
             .map_err(|e| ConmanError::Internal {
@@ -211,7 +213,7 @@ impl WorkspaceRepo {
         self.collection
             .update_one(
                 doc! {"_id": workspace_id},
-                doc! {"$set": {"head_sha": head_sha, "updated_at": mongodb::bson::DateTime::from_millis(Utc::now().timestamp_millis())}},
+                doc! {"$set": {"head_sha": head_sha, "updated_at": Utc::now()}},
             )
             .await
             .map_err(|e| ConmanError::Internal {

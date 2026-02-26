@@ -18,7 +18,9 @@ struct AppDoc {
     integration_branch: String,
     settings: AppSettings,
     created_by: ObjectId,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -159,7 +161,7 @@ impl AppRepo {
         self.collection
             .update_one(
                 doc! {"_id": app_id_obj},
-                doc! {"$set": {"settings": mongodb::bson::to_bson(settings).map_err(|e| ConmanError::Internal { message: format!("failed to encode settings: {e}") })?, "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"settings": mongodb::bson::to_bson(settings).map_err(|e| ConmanError::Internal { message: format!("failed to encode settings: {e}") })?, "updated_at": now}},
             )
             .await
             .map_err(|e| ConmanError::Internal {

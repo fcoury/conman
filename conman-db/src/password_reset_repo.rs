@@ -16,8 +16,11 @@ struct PasswordResetDoc {
     id: ObjectId,
     user_id: ObjectId,
     token: String,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     expires_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime_optional")]
     used_at: Option<DateTime<Utc>>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
 }
 
@@ -83,7 +86,7 @@ impl PasswordResetRepo {
             .find_one(doc! {
                 "token": token,
                 "used_at": null,
-                "expires_at": {"$gt": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}
+                "expires_at": {"$gt": now}
             })
             .await
             .map_err(|e| ConmanError::Internal {
@@ -99,7 +102,7 @@ impl PasswordResetRepo {
         self.collection
             .update_one(
                 doc! {"_id": reset_id, "used_at": null},
-                doc! {"$set": {"used_at": mongodb::bson::DateTime::from_millis(Utc::now().timestamp_millis())}},
+                doc! {"$set": {"used_at": Utc::now()}},
             )
             .await
             .map_err(|e| ConmanError::Internal {

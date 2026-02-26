@@ -30,7 +30,9 @@ struct OverrideDoc {
     key: String,
     value: EnvVarValue,
     target_profile_id: Option<ObjectId>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 

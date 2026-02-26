@@ -1,0 +1,9 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.39s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T07:03:06.946452Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3912"},"target":"conman"}
+{"timestamp":"2026-02-26T07:03:06.981957Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e_fix_20260226040124"},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:03:06.995157Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:03:07.006681Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T07:03:07.009609Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T07:03:07.020873Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3912"},"target":"conman"}
+{"timestamp":"2026-02-26T07:03:07.394913Z","level":"INFO","fields":{"message":"received SIGTERM, shutting down"},"target":"conman"}

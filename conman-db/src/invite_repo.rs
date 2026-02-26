@@ -19,8 +19,11 @@ struct InviteDoc {
     role: Role,
     token: String,
     invited_by: ObjectId,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     expires_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime_optional")]
     accepted_at: Option<DateTime<Utc>>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
 }
 
@@ -97,7 +100,7 @@ impl InviteRepo {
             .find_one(doc! {
                 "token": token,
                 "accepted_at": null,
-                "expires_at": {"$gt": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}
+                "expires_at": {"$gt": now}
             })
             .await
             .map_err(|e| ConmanError::Internal {
@@ -114,7 +117,7 @@ impl InviteRepo {
         self.collection
             .update_one(
                 doc! {"_id": invite_id, "accepted_at": null},
-                doc! {"$set": {"accepted_at": mongodb::bson::DateTime::from_millis(Utc::now().timestamp_millis())}},
+                doc! {"$set": {"accepted_at": Utc::now()}},
             )
             .await
             .map_err(|e| ConmanError::Internal {

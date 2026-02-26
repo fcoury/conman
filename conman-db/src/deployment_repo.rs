@@ -21,10 +21,14 @@ struct DeploymentDoc {
     is_concurrent_batch: bool,
     approvals: Vec<ObjectId>,
     job_id: Option<ObjectId>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime_optional")]
     started_at: Option<DateTime<Utc>>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime_optional")]
     finished_at: Option<DateTime<Utc>>,
     created_by: ObjectId,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -215,7 +219,7 @@ impl DeploymentRepo {
             .collection
             .find_one_and_update(
                 doc! {"_id": deployment_id},
-                doc! {"$set": {"job_id": job_id, "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"job_id": job_id, "updated_at": now}},
             )
             .return_document(mongodb::options::ReturnDocument::After)
             .await
@@ -243,7 +247,7 @@ impl DeploymentRepo {
             message: format!("failed to encode deployment state: {e}"),
         })?;
         let started_at = if state == DeploymentState::Running {
-            Some(mongodb::bson::DateTime::from_millis(now.timestamp_millis()))
+            Some(now)
         } else {
             None
         };
@@ -251,14 +255,14 @@ impl DeploymentRepo {
             state,
             DeploymentState::Succeeded | DeploymentState::Failed | DeploymentState::Canceled
         ) {
-            Some(mongodb::bson::DateTime::from_millis(now.timestamp_millis()))
+            Some(now)
         } else {
             None
         };
 
         let mut set_doc = doc! {
             "state": state_bson,
-            "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis()),
+            "updated_at": now,
         };
         if let Some(started_at) = started_at {
             set_doc.insert("started_at", started_at);

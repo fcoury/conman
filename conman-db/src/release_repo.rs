@@ -19,9 +19,12 @@ struct ReleaseDoc {
     ordered_changeset_ids: Vec<ObjectId>,
     compose_job_id: Option<ObjectId>,
     published_sha: Option<String>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime_optional")]
     published_at: Option<DateTime<Utc>>,
     published_by: Option<ObjectId>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -182,7 +185,7 @@ impl ReleaseRepo {
             .collection
             .find_one_and_update(
                 doc! {"_id": release_id},
-                doc! {"$set": {"ordered_changeset_ids": ids, "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"ordered_changeset_ids": ids, "updated_at": now}},
             )
             .return_document(mongodb::options::ReturnDocument::After)
             .await
@@ -212,7 +215,7 @@ impl ReleaseRepo {
             .collection
             .find_one_and_update(
                 doc! {"_id": release_id},
-                doc! {"$set": {"state": state_bson, "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"state": state_bson, "updated_at": now}},
             )
             .return_document(mongodb::options::ReturnDocument::After)
             .await
@@ -242,7 +245,7 @@ impl ReleaseRepo {
             .collection
             .find_one_and_update(
                 doc! {"_id": release_id},
-                doc! {"$set": {"compose_job_id": job_id, "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"compose_job_id": job_id, "updated_at": now}},
             )
             .return_document(mongodb::options::ReturnDocument::After)
             .await
@@ -283,9 +286,9 @@ impl ReleaseRepo {
                     "$set": {
                         "state": published_state,
                         "published_sha": published_sha,
-                        "published_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis()),
+                        "published_at": now,
                         "published_by": published_by,
-                        "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())
+                        "updated_at": now
                     }
                 },
             )

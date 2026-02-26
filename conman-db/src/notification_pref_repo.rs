@@ -15,7 +15,9 @@ struct NotificationPrefDoc {
     id: ObjectId,
     user_id: ObjectId,
     email_enabled: bool,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -90,7 +92,7 @@ impl NotificationPreferenceRepo {
             .collection
             .find_one_and_update(
                 doc! {"user_id": user_id},
-                doc! {"$set": {"email_enabled": enabled, "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"email_enabled": enabled, "updated_at": now}},
             )
             .upsert(true)
             .return_document(mongodb::options::ReturnDocument::After)

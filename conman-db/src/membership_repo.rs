@@ -18,6 +18,7 @@ struct MembershipDoc {
     user_id: ObjectId,
     app_id: ObjectId,
     role: Role,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
 }
 

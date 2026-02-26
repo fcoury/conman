@@ -18,7 +18,9 @@ struct CommentDoc {
     author_user_id: ObjectId,
     body: String,
     edits: Vec<ChangesetCommentEdit>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 

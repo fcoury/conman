@@ -21,7 +21,9 @@ struct NotificationDoc {
     body: String,
     state: NotificationState,
     error_message: Option<String>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -113,7 +115,7 @@ impl NotificationEventRepo {
             .collection
             .find_one_and_update(
                 doc! {"state": queued},
-                doc! {"$set": {"state": sending, "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())}},
+                doc! {"$set": {"state": sending, "updated_at": now}},
             )
             .sort(doc! {"created_at": 1})
             .return_document(mongodb::options::ReturnDocument::After)
@@ -156,7 +158,7 @@ impl NotificationEventRepo {
                 doc! {"$set": {
                     "state": state_bson,
                     "error_message": error_message,
-                    "updated_at": mongodb::bson::DateTime::from_millis(now.timestamp_millis())
+                    "updated_at": now
                 }},
             )
             .await

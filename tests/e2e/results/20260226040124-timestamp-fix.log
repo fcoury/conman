@@ -1,0 +1,11 @@
+   Compiling conman v0.1.0 (/Volumes/External/code-external/conman)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.95s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T07:01:26.362282Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3911"},"target":"conman"}
+{"timestamp":"2026-02-26T07:01:26.400457Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e_fix_20260226040124"},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:01:29.867553Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:01:29.889869Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T07:01:29.894205Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T07:01:29.909490Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3911"},"target":"conman"}
+{"timestamp":"2026-02-26T07:01:30.388643Z","level":"WARN","fields":{"message":"failed to enqueue notification","error":"not found: user 65f0e1e1e1e1e1e1e1e1e1a1"},"target":"conman_api::handlers::changesets"}
+{"timestamp":"2026-02-26T07:02:11.884071Z","level":"INFO","fields":{"message":"received SIGTERM, shutting down"},"target":"conman"}
