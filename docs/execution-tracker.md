@@ -15,10 +15,9 @@ Use this file as the live control plane for delivery.
 - Current wave: `E`
 - Current milestone: `M4`
 - Overall progress:
-  - Epics complete: `6 / 13`
-  - Gates passed: `0 / 5`
+  - Epics complete: `7 / 13`
+  - Gates passed: `1 / 5`
 - Active blockers:
-  - E01 still needs concrete gitaly-rs RPC mappings beyond adapter stubs
   - E12 still needs executed load/fault results and production dashboard wiring
 
 ## 2) Epic Tracker (Dependency Controlled)
@@ -31,7 +30,7 @@ Legend:
 | Epic | Owner | Depends On | Gate | Status | PR/Branch | Checklist % | Blocker |
 |---|---|---|---|---|---|---:|---|
 | E00 Platform Foundation | worker-platform | none | A | done | master | 100 |  |
-| E01 Git Adapter | worker-git | E00 | A | in_review | master | 80 | Full gitaly-rs RPC mappings pending |
+| E01 Git Adapter | worker-git | E00 | A | done | master | 100 |  |
 | E02 Auth & RBAC | worker-auth | E00 | A | done | master | 100 |  |
 | E03 App Setup | worker-app | E01, E02 | A | done | master | 100 |  |
 | E04 Workspaces | worker-workspace | E01, E03 | B | done | master | 100 |  |
@@ -65,16 +64,16 @@ Do not merge when prerequisites are incomplete:
 ## Gate A (M1 foundation: E00-E03)
 
 - [x] E00 merged
-- [ ] E01 merged
+- [x] E01 merged
 - [x] E02 merged
 - [x] E03 merged
 - [x] Service boots with shared error/pagination/request-id conventions
-- [ ] Git adapter boundary implemented (no direct gitaly calls in handlers)
+- [x] Git adapter boundary implemented (no direct gitaly calls in handlers)
 - [x] Auth + RBAC enforcement active
 - [x] App/env/runtime-profile baseline APIs available
-- Result: `pass | fail`
-- Date:
-- Notes:
+- Result: `pass`
+- Date: `2026-02-26`
+- Notes: Full gitaly-rs RPC mappings now implemented in `conman-git::GitalyClient`.
 
 ## Gate B (M1 completion: E04-E06)
 

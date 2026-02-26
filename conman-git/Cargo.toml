@@ -7,6 +7,9 @@ edition = "2024"
 async-trait.workspace = true
 chrono.workspace = true
 conman-core = { path = "../conman-core" }
+gitaly-proto = { git = "https://github.com/fcoury/gitaly-rs.git", rev = "ae211f9165a2c38c33248c23b823b2bfc1b882c9", package = "gitaly-proto" }
+prost-types = "0.13"
+tokio-stream = "0.1"
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
