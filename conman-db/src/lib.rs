@@ -3,30 +3,40 @@ use conman_core::{Config, ConmanError};
 use mongodb::{Client, Database, bson::doc, options::ClientOptions};
 
 pub mod app_repo;
+pub mod audit_repo;
 pub mod changeset_comment_repo;
 pub mod changeset_profile_override_repo;
 pub mod changeset_repo;
+pub mod deployment_repo;
 pub mod environment_repo;
 pub mod invite_repo;
 pub mod job_repo;
 pub mod membership_repo;
+pub mod notification_pref_repo;
 pub mod password_reset_repo;
+pub mod release_repo;
 pub mod runtime_profile_repo;
+pub mod temp_env_repo;
 pub mod user_repo;
 pub mod workspace_repo;
 
 pub use app_repo::AppRepo;
+pub use audit_repo::AuditRepo;
 pub use changeset_comment_repo::ChangesetCommentRepo;
 pub use changeset_profile_override_repo::{
     ChangesetProfileOverride, ChangesetProfileOverrideRepo, OverrideInput,
 };
 pub use changeset_repo::{ChangesetRepo, CreateChangesetInput, ReviewAction};
+pub use deployment_repo::{CreateDeploymentInput, DeploymentRepo};
 pub use environment_repo::{EnvironmentInput, EnvironmentRepo};
 pub use invite_repo::InviteRepo;
 pub use job_repo::{EnqueueJobInput, JobRepo};
 pub use membership_repo::MembershipRepo;
+pub use notification_pref_repo::NotificationPreferenceRepo;
 pub use password_reset_repo::PasswordResetRepo;
+pub use release_repo::ReleaseRepo;
 pub use runtime_profile_repo::{RuntimeProfileInput, RuntimeProfileRepo, RuntimeProfileUpdate};
+pub use temp_env_repo::{CreateTempEnvInput, TempEnvRepo};
 pub use user_repo::UserRepo;
 pub use workspace_repo::{CreateWorkspaceInput, WorkspaceRepo};
 

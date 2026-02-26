@@ -403,6 +403,65 @@ impl ChangesetRepo {
         Ok(row.into())
     }
 
+    pub async fn list_queued_by_app(&self, app_id: &str) -> Result<Vec<Changeset>, ConmanError> {
+        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid app_id: {e}"),
+        })?;
+        let queued =
+            mongodb::bson::to_bson(&ChangesetState::Queued).map_err(|e| ConmanError::Internal {
+                message: format!("failed to encode queued state: {e}"),
+            })?;
+        let mut cursor = self
+            .collection
+            .find(doc! {"app_id": app_id, "state": queued})
+            .sort(doc! {"queue_position": 1, "queued_at": 1})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to list queued changesets: {e}"),
+            })?;
+        let mut rows = Vec::new();
+        while cursor.advance().await.map_err(|e| ConmanError::Internal {
+            message: format!("queued changeset cursor error: {e}"),
+        })? {
+            let row: ChangesetDoc =
+                cursor
+                    .deserialize_current()
+                    .map_err(|e| ConmanError::Internal {
+                        message: format!("failed to decode queued changeset: {e}"),
+                    })?;
+            rows.push(row.into());
+        }
+        Ok(rows)
+    }
+
+    pub async fn mark_released_batch(&self, changeset_ids: &[String]) -> Result<(), ConmanError> {
+        if changeset_ids.is_empty() {
+            return Ok(());
+        }
+        let ids = changeset_ids
+            .iter()
+            .map(ObjectId::parse_str)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ConmanError::Validation {
+                message: format!("invalid changeset id in release batch: {e}"),
+            })?;
+        let released = mongodb::bson::to_bson(&ChangesetState::Released).map_err(|e| {
+            ConmanError::Internal {
+                message: format!("failed to encode released state: {e}"),
+            }
+        })?;
+        self.collection
+            .update_many(
+                doc! {"_id": {"$in": ids}},
+                doc! {"$set": {"state": released, "updated_at": mongodb::bson::DateTime::from_millis(Utc::now().timestamp_millis())}},
+            )
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to mark released changesets: {e}"),
+            })?;
+        Ok(())
+    }
+
     pub async fn update_title_and_description(
         &self,
         id: &str,

@@ -34,6 +34,11 @@ async fn main() {
     let changeset_comment_repo = conman_db::ChangesetCommentRepo::new(db.clone());
     let changeset_profile_override_repo = conman_db::ChangesetProfileOverrideRepo::new(db.clone());
     let job_repo = conman_db::JobRepo::new(db.clone());
+    let release_repo = conman_db::ReleaseRepo::new(db.clone());
+    let deployment_repo = conman_db::DeploymentRepo::new(db.clone());
+    let temp_env_repo = conman_db::TempEnvRepo::new(db.clone());
+    let audit_repo = conman_db::AuditRepo::new(db.clone());
+    let notification_pref_repo = conman_db::NotificationPreferenceRepo::new(db.clone());
     conman_db::bootstrap_indexes(&[
         &user_repo,
         &membership_repo,
@@ -47,6 +52,11 @@ async fn main() {
         &changeset_comment_repo,
         &changeset_profile_override_repo,
         &job_repo,
+        &release_repo,
+        &deployment_repo,
+        &temp_env_repo,
+        &audit_repo,
+        &notification_pref_repo,
     ])
     .await
     .expect("failed to bootstrap MongoDB indexes");

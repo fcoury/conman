@@ -1,5 +1,9 @@
 pub mod apps;
 pub mod changesets;
+pub mod deployments;
 pub mod health;
 pub mod jobs;
+pub mod me;
+pub mod releases;
+pub mod temp_envs;
 pub mod workspaces;

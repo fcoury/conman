@@ -18,8 +18,19 @@ use crate::handlers::changesets::{
     list_changeset_comments, list_changesets, move_changeset_to_draft, queue_changeset,
     resubmit_changeset, review_changeset, submit_changeset, update_changeset,
 };
+use crate::handlers::deployments::{
+    deploy_environment, list_deployments, promote_environment, rollback_environment,
+};
 use crate::handlers::health::health_check;
 use crate::handlers::jobs::{get_job, list_jobs};
+use crate::handlers::me::{get_notification_preferences, update_notification_preferences};
+use crate::handlers::releases::{
+    assemble_release, create_release, get_release, list_releases, publish_release,
+    reorder_release_changesets, set_release_changesets,
+};
+use crate::handlers::temp_envs::{
+    create_temp_env, delete_temp_env, extend_temp_env, list_temp_envs, undo_expire_temp_env,
+};
 use crate::handlers::workspaces::{
     create_workspace, create_workspace_checkpoint, delete_workspace_file, get_workspace,
     get_workspace_file_or_tree, list_workspaces, reset_workspace, sync_workspace_integration,
@@ -109,27 +120,24 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/apps/{appId}/releases",
-            get(not_implemented).post(not_implemented),
+            get(list_releases).post(create_release),
         )
-        .route(
-            "/api/apps/{appId}/releases/{releaseId}",
-            get(not_implemented),
-        )
+        .route("/api/apps/{appId}/releases/{releaseId}", get(get_release))
         .route(
             "/api/apps/{appId}/releases/{releaseId}/changesets",
-            post(not_implemented),
+            post(set_release_changesets),
         )
         .route(
             "/api/apps/{appId}/releases/{releaseId}/reorder",
-            post(not_implemented),
+            post(reorder_release_changesets),
         )
         .route(
             "/api/apps/{appId}/releases/{releaseId}/assemble",
-            post(not_implemented),
+            post(assemble_release),
         )
         .route(
             "/api/apps/{appId}/releases/{releaseId}/publish",
-            post(not_implemented),
+            post(publish_release),
         )
         .route(
             "/api/apps/{appId}/environments",
@@ -149,38 +157,38 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/apps/{appId}/environments/{envId}/deploy",
-            post(not_implemented),
+            post(deploy_environment),
         )
         .route(
             "/api/apps/{appId}/environments/{envId}/promote",
-            post(not_implemented),
+            post(promote_environment),
         )
         .route(
             "/api/apps/{appId}/environments/{envId}/rollback",
-            post(not_implemented),
+            post(rollback_environment),
         )
-        .route("/api/apps/{appId}/deployments", get(not_implemented))
+        .route("/api/apps/{appId}/deployments", get(list_deployments))
         .route(
             "/api/apps/{appId}/temp-envs",
-            get(not_implemented).post(not_implemented),
+            get(list_temp_envs).post(create_temp_env),
         )
         .route(
             "/api/apps/{appId}/temp-envs/{tempEnvId}/extend",
-            post(not_implemented),
+            post(extend_temp_env),
         )
         .route(
             "/api/apps/{appId}/temp-envs/{tempEnvId}/undo-expire",
-            post(not_implemented),
+            post(undo_expire_temp_env),
         )
         .route(
             "/api/apps/{appId}/temp-envs/{tempEnvId}",
-            delete(not_implemented),
+            delete(delete_temp_env),
         )
         .route("/api/apps/{appId}/jobs", get(list_jobs))
         .route("/api/apps/{appId}/jobs/{jobId}", get(get_job))
         .route(
             "/api/me/notification-preferences",
-            get(not_implemented).patch(not_implemented),
+            get(get_notification_preferences).patch(update_notification_preferences),
         )
         .fallback(fallback_404)
         .layer(axum::middleware::from_fn_with_state(
@@ -189,17 +197,6 @@ pub fn build_router(state: AppState) -> Router {
         ))
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(state)
-}
-
-async fn not_implemented() -> impl IntoResponse {
-    let body = ApiError {
-        error: ApiErrorBody {
-            code: "not_implemented",
-            message: "This endpoint is not yet implemented.".to_string(),
-            request_id: RequestContext::current_request_id(),
-        },
-    };
-    (StatusCode::NOT_IMPLEMENTED, Json(body))
 }
 
 async fn fallback_404() -> impl IntoResponse {
