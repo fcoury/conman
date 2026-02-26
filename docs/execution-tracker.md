@@ -42,7 +42,7 @@ Legend:
 | E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 85 | Drift checks and deploy approvals are enforced; real execution hooks are still noop |
 | E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 90 | Runtime cleanup worker is active; provider-side teardown hooks remain stubbed |
 | E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 90 | Outbox drain + SMTP provider path shipped; full audit completeness assertions pending |
-| E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 72 | Metrics, throttling, runbooks, test scaffolding, security guards, and alert/dashboard artifacts shipped; load/fault execution pending |
+| E12 Hardening | worker-observability | E08-E11 | E | in_progress | master | 78 | Metrics, throttling, runbooks, test scaffolding, security guards, alert/dashboard artifacts, and component-level health checks shipped; load/fault execution pending |
 
 ## 3) Dependency Gate Rules (Hard Stop)
 
