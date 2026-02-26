@@ -8,6 +8,7 @@ use conman_auth::AuthUser;
 use conman_core::{
     ConmanError, Deployment, Job, JobState, JobType, ReleaseState, Role, RollbackMode,
 };
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -42,6 +43,8 @@ pub struct DeploymentEnqueueResponse {
     pub deployment: Deployment,
     pub job: Job,
 }
+
+const DEPLOYMENTS_TOTAL: &str = "conman_deployments_total";
 
 fn validate_exceptional_approvals(
     is_skip_stage: bool,
@@ -87,6 +90,7 @@ pub async fn deploy_environment(
     Json(req): Json<DeployRequest>,
 ) -> Result<Json<ApiResponse<DeploymentEnqueueResponse>>, ApiConmanError> {
     auth.require_role(&app_id, Role::ConfigManager)?;
+    counter!(DEPLOYMENTS_TOTAL, "action" => "deploy").increment(1);
     validate_exceptional_approvals(req.is_skip_stage, req.is_concurrent_batch, &req.approvals)?;
     let release = conman_db::ReleaseRepo::new(state.db.clone())
         .find_by_id(&req.release_id)
@@ -294,6 +298,7 @@ pub async fn rollback_environment(
     Json(req): Json<RollbackRequest>,
 ) -> Result<Json<ApiResponse<DeploymentEnqueueResponse>>, ApiConmanError> {
     auth.require_role(&app_id, Role::ConfigManager)?;
+    counter!(DEPLOYMENTS_TOTAL, "action" => "rollback").increment(1);
     validate_exceptional_approvals(true, false, &req.approvals)?;
     let release = conman_db::ReleaseRepo::new(state.db.clone())
         .find_by_id(&req.release_id)

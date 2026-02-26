@@ -381,6 +381,19 @@ impl JobRepo {
         }
         Ok(rows)
     }
+
+    pub async fn count_queued(&self) -> Result<u64, ConmanError> {
+        let queued =
+            mongodb::bson::to_bson(&JobState::Queued).map_err(|e| ConmanError::Internal {
+                message: format!("failed to encode queued state for count: {e}"),
+            })?;
+        self.jobs
+            .count_documents(doc! {"state": queued})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to count queued jobs: {e}"),
+            })
+    }
 }
 
 #[async_trait::async_trait]

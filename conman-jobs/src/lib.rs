@@ -10,6 +10,7 @@ use conman_db::{
     ChangesetProfileOverrideRepo, ChangesetRepo, DeploymentRepo, EnqueueJobInput, JobRepo,
     NotificationEventRepo, ReleaseRepo, TempEnvRepo,
 };
+use metrics::{counter, gauge, histogram};
 use serde_json::json;
 
 #[async_trait]
@@ -271,6 +272,25 @@ pub struct JobRunner {
     poll_interval: Duration,
 }
 
+const JOBS_ENQUEUED_TOTAL: &str = "conman_jobs_enqueued_total";
+const JOBS_COMPLETED_TOTAL: &str = "conman_jobs_completed_total";
+const JOB_DURATION_SECONDS: &str = "conman_job_duration_seconds";
+const JOB_QUEUE_DEPTH: &str = "conman_job_queue_depth";
+
+fn job_type_label(job_type: JobType) -> &'static str {
+    match job_type {
+        JobType::MsuiteSubmit => "msuite_submit",
+        JobType::MsuiteMerge => "msuite_merge",
+        JobType::MsuiteDeploy => "msuite_deploy",
+        JobType::RevalidateQueuedChangeset => "revalidate_queued_changeset",
+        JobType::ReleaseAssemble => "release_assemble",
+        JobType::DeployRelease => "deploy_release",
+        JobType::RuntimeProfileDriftCheck => "runtime_profile_drift_check",
+        JobType::TempEnvProvision => "temp_env_provision",
+        JobType::TempEnvExpire => "temp_env_expire",
+    }
+}
+
 impl JobRunner {
     pub fn new(db: mongodb::Database) -> Self {
         let mut workers: HashMap<JobType, Arc<dyn JobWorker>> = HashMap::new();
@@ -336,12 +356,18 @@ impl JobRunner {
     }
 
     pub async fn enqueue(&self, input: EnqueueJobInput) -> Result<conman_core::Job, ConmanError> {
-        self.repo.enqueue(input).await
+        let label = job_type_label(input.job_type);
+        let job = self.repo.enqueue(input).await?;
+        counter!(JOBS_ENQUEUED_TOTAL, "job_type" => label).increment(1);
+        Ok(job)
     }
 
     pub async fn tick(&self) -> Result<(), ConmanError> {
         self.enqueue_due_temp_env_expiry_jobs().await?;
         self.drain_notification_outbox().await?;
+        if let Ok(queued) = self.repo.count_queued().await {
+            gauge!(JOB_QUEUE_DEPTH).set(queued as f64);
+        }
 
         let Some(job) = self.repo.reserve_next_queued().await? else {
             return Ok(());
@@ -357,6 +383,8 @@ impl JobRunner {
         self.repo
             .append_log(&job.app_id, &job.id, "info", "job started")
             .await?;
+        let started_at = std::time::Instant::now();
+        let job_type = job_type_label(job.job_type);
 
         let outcome = tokio::time::timeout(timeout, worker.run(&job)).await;
         match outcome {
@@ -365,12 +393,16 @@ impl JobRunner {
                 self.repo
                     .append_log(&job.app_id, &job.id, "info", "job succeeded")
                     .await?;
+                counter!(JOBS_COMPLETED_TOTAL, "job_type" => job_type, "outcome" => "succeeded")
+                    .increment(1);
             }
             Ok(Err(err)) => {
                 self.repo.complete_failure(&job.id, err.clone()).await?;
                 self.repo
                     .append_log(&job.app_id, &job.id, "error", &format!("job failed: {err}"))
                     .await?;
+                counter!(JOBS_COMPLETED_TOTAL, "job_type" => job_type, "outcome" => "failed")
+                    .increment(1);
             }
             Err(_) => {
                 let err = "job timed out".to_string();
@@ -378,8 +410,12 @@ impl JobRunner {
                 self.repo
                     .append_log(&job.app_id, &job.id, "error", &err)
                     .await?;
+                counter!(JOBS_COMPLETED_TOTAL, "job_type" => job_type, "outcome" => "timed_out")
+                    .increment(1);
             }
         }
+        histogram!(JOB_DURATION_SECONDS, "job_type" => job_type)
+            .record(started_at.elapsed().as_secs_f64());
 
         Ok(())
     }

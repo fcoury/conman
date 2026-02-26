@@ -7,6 +7,7 @@ use conman_auth::{
     AuthUser, PasswordPolicy, hash_password, issue_token, validate_token, verify_password,
 };
 use conman_core::ConmanError;
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ApiConmanError;
@@ -63,6 +64,8 @@ pub struct MessageResponse {
     pub message: String,
 }
 
+const AUTH_FAILURES_TOTAL: &str = "conman_auth_failures_total";
+
 pub async fn login(
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
@@ -77,15 +80,16 @@ pub async fn login(
     let users = conman_db::UserRepo::new(state.db.clone());
     let memberships = conman_db::MembershipRepo::new(state.db.clone());
 
-    let user = users
-        .find_by_email(&req.email)
-        .await?
-        .ok_or_else(|| ConmanError::Unauthorized {
+    let user = users.find_by_email(&req.email).await?.ok_or_else(|| {
+        counter!(AUTH_FAILURES_TOTAL, "reason" => "unknown_email").increment(1);
+        ConmanError::Unauthorized {
             message: "invalid_credentials".to_string(),
-        })?;
+        }
+    })?;
 
     let valid = verify_password(&req.password, &user.password_hash)?;
     if !valid {
+        counter!(AUTH_FAILURES_TOTAL, "reason" => "bad_password").increment(1);
         return Err(ConmanError::Unauthorized {
             message: "invalid_credentials".to_string(),
         }
@@ -292,7 +296,10 @@ pub async fn auth_middleware(
             req.extensions_mut().insert(auth_user);
             next.run(req).await
         }
-        Err(err) => ApiConmanError(err).into_response(),
+        Err(err) => {
+            counter!(AUTH_FAILURES_TOTAL, "reason" => "invalid_bearer").increment(1);
+            ApiConmanError(err).into_response()
+        }
     }
 }
 

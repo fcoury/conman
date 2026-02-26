@@ -501,6 +501,7 @@ dependencies = [
  "chrono",
  "conman-core",
  "conman-db",
+ "metrics",
  "mongodb",
  "serde_json",
  "tokio",
