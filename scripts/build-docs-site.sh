@@ -25,28 +25,61 @@ PANDOC_OPTS=(
   --syntax-highlighting=breezedark
 )
 
-pandoc "$SRC_DIR/conman-v1-scope.md" \
-  "${PANDOC_OPTS[@]}" \
-  --css style.css \
-  --metadata title="Conman V1 Scope" \
-  -o "$DIST_DIR/conman-v1-scope.html"
+build_page() {
+  local source="$1"
+  local output="$2"
+  local title="$3"
+  local css_path="$4"
+  shift 4
+  pandoc "$source" \
+    "${PANDOC_OPTS[@]}" \
+    --css "$css_path" \
+    --metadata title="$title" \
+    "$@" \
+    -o "$output"
+}
 
-pandoc "$SRC_DIR/conman-v1-backlog.md" \
-  "${PANDOC_OPTS[@]}" \
-  --css style.css \
-  --metadata title="Conman V1 Backlog" \
-  -o "$DIST_DIR/conman-v1-backlog.html"
+build_page \
+  "$SRC_DIR/conman-v1-scope.md" \
+  "$DIST_DIR/conman-v1-scope.html" \
+  "Conman V1 Scope" \
+  "style.css"
 
-pandoc "$SRC_DIR/IMPLEMENTATION.md" \
-  "${PANDOC_OPTS[@]}" \
-  --css style.css \
-  --metadata title="V1 Implementation Guide" \
-  -o "$DIST_DIR/implementation.html"
+build_page \
+  "$SRC_DIR/conman-v1-backlog.md" \
+  "$DIST_DIR/conman-v1-backlog.html" \
+  "Conman V1 Backlog" \
+  "style.css"
 
-# Rewrite .md links to .html so cross-doc links resolve correctly
-for html in "$DIST_DIR"/*.html "$DIST_DIR"/epics/*.html; do
-  [ -f "$html" ] && sed -i '' 's/\.md"/.html"/g; s/\.md#/.html#/g' "$html"
-done
+build_page \
+  "$SRC_DIR/IMPLEMENTATION.md" \
+  "$DIST_DIR/implementation.html" \
+  "V1 Implementation Guide" \
+  "style.css"
+
+build_page \
+  "$SRC_DIR/runtime-profiles-draft.md" \
+  "$DIST_DIR/runtime-profiles.html" \
+  "Runtime Profiles Draft" \
+  "style.css"
+
+build_page \
+  "$SRC_DIR/execution-plan.md" \
+  "$DIST_DIR/execution-plan.html" \
+  "Multi-Agent Execution Plan" \
+  "style.css"
+
+build_page \
+  "$SRC_DIR/execution-tracker.md" \
+  "$DIST_DIR/execution-tracker.html" \
+  "Execution Tracker" \
+  "style.css"
+
+build_page \
+  "$SRC_DIR/go-live-checklist.md" \
+  "$DIST_DIR/go-live-checklist.html" \
+  "Go-Live Checklist" \
+  "style.css"
 
 # Build epic pages
 mkdir -p "$DIST_DIR/epics"
@@ -60,6 +93,24 @@ for epic in "$SRC_DIR"/epics/*.md; do
     --metadata home-link="../index.html" \
     --metadata title="$title" \
     -o "$DIST_DIR/epics/${basename}.html"
+done
+
+# Build runbook pages
+mkdir -p "$DIST_DIR/runbooks"
+for runbook in "$SRC_DIR"/runbooks/*.md; do
+  basename="$(basename "$runbook" .md)"
+  title="$(head -1 "$runbook" | sed -E 's/^#+ *//')"
+  build_page \
+    "$runbook" \
+    "$DIST_DIR/runbooks/${basename}.html" \
+    "$title" \
+    "../style.css" \
+    --metadata home-link="../index.html"
+done
+
+# Rewrite .md links to .html so cross-doc links resolve correctly
+for html in "$DIST_DIR"/*.html "$DIST_DIR"/epics/*.html "$DIST_DIR"/runbooks/*.html; do
+  [ -f "$html" ] && sed -i '' 's/\.md"/.html"/g; s/\.md#/.html#/g' "$html"
 done
 
 GENERATED_AT="$(date -u +"%Y-%m-%d %H:%M:%S UTC")"
@@ -90,6 +141,26 @@ cat > "$DIST_DIR/index.html" <<EOF
         <a class="doc-card" href="./implementation.html">
           <p class="card-title">V1 Implementation Guide</p>
           <p class="card-desc">Epic-by-epic implementation plan with ordered checklists.</p>
+        </a>
+        <a class="doc-card" href="./runtime-profiles.html">
+          <p class="card-title">Runtime Profiles Draft</p>
+          <p class="card-desc">Profile model for URLs, env vars, secrets, database, and data lifecycle.</p>
+        </a>
+        <a class="doc-card" href="./execution-plan.html">
+          <p class="card-title">Execution Plan</p>
+          <p class="card-desc">Dependency-ordered multi-agent delivery plan by wave and milestone.</p>
+        </a>
+        <a class="doc-card" href="./execution-tracker.html">
+          <p class="card-title">Execution Tracker</p>
+          <p class="card-desc">Live milestone gate status, blockers, and launch readiness sign-off.</p>
+        </a>
+        <a class="doc-card" href="./go-live-checklist.html">
+          <p class="card-title">Go-Live Checklist</p>
+          <p class="card-desc">Operational launch checklist with links to evidence artifacts.</p>
+        </a>
+        <a class="doc-card" href="./runbooks/REVIEW-SIGNOFF.html">
+          <p class="card-title">Runbook Sign-Off</p>
+          <p class="card-desc">On-call review checklist and runbook index for production readiness.</p>
         </a>
       </div>
       <p class="meta">Generated: ${GENERATED_AT}</p>
