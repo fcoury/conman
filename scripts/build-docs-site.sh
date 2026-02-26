@@ -33,6 +33,11 @@ pandoc "$SRC_DIR/conman-v1-backlog.md" \
   --metadata title="Conman V1 Backlog" \
   -o "$DIST_DIR/conman-v1-backlog.html"
 
+pandoc "$SRC_DIR/IMPLEMENTATION.md" \
+  "${PANDOC_OPTS[@]}" \
+  --metadata title="V1 Implementation Guide" \
+  -o "$DIST_DIR/implementation.html"
+
 GENERATED_AT="$(date -u +"%Y-%m-%d %H:%M:%S UTC")"
 
 cat > "$DIST_DIR/index.html" <<EOF
@@ -56,6 +61,10 @@ cat > "$DIST_DIR/index.html" <<EOF
         <a class="doc-card" href="./conman-v1-backlog.html">
           <p class="card-title">V1 Implementation Backlog</p>
           <p class="card-desc">Prioritized tasks and milestones for the v1 build.</p>
+        </a>
+        <a class="doc-card" href="./implementation.html">
+          <p class="card-title">V1 Implementation Guide</p>
+          <p class="card-desc">Epic-by-epic implementation plan with ordered checklists.</p>
         </a>
       </div>
       <p class="meta">Generated: ${GENERATED_AT}</p>
