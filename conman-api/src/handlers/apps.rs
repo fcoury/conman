@@ -382,6 +382,24 @@ pub async fn assign_member(
     let user = conman_db::UserRepo::new(state.db.clone())
         .find_by_id(&req.user_id)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "membership",
+        &format!("{}:{}", app_id, membership.user_id),
+        "assigned",
+        None,
+        Some(serde_json::json!({
+            "user_id": membership.user_id,
+            "role": membership.role,
+        })),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(MemberResponse {
         user_id: membership.user_id,
         app_id: membership.app_id,
@@ -474,6 +492,22 @@ pub async fn replace_environments(
         }
     }
 
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "environment_set",
+        &app_id,
+        "replaced",
+        None,
+        serde_json::to_value(&environments).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
+
     Ok(Json(ApiResponse::ok(environments)))
 }
 
@@ -524,6 +558,26 @@ pub async fn create_runtime_profile(
             &state.config.secrets_master_key,
         )
         .await?;
+
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "runtime_profile",
+        &profile.id,
+        "created",
+        None,
+        serde_json::to_value(&runtime_profile_response(
+            profile.clone(),
+            &state.config.secrets_master_key,
+        )?)
+        .ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
 
     Ok(Json(ApiResponse::ok(runtime_profile_response(
         profile,
@@ -592,6 +646,26 @@ pub async fn update_runtime_profile(
         .into());
     }
 
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "runtime_profile",
+        &profile.id,
+        "updated",
+        None,
+        serde_json::to_value(&runtime_profile_response(
+            profile.clone(),
+            &state.config.secrets_master_key,
+        )?)
+        .ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
+
     Ok(Json(ApiResponse::ok(runtime_profile_response(
         profile,
         &state.config.secrets_master_key,
@@ -607,5 +681,23 @@ pub async fn reveal_runtime_profile_secret(
     let value = conman_db::RuntimeProfileRepo::new(state.db.clone())
         .reveal_secret(&profile_id, &key, &state.config.secrets_master_key)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "runtime_profile_secret",
+        &profile_id,
+        "revealed",
+        None,
+        Some(serde_json::json!({
+            "key": key,
+            "value_masked": mask_secret(&value),
+        })),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(RevealSecretResponse { key, value })))
 }

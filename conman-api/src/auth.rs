@@ -131,7 +131,26 @@ pub async fn forgot_password(
     let tokens = conman_db::PasswordResetRepo::new(state.db.clone());
 
     let reset_token = if let Some(user) = users.find_by_email(&req.email).await? {
-        Some(tokens.create(&user.id, 60).await?.token)
+        let token = tokens.create(&user.id, 60).await?;
+        if let Err(err) = emit_audit(
+            &state,
+            Some(&user.id),
+            None,
+            "password_reset_token",
+            &token.id,
+            "requested",
+            None,
+            Some(serde_json::json!({
+                "user_id": user.id,
+                "expires_at": token.expires_at,
+            })),
+            None,
+        )
+        .await
+        {
+            tracing::warn!(error = %err, "failed to write audit event");
+        }
+        Some(token.token)
     } else {
         None
     };

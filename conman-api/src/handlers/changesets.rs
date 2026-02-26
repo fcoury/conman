@@ -222,6 +222,21 @@ pub async fn update_changeset(
     let row = conman_db::ChangesetRepo::new(state.db.clone())
         .update_title_and_description(&changeset_id, req.title, req.description)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "changeset",
+        &row.id,
+        "metadata_updated",
+        serde_json::to_value(&changeset).ok(),
+        serde_json::to_value(&row).ok(),
+        row.submitted_head_sha.as_deref(),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(row)))
 }
 

@@ -11,7 +11,7 @@ use conman_core::{
 use conman_db::CreateWorkspaceInput;
 use serde::{Deserialize, Serialize};
 
-use crate::{error::ApiConmanError, response::ApiResponse, state::AppState};
+use crate::{error::ApiConmanError, events::emit_audit, response::ApiResponse, state::AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateWorkspaceRequest {
@@ -176,6 +176,32 @@ async fn find_workspace_for_owner(
     Ok(workspace)
 }
 
+async fn audit_workspace_event(
+    state: &AppState,
+    auth: &AuthUser,
+    app_id: &str,
+    workspace_id: &str,
+    action: &str,
+    after: Option<serde_json::Value>,
+    commit_sha: Option<&str>,
+) {
+    if let Err(err) = emit_audit(
+        state,
+        Some(&auth.user_id),
+        Some(app_id),
+        "workspace",
+        workspace_id,
+        action,
+        None,
+        after,
+        commit_sha,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
+}
+
 async fn ensure_default_workspace(
     state: &AppState,
     auth: &AuthUser,
@@ -213,6 +239,16 @@ async fn ensure_default_workspace(
             head_sha,
         })
         .await?;
+    audit_workspace_event(
+        state,
+        auth,
+        &workspace.app_id,
+        &workspace.id,
+        "created",
+        serde_json::to_value(&workspace).ok(),
+        Some(&workspace.head_sha),
+    )
+    .await;
     Ok(workspace)
 }
 
@@ -289,6 +325,17 @@ pub async fn create_workspace(
         })
         .await?;
 
+    audit_workspace_event(
+        &state,
+        &auth,
+        &workspace.app_id,
+        &workspace.id,
+        "created",
+        serde_json::to_value(&workspace).ok(),
+        Some(&workspace.head_sha),
+    )
+    .await;
+
     Ok(Json(ApiResponse::ok(workspace)))
 }
 
@@ -325,6 +372,18 @@ pub async fn update_workspace(
     let updated = conman_db::WorkspaceRepo::new(state.db.clone())
         .update_title(&workspace_id, req.title)
         .await?;
+
+    audit_workspace_event(
+        &state,
+        &auth,
+        &app_id,
+        &updated.id,
+        "updated",
+        serde_json::to_value(&updated).ok(),
+        Some(&updated.head_sha),
+    )
+    .await;
+
     Ok(Json(ApiResponse::ok(updated)))
 }
 
@@ -461,6 +520,21 @@ pub async fn write_workspace_file(
         .update_head(&workspace.id, &result.commit_id)
         .await?;
 
+    audit_workspace_event(
+        &state,
+        &auth,
+        &app_id,
+        &workspace.id,
+        "file_written",
+        Some(serde_json::json!({
+            "path": path,
+            "commit_sha": result.commit_id,
+            "workspace_id": workspace.id,
+        })),
+        Some(&result.commit_id),
+    )
+    .await;
+
     Ok(Json(ApiResponse::ok(FileWriteResponse {
         commit_sha: result.commit_id,
         path,
@@ -508,6 +582,21 @@ pub async fn delete_workspace_file(
     conman_db::WorkspaceRepo::new(state.db.clone())
         .update_head(&workspace.id, &result.commit_id)
         .await?;
+
+    audit_workspace_event(
+        &state,
+        &auth,
+        &app_id,
+        &workspace.id,
+        "file_deleted",
+        Some(serde_json::json!({
+            "path": path,
+            "commit_sha": result.commit_id,
+            "workspace_id": workspace.id,
+        })),
+        Some(&result.commit_id),
+    )
+    .await;
 
     Ok(Json(ApiResponse::ok(FileWriteResponse {
         commit_sha: result.commit_id,
@@ -563,6 +652,22 @@ pub async fn sync_workspace_integration(
         Err(err) => return Err(err.into()),
     };
 
+    audit_workspace_event(
+        &state,
+        &auth,
+        &app_id,
+        &workspace.id,
+        "synced_integration",
+        Some(serde_json::json!({
+            "clean": status.clean,
+            "head_sha": status.head_sha,
+            "conflicting_paths": status.conflicting_paths,
+            "message": status.message,
+        })),
+        Some(&status.head_sha),
+    )
+    .await;
+
     Ok(Json(ApiResponse::ok(SyncIntegrationResponse {
         clean: status.clean,
         head_sha: status.head_sha,
@@ -603,6 +708,20 @@ pub async fn reset_workspace(
         .update_head(&workspace.id, &head_sha)
         .await?;
 
+    audit_workspace_event(
+        &state,
+        &auth,
+        &app_id,
+        &workspace.id,
+        "reset",
+        Some(serde_json::json!({
+            "head_sha": head_sha,
+            "base_ref": base_ref,
+        })),
+        Some(&head_sha),
+    )
+    .await;
+
     Ok(Json(ApiResponse::ok(ResetResponse {
         head_sha,
         message: "workspace reset to baseline reference".to_string(),
@@ -639,6 +758,20 @@ pub async fn create_workspace_checkpoint(
             "checkpoint acknowledged; manual checkpoint strategy is enabled".to_string()
         }
     };
+
+    audit_workspace_event(
+        &state,
+        &auth,
+        &app_id,
+        &workspace.id,
+        "checkpoint_created",
+        Some(serde_json::json!({
+            "commit_sha": workspace.head_sha,
+            "message": detail.clone(),
+        })),
+        Some(&workspace.head_sha),
+    )
+    .await;
 
     Ok(Json(ApiResponse::ok(CheckpointResponse {
         commit_sha: workspace.head_sha,

@@ -261,7 +261,7 @@ pub async fn request_id_middleware(mut req: Request, next: Next) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{fs, path::PathBuf, sync::Arc};
 
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
@@ -395,5 +395,215 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         assert!(response.headers().contains_key("content-type"));
+    }
+
+    fn source_for(relative: &str) -> String {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        fs::read_to_string(root.join(relative)).expect("source file to exist")
+    }
+
+    fn function_block<'a>(source: &'a str, fn_name: &str) -> &'a str {
+        let markers = [
+            format!("pub async fn {fn_name}"),
+            format!("async fn {fn_name}"),
+        ];
+        for marker in markers {
+            if let Some(start) = source.find(&marker) {
+                let body_start = start + marker.len();
+                let tail = &source[body_start..];
+                let candidates = [
+                    tail.find("\npub async fn "),
+                    tail.find("\nasync fn "),
+                    tail.find("\n#[cfg(test)]"),
+                ];
+                let end_rel = candidates
+                    .into_iter()
+                    .flatten()
+                    .filter(|idx| *idx > 0)
+                    .min();
+                let end = end_rel.map(|idx| body_start + idx).unwrap_or(source.len());
+                return &source[start..end];
+            }
+        }
+        panic!("function `{fn_name}` not found");
+    }
+
+    #[test]
+    fn critical_mutation_handlers_emit_audit_or_delegate() {
+        let cases: &[(&str, &str, &str)] = &[
+            ("src/auth.rs", "forgot_password", "emit_audit("),
+            ("src/auth.rs", "reset_password", "emit_audit("),
+            ("src/auth.rs", "accept_invite", "emit_audit("),
+            ("src/handlers/apps.rs", "create_app", "emit_audit("),
+            ("src/handlers/apps.rs", "update_app_settings", "emit_audit("),
+            ("src/handlers/apps.rs", "assign_member", "emit_audit("),
+            ("src/handlers/apps.rs", "create_invite", "emit_audit("),
+            (
+                "src/handlers/apps.rs",
+                "replace_environments",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/apps.rs",
+                "create_runtime_profile",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/apps.rs",
+                "update_runtime_profile",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/apps.rs",
+                "reveal_runtime_profile_secret",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/workspaces.rs",
+                "ensure_default_workspace",
+                "audit_workspace_event(",
+            ),
+            (
+                "src/handlers/workspaces.rs",
+                "create_workspace",
+                "audit_workspace_event(",
+            ),
+            (
+                "src/handlers/workspaces.rs",
+                "update_workspace",
+                "audit_workspace_event(",
+            ),
+            (
+                "src/handlers/workspaces.rs",
+                "write_workspace_file",
+                "audit_workspace_event(",
+            ),
+            (
+                "src/handlers/workspaces.rs",
+                "delete_workspace_file",
+                "audit_workspace_event(",
+            ),
+            (
+                "src/handlers/workspaces.rs",
+                "sync_workspace_integration",
+                "audit_workspace_event(",
+            ),
+            (
+                "src/handlers/workspaces.rs",
+                "reset_workspace",
+                "audit_workspace_event(",
+            ),
+            (
+                "src/handlers/workspaces.rs",
+                "create_workspace_checkpoint",
+                "audit_workspace_event(",
+            ),
+            (
+                "src/handlers/changesets.rs",
+                "create_changeset",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/changesets.rs",
+                "update_changeset",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/changesets.rs",
+                "submit_changeset",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/changesets.rs",
+                "resubmit_changeset",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/changesets.rs",
+                "review_changeset",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/changesets.rs",
+                "queue_changeset",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/changesets.rs",
+                "move_changeset_to_draft",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/changesets.rs",
+                "create_changeset_comment",
+                "emit_audit(",
+            ),
+            ("src/handlers/releases.rs", "create_release", "emit_audit("),
+            (
+                "src/handlers/releases.rs",
+                "set_release_changesets",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/releases.rs",
+                "reorder_release_changesets",
+                "set_release_changesets(",
+            ),
+            (
+                "src/handlers/releases.rs",
+                "assemble_release",
+                "emit_audit(",
+            ),
+            ("src/handlers/releases.rs", "publish_release", "emit_audit("),
+            (
+                "src/handlers/deployments.rs",
+                "deploy_environment",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/deployments.rs",
+                "promote_environment",
+                "deploy_environment(",
+            ),
+            (
+                "src/handlers/deployments.rs",
+                "rollback_environment",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/temp_envs.rs",
+                "create_temp_env",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/temp_envs.rs",
+                "extend_temp_env",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/temp_envs.rs",
+                "undo_expire_temp_env",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/temp_envs.rs",
+                "delete_temp_env",
+                "emit_audit(",
+            ),
+            (
+                "src/handlers/me.rs",
+                "update_notification_preferences",
+                "emit_audit(",
+            ),
+        ];
+
+        for (file, fn_name, required_fragment) in cases {
+            let source = source_for(file);
+            let block = function_block(&source, fn_name);
+            assert!(
+                block.contains(required_fragment),
+                "{file}:{fn_name} missing required audit/delegation fragment `{required_fragment}`"
+            );
+        }
     }
 }

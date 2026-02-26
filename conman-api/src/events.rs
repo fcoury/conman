@@ -3,6 +3,7 @@ use conman_core::{AuditEvent, AuditRequestContext, ConmanError};
 
 use crate::{request_context::RequestContext, state::AppState};
 
+#[allow(clippy::too_many_arguments)]
 pub async fn emit_audit(
     state: &AppState,
     actor_user_id: Option<&str>,
