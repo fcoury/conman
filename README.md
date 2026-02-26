@@ -41,6 +41,12 @@ Prerequisites:
 - Rust toolchain (`cargo`)
 - `pandoc` (for docs-to-HTML site generation)
 
+Bootstrap local env:
+
+```bash
+cp .env.example .env
+```
+
 Run:
 
 ```bash

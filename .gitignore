@@ -1,2 +1,4 @@
 /target
 /docs/site/dist
+.env
+.env.local

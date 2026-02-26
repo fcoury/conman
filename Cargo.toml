@@ -18,6 +18,7 @@ axum = { version = "0.8", features = ["macros"] }
 base64 = "0.22"
 bson = { version = "2.15", features = ["chrono-0_4"] }
 chrono = { version = "0.4", features = ["serde"] }
+dotenvy = "0.15"
 http = "1"
 jsonwebtoken = "9"
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls"] }
@@ -48,6 +49,7 @@ conman-core = { path = "./conman-core" }
 conman-db = { path = "./conman-db" }
 conman-git = { path = "./conman-git" }
 conman-jobs = { path = "./conman-jobs" }
+dotenvy.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
