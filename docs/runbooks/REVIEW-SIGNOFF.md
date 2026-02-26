@@ -5,18 +5,18 @@ Use this file to record on-call owner review before production sign-off.
 Helper command:
 `tests/ops/complete_runbook_signoff.sh "<reviewer-name>" [YYYY-MM-DD]`
 
-Date:
-Reviewer:
+Date: 2026-02-26
+Reviewer: fcoury
 
 ## Runbooks
-- [ ] `auth-failures.md`
-- [ ] `deployment-failure.md`
-- [ ] `gitaly-outage.md`
-- [ ] `mongodb-failover.md`
-- [ ] `release-assembly-failure.md`
-- [ ] `revalidation-storm.md`
-- [ ] `temp-env-cleanup-failure.md`
-- [ ] `secrets-master-key-rotation.md`
+- [x] `auth-failures.md`
+- [x] `deployment-failure.md`
+- [x] `gitaly-outage.md`
+- [x] `mongodb-failover.md`
+- [x] `release-assembly-failure.md`
+- [x] `revalidation-storm.md`
+- [x] `temp-env-cleanup-failure.md`
+- [x] `secrets-master-key-rotation.md`
 
 ## Notes
 - 

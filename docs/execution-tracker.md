@@ -167,7 +167,7 @@ Rules:
 - [x] Runbooks approved
 - [x] Observability dashboards active
 - [x] Security checklist complete
-- [ ] Final sign-off (names/date)
+- [x] Final sign-off (names/date)
 
-Latest readiness report: `tests/ops/results/20260226075617-go-live-readiness-summary.md`
-(pending warning: runbook owner checklist completion).
+Latest readiness report: `tests/ops/results/20260226075757-go-live-readiness-summary.md`
+Final sign-off: `2026-02-26` (`fcoury`).
