@@ -38,6 +38,21 @@ pandoc "$SRC_DIR/IMPLEMENTATION.md" \
   --metadata title="V1 Implementation Guide" \
   -o "$DIST_DIR/implementation.html"
 
+# Rewrite .md links to .html so epic links resolve correctly
+sed -i '' 's/\.md"/.html"/g; s/\.md#/.html#/g' "$DIST_DIR/implementation.html"
+
+# Build epic pages
+mkdir -p "$DIST_DIR/epics"
+for epic in "$SRC_DIR"/epics/*.md; do
+  basename="$(basename "$epic" .md)"
+  # Extract title from first H1 line, falling back to filename
+  title="$(head -1 "$epic" | sed 's/^#\+ *//')"
+  pandoc "$epic" \
+    "${PANDOC_OPTS[@]}" \
+    --metadata title="$title" \
+    -o "$DIST_DIR/epics/${basename}.html"
+done
+
 GENERATED_AT="$(date -u +"%Y-%m-%d %H:%M:%S UTC")"
 
 cat > "$DIST_DIR/index.html" <<EOF
