@@ -14,5 +14,8 @@ evidence artifacts.
   verifies go-live evidence presence and reports any remaining human sign-off
   requirements (master-key runtime config and runbook owner review). Use
   `--strict` to fail on warnings.
+- `complete_runbook_signoff.sh`:
+  helper for on-call owners to complete `docs/runbooks/REVIEW-SIGNOFF.md`
+  consistently (`date`, `reviewer`, and all runbook checkboxes).
 
 Results are written to `tests/ops/results/`.

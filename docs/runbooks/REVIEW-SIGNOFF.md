@@ -2,6 +2,9 @@
 
 Use this file to record on-call owner review before production sign-off.
 
+Helper command:
+`tests/ops/complete_runbook_signoff.sh "<reviewer-name>" [YYYY-MM-DD]`
+
 Date:
 Reviewer:
 
