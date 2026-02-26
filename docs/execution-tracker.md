@@ -15,10 +15,10 @@ Use this file as the live control plane for delivery.
 - Current wave: `A`
 - Current milestone: `M1`
 - Overall progress:
-  - Epics complete: `1 / 13`
+  - Epics complete: `2 / 13`
   - Gates passed: `0 / 5`
 - Active blockers:
-  - None (E00 complete, E01/E02 in progress)
+  - E01 still needs concrete gitaly-rs RPC mappings beyond adapter stubs
 
 ## 2) Epic Tracker (Dependency Controlled)
 
@@ -31,8 +31,8 @@ Legend:
 |---|---|---|---|---|---|---:|---|
 | E00 Platform Foundation | worker-platform | none | A | done | master | 100 |  |
 | E01 Git Adapter | worker-git | E00 | A | in_review | master | 80 | Full gitaly-rs RPC mappings pending |
-| E02 Auth & RBAC | worker-auth | E00 | A | in_progress | master | 55 | Invite/reset and onboarding endpoints pending |
-| E03 App Setup | worker-app | E01, E02 | A | not_started |  | 0 |  |
+| E02 Auth & RBAC | worker-auth | E00 | A | done | master | 100 |  |
+| E03 App Setup | worker-app | E01, E02 | A | in_progress | master | 75 | App/review/deploy audit events still pending |
 | E04 Workspaces | worker-workspace | E01, E03 | B | not_started |  | 0 |  |
 | E05 Changesets | worker-changeset | E02, E04 | B | not_started |  | 0 |  |
 | E06 Async Jobs | worker-jobs | E00, E05 | B | not_started |  | 0 |  |
@@ -65,7 +65,7 @@ Do not merge when prerequisites are incomplete:
 
 - [ ] E00 merged
 - [ ] E01 merged
-- [ ] E02 merged
+- [x] E02 merged
 - [ ] E03 merged
 - [ ] Service boots with shared error/pagination/request-id conventions
 - [ ] Git adapter boundary implemented (no direct gitaly calls in handlers)

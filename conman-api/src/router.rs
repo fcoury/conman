@@ -7,7 +7,12 @@ use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use uuid::Uuid;
 
-use crate::auth::{auth_middleware, login, logout};
+use crate::auth::{accept_invite, auth_middleware, forgot_password, login, logout, reset_password};
+use crate::handlers::apps::{
+    assign_member, create_app, create_invite, create_runtime_profile, get_app, get_runtime_profile,
+    list_apps, list_environments, list_members, list_runtime_profiles, replace_environments,
+    reveal_runtime_profile_secret, update_app_settings, update_runtime_profile,
+};
 use crate::handlers::health::health_check;
 use crate::request_context::RequestContext;
 use crate::response::{ApiError, ApiErrorBody};
@@ -18,14 +23,17 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/health", get(health_check))
         .route("/api/auth/login", post(login))
         .route("/api/auth/logout", post(logout))
-        .route("/api/auth/forgot-password", post(not_implemented))
-        .route("/api/auth/reset-password", post(not_implemented))
-        .route("/api/auth/accept-invite", post(not_implemented))
-        .route("/api/apps", get(not_implemented).post(not_implemented))
-        .route("/api/apps/{appId}", get(not_implemented))
-        .route("/api/apps/{appId}/settings", patch(not_implemented))
-        .route("/api/apps/{appId}/members", get(not_implemented))
-        .route("/api/apps/{appId}/invites", post(not_implemented))
+        .route("/api/auth/forgot-password", post(forgot_password))
+        .route("/api/auth/reset-password", post(reset_password))
+        .route("/api/auth/accept-invite", post(accept_invite))
+        .route("/api/apps", get(list_apps).post(create_app))
+        .route("/api/apps/{appId}", get(get_app))
+        .route("/api/apps/{appId}/settings", patch(update_app_settings))
+        .route(
+            "/api/apps/{appId}/members",
+            get(list_members).post(assign_member),
+        )
+        .route("/api/apps/{appId}/invites", post(create_invite))
         .route(
             "/api/apps/{appId}/workspaces",
             get(not_implemented).post(not_implemented),
@@ -114,7 +122,19 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/apps/{appId}/environments",
-            get(not_implemented).patch(not_implemented),
+            get(list_environments).patch(replace_environments),
+        )
+        .route(
+            "/api/apps/{appId}/runtime-profiles",
+            get(list_runtime_profiles).post(create_runtime_profile),
+        )
+        .route(
+            "/api/apps/{appId}/runtime-profiles/{profileId}",
+            get(get_runtime_profile).patch(update_runtime_profile),
+        )
+        .route(
+            "/api/apps/{appId}/runtime-profiles/{profileId}/secrets/{key}/reveal",
+            post(reveal_runtime_profile_secret),
         )
         .route(
             "/api/apps/{appId}/environments/{envId}/deploy",

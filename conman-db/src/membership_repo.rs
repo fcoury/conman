@@ -107,6 +107,79 @@ impl MembershipRepo {
 
         Ok(roles)
     }
+
+    pub async fn list_by_app_id(&self, app_id: &str) -> Result<Vec<AppMembership>, ConmanError> {
+        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid app_id: {e}"),
+        })?;
+
+        let mut cursor = self
+            .collection
+            .find(doc! {"app_id": app_id})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to query app memberships: {e}"),
+            })?;
+
+        let mut rows = Vec::new();
+        while cursor.advance().await.map_err(|e| ConmanError::Internal {
+            message: format!("membership cursor error: {e}"),
+        })? {
+            let doc: MembershipDoc =
+                cursor
+                    .deserialize_current()
+                    .map_err(|e| ConmanError::Internal {
+                        message: format!("failed to deserialize membership: {e}"),
+                    })?;
+            rows.push(doc.into());
+        }
+        Ok(rows)
+    }
+
+    pub async fn assign_role(
+        &self,
+        user_id: &str,
+        app_id: &str,
+        role: Role,
+    ) -> Result<AppMembership, ConmanError> {
+        let user_id = ObjectId::parse_str(user_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid user_id: {e}"),
+        })?;
+        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid app_id: {e}"),
+        })?;
+
+        let filter = doc! {"user_id": user_id, "app_id": app_id};
+        let existing = self
+            .collection
+            .find_one(filter.clone())
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to query membership for assign_role: {e}"),
+            })?;
+
+        if let Some(existing) = existing {
+            let role_bson = mongodb::bson::to_bson(&role).map_err(|e| ConmanError::Internal {
+                message: format!("failed to encode role: {e}"),
+            })?;
+            self.collection
+                .update_one(filter, doc! {"$set": {"role": role_bson}})
+                .await
+                .map_err(|e| ConmanError::Internal {
+                    message: format!("failed to update membership role: {e}"),
+                })?;
+
+            return Ok(AppMembership {
+                id: existing.id.to_hex(),
+                user_id: user_id.to_hex(),
+                app_id: app_id.to_hex(),
+                role,
+                created_at: existing.created_at,
+            });
+        }
+
+        self.insert(&user_id.to_hex(), &app_id.to_hex(), role).await
+    }
 }
 
 #[async_trait::async_trait]

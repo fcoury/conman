@@ -2,10 +2,20 @@ use async_trait::async_trait;
 use conman_core::{Config, ConmanError};
 use mongodb::{Client, Database, bson::doc, options::ClientOptions};
 
+pub mod app_repo;
+pub mod environment_repo;
+pub mod invite_repo;
 pub mod membership_repo;
+pub mod password_reset_repo;
+pub mod runtime_profile_repo;
 pub mod user_repo;
 
+pub use app_repo::AppRepo;
+pub use environment_repo::{EnvironmentInput, EnvironmentRepo};
+pub use invite_repo::InviteRepo;
 pub use membership_repo::MembershipRepo;
+pub use password_reset_repo::PasswordResetRepo;
+pub use runtime_profile_repo::{RuntimeProfileInput, RuntimeProfileRepo, RuntimeProfileUpdate};
 pub use user_repo::UserRepo;
 
 #[async_trait]

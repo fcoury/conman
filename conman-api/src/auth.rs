@@ -3,7 +3,9 @@ use axum::extract::Request;
 use axum::extract::State;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use conman_auth::{AuthUser, issue_token, validate_token, verify_password};
+use conman_auth::{
+    AuthUser, PasswordPolicy, hash_password, issue_token, validate_token, verify_password,
+};
 use conman_core::ConmanError;
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +16,24 @@ use crate::state::AppState;
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
     pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ForgotPasswordRequest {
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResetPasswordRequest {
+    pub token: String,
+    pub new_password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AcceptInviteRequest {
+    pub token: String,
+    pub name: String,
     pub password: String,
 }
 
@@ -28,6 +48,13 @@ pub struct UserSummary {
 pub struct LoginResponse {
     pub token: String,
     pub user: UserSummary,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ForgotPasswordResponse {
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reset_token: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -66,6 +93,123 @@ pub async fn login(
 
     let roles = memberships.find_roles_by_user_id(&user.id).await?;
 
+    let token = issue_token(
+        &user.id,
+        &user.email,
+        roles,
+        &state.config.jwt_secret,
+        state.config.jwt_expiry_hours,
+    )?;
+
+    Ok(Json(ApiResponse::ok(LoginResponse {
+        token,
+        user: UserSummary {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+        },
+    })))
+}
+
+pub async fn forgot_password(
+    State(state): State<AppState>,
+    Json(req): Json<ForgotPasswordRequest>,
+) -> Result<Json<ApiResponse<ForgotPasswordResponse>>, ApiConmanError> {
+    if req.email.trim().is_empty() {
+        return Err(ConmanError::Validation {
+            message: "email is required".to_string(),
+        }
+        .into());
+    }
+
+    let users = conman_db::UserRepo::new(state.db.clone());
+    let tokens = conman_db::PasswordResetRepo::new(state.db.clone());
+
+    let reset_token = if let Some(user) = users.find_by_email(&req.email).await? {
+        Some(tokens.create(&user.id, 60).await?.token)
+    } else {
+        None
+    };
+
+    Ok(Json(ApiResponse::ok(ForgotPasswordResponse {
+        message: "if the account exists, a reset email has been queued".to_string(),
+        reset_token,
+    })))
+}
+
+pub async fn reset_password(
+    State(state): State<AppState>,
+    Json(req): Json<ResetPasswordRequest>,
+) -> Result<Json<ApiResponse<MessageResponse>>, ApiConmanError> {
+    if req.token.trim().is_empty() || req.new_password.is_empty() {
+        return Err(ConmanError::Validation {
+            message: "token and new_password are required".to_string(),
+        }
+        .into());
+    }
+
+    PasswordPolicy::validate(&req.new_password)?;
+
+    let reset_repo = conman_db::PasswordResetRepo::new(state.db.clone());
+    let users = conman_db::UserRepo::new(state.db.clone());
+
+    let token = reset_repo
+        .find_active_by_token(&req.token)
+        .await?
+        .ok_or_else(|| ConmanError::Forbidden {
+            message: "invalid_or_expired_reset_token".to_string(),
+        })?;
+
+    let password_hash = hash_password(&req.new_password)?;
+    users
+        .update_password(&token.user_id, &password_hash)
+        .await?;
+    reset_repo.mark_used(&token.id).await?;
+
+    Ok(Json(ApiResponse::ok(MessageResponse {
+        message: "password updated".to_string(),
+    })))
+}
+
+pub async fn accept_invite(
+    State(state): State<AppState>,
+    Json(req): Json<AcceptInviteRequest>,
+) -> Result<Json<ApiResponse<LoginResponse>>, ApiConmanError> {
+    if req.token.trim().is_empty() || req.name.trim().is_empty() || req.password.is_empty() {
+        return Err(ConmanError::Validation {
+            message: "token, name and password are required".to_string(),
+        }
+        .into());
+    }
+    PasswordPolicy::validate(&req.password)?;
+
+    let invites = conman_db::InviteRepo::new(state.db.clone());
+    let users = conman_db::UserRepo::new(state.db.clone());
+    let memberships = conman_db::MembershipRepo::new(state.db.clone());
+
+    let invite = invites
+        .find_active_by_token(&req.token)
+        .await?
+        .ok_or_else(|| ConmanError::Forbidden {
+            message: "invalid_or_expired_invite".to_string(),
+        })?;
+
+    let user = match users.find_by_email(&invite.email).await? {
+        Some(user) => user,
+        None => {
+            let password_hash = hash_password(&req.password)?;
+            users
+                .insert(&invite.email, &req.name, &password_hash)
+                .await?
+        }
+    };
+
+    memberships
+        .assign_role(&user.id, &invite.app_id, invite.role)
+        .await?;
+    invites.mark_accepted(&invite.id).await?;
+
+    let roles = memberships.find_roles_by_user_id(&user.id).await?;
     let token = issue_token(
         &user.id,
         &user.email,

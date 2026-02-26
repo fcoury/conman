@@ -23,9 +23,22 @@ async fn main() {
 
     let user_repo = conman_db::UserRepo::new(db.clone());
     let membership_repo = conman_db::MembershipRepo::new(db.clone());
-    conman_db::bootstrap_indexes(&[&user_repo, &membership_repo])
-        .await
-        .expect("failed to bootstrap MongoDB indexes");
+    let app_repo = conman_db::AppRepo::new(db.clone());
+    let environment_repo = conman_db::EnvironmentRepo::new(db.clone());
+    let invite_repo = conman_db::InviteRepo::new(db.clone());
+    let runtime_profile_repo = conman_db::RuntimeProfileRepo::new(db.clone());
+    let password_reset_repo = conman_db::PasswordResetRepo::new(db.clone());
+    conman_db::bootstrap_indexes(&[
+        &user_repo,
+        &membership_repo,
+        &app_repo,
+        &environment_repo,
+        &invite_repo,
+        &runtime_profile_repo,
+        &password_reset_repo,
+    ])
+    .await
+    .expect("failed to bootstrap MongoDB indexes");
 
     let git_adapter: Arc<dyn GitAdapter> = match GitalyClient::connect(&config.gitaly_address).await
     {
