@@ -317,7 +317,7 @@ Loaded from environment variables with `CONMAN_` prefix:
 | Term            | Definition                                                                                    |
 | --------------- | --------------------------------------------------------------------------------------------- |
 | Tenant          | Top-level customer/account boundary for repositories                                           |
-| Repository      | Managed config repository (stored in `App`; `/api/repos` primary, `/api/apps` compatibility) |
+| Repository      | Managed config repository (stored in `App`; `/api/repos` primary, `/api/repos` compatibility) |
 | App Surface     | User-facing app within a repository (domains/branding/role hints)                             |
 | Workspace       | User-owned mutable branch (`ws/<user>/<app>`)                                                 |
 | Changeset       | Reviewable proposal: workspace HEAD vs integration baseline                                   |
@@ -450,7 +450,6 @@ test cases.
 | [E09](epics/E09-deployments.md)   | Deployments           | E03, E06, E08 | Deploy, promote, skip-stage, rollback, drift blocking                  |
 | [E10](epics/E10-temp-envs.md)     | Temp Environments     | E03, E06      | On-demand envs, profile derivation, TTL, cleanup                       |
 | [E11](epics/E11-notifications.md) | Notifications & Audit | E05-E10       | Email notifications, audit completeness, runtime profile events        |
-| [E12](epics/E12-hardening.md)     | Hardening             | E08-E11       | Load testing, fault injection, encryption/rotation runbooks            |
 
 ### Critical path
 
@@ -467,4 +466,4 @@ Parallelizable after E06: E08 can proceed with E10. E11 can run alongside E09/E1
 | M1: Authoring + Review      | E00–E06 | Users can author, submit, and review changesets   |
 | M2: Queue + Release         | E07–E08 | Config managers can publish subset-based releases |
 | M3: Environments + Recovery | E09–E10 | Full release movement and recovery paths          |
-| M4: Operations + Launch     | E11–E12 | Production-readiness checklist passes             |
+| M4: Notifications + Audit   | E11     | Notification coverage and audit completeness pass |

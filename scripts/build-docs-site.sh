@@ -6,6 +6,7 @@ SRC_DIR="$ROOT_DIR/docs"
 SITE_DIR="$ROOT_DIR/docs/site"
 DIST_DIR="$SITE_DIR/dist"
 
+rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
 cp "$SITE_DIR/style.css" "$DIST_DIR/style.css"
@@ -92,12 +93,6 @@ build_page \
   "Execution Tracker" \
   "style.css"
 
-build_page \
-  "$SRC_DIR/go-live-checklist.md" \
-  "$DIST_DIR/go-live-checklist.html" \
-  "Go-Live Checklist" \
-  "style.css"
-
 # Build epic pages
 mkdir -p "$DIST_DIR/epics"
 for epic in "$SRC_DIR"/epics/*.md; do
@@ -112,21 +107,8 @@ for epic in "$SRC_DIR"/epics/*.md; do
     -o "$DIST_DIR/epics/${basename}.html"
 done
 
-# Build runbook pages
-mkdir -p "$DIST_DIR/runbooks"
-for runbook in "$SRC_DIR"/runbooks/*.md; do
-  basename="$(basename "$runbook" .md)"
-  title="$(head -1 "$runbook" | sed -E 's/^#+ *//')"
-  build_page \
-    "$runbook" \
-    "$DIST_DIR/runbooks/${basename}.html" \
-    "$title" \
-    "../style.css" \
-    --metadata home-link="../index.html"
-done
-
 # Rewrite .md links to .html so cross-doc links resolve correctly
-for html in "$DIST_DIR"/*.html "$DIST_DIR"/epics/*.html "$DIST_DIR"/runbooks/*.html; do
+for html in "$DIST_DIR"/*.html "$DIST_DIR"/epics/*.html; do
   if [ -f "$html" ]; then
     if [[ "$(uname -s)" == "Darwin" ]]; then
       sed -i '' 's/\.md"/.html"/g; s/\.md#/.html#/g' "$html"
@@ -183,15 +165,7 @@ cat > "$DIST_DIR/index.html" <<EOF
         </a>
         <a class="doc-card" href="./execution-tracker.html">
           <p class="card-title">Execution Tracker</p>
-          <p class="card-desc">Live milestone gate status, blockers, and launch readiness sign-off.</p>
-        </a>
-        <a class="doc-card" href="./go-live-checklist.html">
-          <p class="card-title">Go-Live Checklist</p>
-          <p class="card-desc">Operational launch checklist with links to evidence artifacts.</p>
-        </a>
-        <a class="doc-card" href="./runbooks/REVIEW-SIGNOFF.html">
-          <p class="card-title">Runbook Sign-Off</p>
-          <p class="card-desc">On-call review checklist and runbook index for production readiness.</p>
+          <p class="card-desc">Live milestone and delivery status tracking.</p>
         </a>
       </div>
       <p class="meta">Generated: ${GENERATED_AT}</p>

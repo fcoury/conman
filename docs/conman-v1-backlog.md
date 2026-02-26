@@ -18,7 +18,6 @@ Execution order (topological):
 10. E09 Deployment/promotion/rollback orchestration
 11. E10 Temp environments (workspace/changeset) + TTL/grace
 12. E11 Notifications + audit completeness
-13. E12 Hardening, SLOs, migration, launch readiness
 
 Parallelizable tracks after E06:
 
@@ -98,7 +97,7 @@ Issues:
 
 1. E03-01: `tenants` create/list/get APIs.
 2. E03-02: Repository creation under tenant + `repos` list/get APIs, with
-   `/api/apps` compatibility alias preserved.
+   `/api/repos` compatibility alias preserved.
 3. E03-03: App-surface CRUD/list APIs per repository.
 4. E03-04: Settings API for baseline mode, canonical env, commit mode default,
    blocked paths, file size limit.
@@ -302,27 +301,6 @@ Acceptance:
 
 Depends on: E05, E07, E08, E09, E10.
 
-## E12 Hardening and Launch Readiness
-
-Goal: Stabilize for production rollout.
-
-Issues:
-
-1. E12-01: Load/perf test large real repos (detoxu/hepquant profiles).
-2. E12-02: Fault-injection tests for Git adapter and job worker crashes.
-3. E12-03: SLOs and operational dashboards (queue depth, job latency,
-   deployment success rate).
-4. E12-04: Runbooks for release failure, revalidation storms, temp env cleanup.
-5. E12-05: Security checklist (password policy, token expiry, RBAC tests).
-6. E12-06: Secrets encryption and manual rotation drills.
-
-Acceptance:
-
-- Release-critical flows have runbooks and alerting.
-- No P0 blockers in go-live checklist.
-
-Depends on: E08, E09, E10, E11.
-
 ## 3) Milestone Cuts
 
 ## M1: Authoring + Review Baseline
@@ -372,19 +350,18 @@ Exit criteria:
 
 - Full release movement and recovery paths are operational.
 
-## M4: Operations and Launch
+## M4: Notifications and Audit
 
-Includes: E11-E12
+Includes: E11
 
 Scope:
 
 - Email notifications
 - Audit completeness
-- Observability/runbooks/perf hardening
 
 Exit criteria:
 
-- Production-readiness checklist passes.
+- Notification coverage and audit completeness pass.
 
 ## 4) Critical Path
 
@@ -396,7 +373,6 @@ Fast-follow but not blocking first release assembly:
 
 1. E10 (temp envs)
 2. E11 (notifications/audit polish)
-3. E12 (hardening)
 
 ## 5) Suggested First Sprint (Execution-Ready)
 

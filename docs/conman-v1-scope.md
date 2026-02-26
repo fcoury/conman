@@ -484,59 +484,59 @@ Base path: `/api`
 
 ## 8.2 Apps compatibility endpoints
 
-`/api/apps` remains available in v1 as a compatibility alias for repository
+`/api/repos` remains available in v1 as a compatibility alias for repository
 records.
 
-- `GET /api/apps?page=&limit=`
-- `POST /api/apps`
-- `GET /api/apps/:appId`
-- `PATCH /api/apps/:appId/settings`
-- `GET /api/apps/:appId/members?page=&limit=`
-- `POST /api/apps/:appId/invites`
-- `POST /api/apps/:appId/invites/:inviteId/resend`
-- `DELETE /api/apps/:appId/invites/:inviteId`
+- `GET /api/repos?page=&limit=`
+- `POST /api/repos`
+- `GET /api/repos/:appId`
+- `PATCH /api/repos/:appId/settings`
+- `GET /api/repos/:appId/members?page=&limit=`
+- `POST /api/repos/:appId/invites`
+- `POST /api/repos/:appId/invites/:inviteId/resend`
+- `DELETE /api/repos/:appId/invites/:inviteId`
 
 ## 8.3 Workspaces
 
-- `GET /api/apps/:appId/workspaces?page=&limit=`
-- `POST /api/apps/:appId/workspaces`
-- `GET /api/apps/:appId/workspaces/:workspaceId`
-- `PATCH /api/apps/:appId/workspaces/:workspaceId`
-- `POST /api/apps/:appId/workspaces/:workspaceId/reset`
-- `POST /api/apps/:appId/workspaces/:workspaceId/sync-integration`
+- `GET /api/repos/:appId/workspaces?page=&limit=`
+- `POST /api/repos/:appId/workspaces`
+- `GET /api/repos/:appId/workspaces/:workspaceId`
+- `PATCH /api/repos/:appId/workspaces/:workspaceId`
+- `POST /api/repos/:appId/workspaces/:workspaceId/reset`
+- `POST /api/repos/:appId/workspaces/:workspaceId/sync-integration`
 
 ## 8.4 Workspace files
 
-- `GET /api/apps/:appId/workspaces/:workspaceId/files?path=`
-- `PUT /api/apps/:appId/workspaces/:workspaceId/files` (body: `path`, `content`)
-- `DELETE /api/apps/:appId/workspaces/:workspaceId/files` (body: `path`)
-- `POST /api/apps/:appId/workspaces/:workspaceId/checkpoints`
+- `GET /api/repos/:appId/workspaces/:workspaceId/files?path=`
+- `PUT /api/repos/:appId/workspaces/:workspaceId/files` (body: `path`, `content`)
+- `DELETE /api/repos/:appId/workspaces/:workspaceId/files` (body: `path`)
+- `POST /api/repos/:appId/workspaces/:workspaceId/checkpoints`
 
 ## 8.5 Changesets
 
-- `GET /api/apps/:appId/changesets?page=&limit=&state=`
-- `POST /api/apps/:appId/changesets` (from workspace)
-- `GET /api/apps/:appId/changesets/:changesetId`
-- `PATCH /api/apps/:appId/changesets/:changesetId`
-- `POST /api/apps/:appId/changesets/:changesetId/submit`
-- `POST /api/apps/:appId/changesets/:changesetId/resubmit`
-- `POST /api/apps/:appId/changesets/:changesetId/review`
-- `POST /api/apps/:appId/changesets/:changesetId/queue`
-- `POST /api/apps/:appId/changesets/:changesetId/move-to-draft`
-- `GET /api/apps/:appId/changesets/:changesetId/profile-overrides`
-- `PUT /api/apps/:appId/changesets/:changesetId/profile-overrides`
+- `GET /api/repos/:appId/changesets?page=&limit=&state=`
+- `POST /api/repos/:appId/changesets` (from workspace)
+- `GET /api/repos/:appId/changesets/:changesetId`
+- `PATCH /api/repos/:appId/changesets/:changesetId`
+- `POST /api/repos/:appId/changesets/:changesetId/submit`
+- `POST /api/repos/:appId/changesets/:changesetId/resubmit`
+- `POST /api/repos/:appId/changesets/:changesetId/review`
+- `POST /api/repos/:appId/changesets/:changesetId/queue`
+- `POST /api/repos/:appId/changesets/:changesetId/move-to-draft`
+- `GET /api/repos/:appId/changesets/:changesetId/profile-overrides`
+- `PUT /api/repos/:appId/changesets/:changesetId/profile-overrides`
 
 `POST .../submit` responses include an `included_profile_overrides` summary.
 
 ## 8.6 Diffs, comments, and AI
 
-- `GET /api/apps/:appId/changesets/:changesetId/diff?mode=raw|semantic`
-- `GET /api/apps/:appId/changesets/:changesetId/comments?page=&limit=`
-- `POST /api/apps/:appId/changesets/:changesetId/comments`
-- `PATCH /api/apps/:appId/changesets/:changesetId/comments/:commentId` (stores
+- `GET /api/repos/:appId/changesets/:changesetId/diff?mode=raw|semantic`
+- `GET /api/repos/:appId/changesets/:changesetId/comments?page=&limit=`
+- `POST /api/repos/:appId/changesets/:changesetId/comments`
+- `PATCH /api/repos/:appId/changesets/:changesetId/comments/:commentId` (stores
   comment revision history)
-- `POST /api/apps/:appId/changesets/:changesetId/analyze`
-- `POST /api/apps/:appId/changesets/:changesetId/chat`
+- `POST /api/repos/:appId/changesets/:changesetId/analyze`
+- `POST /api/repos/:appId/changesets/:changesetId/chat`
 
 Semantic diff API contract (v1 standard):
 
@@ -579,34 +579,34 @@ interface SemanticDiffResponse {
 
 ## 8.7 Releases
 
-- `GET /api/apps/:appId/releases?page=&limit=&state=`
-- `POST /api/apps/:appId/releases` (create draft release)
-- `POST /api/apps/:appId/releases/:releaseId/changesets` (add/remove subset)
-- `POST /api/apps/:appId/releases/:releaseId/reorder`
-- `POST /api/apps/:appId/releases/:releaseId/assemble`
-- `POST /api/apps/:appId/releases/:releaseId/publish`
-- `GET /api/apps/:appId/releases/:releaseId`
+- `GET /api/repos/:appId/releases?page=&limit=&state=`
+- `POST /api/repos/:appId/releases` (create draft release)
+- `POST /api/repos/:appId/releases/:releaseId/changesets` (add/remove subset)
+- `POST /api/repos/:appId/releases/:releaseId/reorder`
+- `POST /api/repos/:appId/releases/:releaseId/assemble`
+- `POST /api/repos/:appId/releases/:releaseId/publish`
+- `GET /api/repos/:appId/releases/:releaseId`
 
 ## 8.8 Environments and deployments
 
-- `GET /api/apps/:appId/environments`
-- `PATCH /api/apps/:appId/environments`
-- `POST /api/apps/:appId/environments/:envId/deploy`
-- `POST /api/apps/:appId/environments/:envId/promote`
-- `POST /api/apps/:appId/environments/:envId/rollback`
-- `POST /api/apps/:appId/environments/:envId/create-drift-fix-changeset`
-- `GET /api/apps/:appId/deployments?page=&limit=`
+- `GET /api/repos/:appId/environments`
+- `PATCH /api/repos/:appId/environments`
+- `POST /api/repos/:appId/environments/:envId/deploy`
+- `POST /api/repos/:appId/environments/:envId/promote`
+- `POST /api/repos/:appId/environments/:envId/rollback`
+- `POST /api/repos/:appId/environments/:envId/create-drift-fix-changeset`
+- `GET /api/repos/:appId/deployments?page=&limit=`
 
 ## 8.9 Runtime profiles
 
-- `GET /api/apps/:appId/runtime-profiles?page=&limit=`
-- `POST /api/apps/:appId/runtime-profiles`
-- `GET /api/apps/:appId/runtime-profiles/:profileId`
-- `PATCH /api/apps/:appId/runtime-profiles/:profileId`
-- `GET /api/apps/:appId/runtime-profiles/:profileId/revisions?page=&limit=`
-- `POST /api/apps/:appId/runtime-profiles/:profileId/revert`
-- `POST /api/apps/:appId/runtime-profiles/:profileId/rotate-key` (manual)
-- `POST /api/apps/:appId/runtime-profiles/:profileId/secrets/:key/reveal`
+- `GET /api/repos/:appId/runtime-profiles?page=&limit=`
+- `POST /api/repos/:appId/runtime-profiles`
+- `GET /api/repos/:appId/runtime-profiles/:profileId`
+- `PATCH /api/repos/:appId/runtime-profiles/:profileId`
+- `GET /api/repos/:appId/runtime-profiles/:profileId/revisions?page=&limit=`
+- `POST /api/repos/:appId/runtime-profiles/:profileId/revert`
+- `POST /api/repos/:appId/runtime-profiles/:profileId/rotate-key` (manual)
+- `POST /api/repos/:appId/runtime-profiles/:profileId/secrets/:key/reveal`
   (`app_admin` only; audited)
 - `surface_endpoints` keys must reference existing
   `/api/repos/:appId/surfaces` keys
@@ -616,13 +616,13 @@ interface SemanticDiffResponse {
 
 ## 8.10 Temp environments and jobs
 
-- `POST /api/apps/:appId/temp-envs` (workspace or changeset)
-- `GET /api/apps/:appId/temp-envs?page=&limit=`
-- `POST /api/apps/:appId/temp-envs/:tempEnvId/extend`
-- `POST /api/apps/:appId/temp-envs/:tempEnvId/undo-expire`
-- `DELETE /api/apps/:appId/temp-envs/:tempEnvId`
-- `GET /api/apps/:appId/jobs/:jobId`
-- `GET /api/apps/:appId/jobs?page=&limit=&type=&state=`
+- `POST /api/repos/:appId/temp-envs` (workspace or changeset)
+- `GET /api/repos/:appId/temp-envs?page=&limit=`
+- `POST /api/repos/:appId/temp-envs/:tempEnvId/extend`
+- `POST /api/repos/:appId/temp-envs/:tempEnvId/undo-expire`
+- `DELETE /api/repos/:appId/temp-envs/:tempEnvId`
+- `GET /api/repos/:appId/jobs/:jobId`
+- `GET /api/repos/:appId/jobs?page=&limit=&type=&state=`
 
 ## 8.11 Notifications and auth
 
@@ -773,7 +773,7 @@ Retention: keep forever in v1.
 - Auditing completeness verification.
 - Email notifications and user toggle.
 - Operational limits, retries, observability, and backfill tooling.
-- Secrets encryption hardening and manual key-rotation runbooks.
+- Secrets encryption hardening and manual key-rotation procedures.
 
 ## 15) Open Items to Confirm During Implementation
 

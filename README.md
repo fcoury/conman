@@ -9,7 +9,7 @@ Conman is a Git-backed configuration manager backend (Rust, API-first).
 It models and orchestrates:
 
 - tenants
-- repositories (Git-backed, exposed by `/api/repos`; `/api/apps` is kept as a compatibility alias)
+- repositories (Git-backed, exposed by `/api/repos`; `/api/repos` is kept as a compatibility alias)
 - app surfaces (multiple user-facing apps per repository)
 - workspaces (user editing branches)
 - changesets (reviewable proposals)
@@ -104,10 +104,10 @@ CLOUDFLARE_PAGES_BRANCH=main ./scripts/publish-docs-site.sh conman-docs
 Run the end-to-end plan completion gate:
 
 ```bash
-CONMAN_SECRETS_MASTER_KEY='<prod-key>' ./tests/ops/run_plan_completion_gate.sh --strict
+CONMAN_SECRETS_MASTER_KEY='<master-key>' ./tests/ops/run_plan_completion_gate.sh --strict
 ```
 
-This verifies milestone/checklist completion, runs tests + clippy, rebuilds
+This verifies execution tracker completion, runs tests + clippy, rebuilds
 the docs site, and records a summary under `tests/ops/results/`.
 
 ## CI/CD

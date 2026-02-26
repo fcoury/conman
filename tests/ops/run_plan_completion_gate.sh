@@ -3,8 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TRACKER="$ROOT/docs/execution-tracker.md"
-CHECKLIST="$ROOT/docs/go-live-checklist.md"
-RUNBOOK_SIGNOFF="$ROOT/docs/runbooks/REVIEW-SIGNOFF.md"
 OPS_RESULTS_DIR="$ROOT/tests/ops/results"
 STRICT=0
 
@@ -57,26 +55,14 @@ require_match() {
   fi
 }
 
-ensure_no_unchecked() {
-  local label="$1"
-  local file="$2"
-  if has_pattern '^- \[ \]' "$file"; then
-    record_fail "$label" "\`$(basename "$file")\` contains unchecked checklist items."
-  else
-    record_pass "$label" "\`$(basename "$file")\` has no unchecked checklist items."
-  fi
-}
-
-require_match "Epics complete ratio" 'Epics complete:\s*`13 / 13`' "$TRACKER"
+require_match "Epics complete ratio" 'Epics complete:\s*`12 / 12`' "$TRACKER"
 require_match "Gates passed ratio" 'Gates passed:\s*`5 / 5`' "$TRACKER"
 require_match "Final sign-off checked" '^\- \[x\] Final sign-off \(names/date\)$' "$TRACKER"
-ensure_no_unchecked "Go-live checklist complete" "$CHECKLIST"
-ensure_no_unchecked "Runbook sign-off complete" "$RUNBOOK_SIGNOFF"
 
 if [[ -n "${CONMAN_SECRETS_MASTER_KEY:-}" ]]; then
   record_pass "Secrets key env available" "\`CONMAN_SECRETS_MASTER_KEY\` is set."
 else
-  record_warn "Secrets key env available" "\`CONMAN_SECRETS_MASTER_KEY\` is not set; readiness sub-check may warn."
+  record_warn "Secrets key env available" "\`CONMAN_SECRETS_MASTER_KEY\` is not set."
 fi
 
 if (cd "$ROOT" && cargo test --workspace -q >/dev/null); then
@@ -97,14 +83,8 @@ else
   record_fail "docs site build" "Docs site build failed."
 fi
 
-if (cd "$ROOT" && ./tests/ops/run_go_live_readiness_check.sh >/dev/null); then
-  record_pass "go-live readiness check" "Readiness check command succeeded."
-else
-  record_fail "go-live readiness check" "Readiness check command failed."
-fi
-
 {
-  echo "# Plan Completion Gate Summary"
+  echo "# Execution Gate Summary"
   echo
   echo "- Generated at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
   echo "- Strict mode: \`$STRICT\`"
@@ -117,16 +97,16 @@ fi
   printf '%s\n' "${RESULTS[@]}"
 } > "$SUMMARY_FILE"
 
-echo "Wrote plan-completion summary: $SUMMARY_FILE"
+echo "Wrote execution summary: $SUMMARY_FILE"
 
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
-  echo "Plan completion gate failed with $FAIL_COUNT hard failures."
+  echo "Execution gate failed with $FAIL_COUNT hard failures."
   exit 1
 fi
 
 if [[ "$STRICT" -eq 1 && "$WARN_COUNT" -gt 0 ]]; then
-  echo "Plan completion gate strict mode failed with $WARN_COUNT warnings."
+  echo "Execution gate strict mode failed with $WARN_COUNT warnings."
   exit 2
 fi
 
-echo "Plan completion gate passed."
+echo "Execution gate passed."

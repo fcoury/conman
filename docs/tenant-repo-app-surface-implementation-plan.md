@@ -15,7 +15,7 @@ This plan is optimized for current reality: pre-production and one active user.
 1. Current `App` becomes a repository concept in practice.
 2. Add first-class `Tenant`.
 3. Add first-class `App Surface` under each repository.
-4. Keep existing `/api/apps` working (backward-compatible) while adding clearer
+4. Keep existing `/api/repos` working (backward-compatible) while adding clearer
    `/api/repos` and `/api/tenants` APIs.
 5. Runtime profiles gain surface endpoint mapping.
 
@@ -74,7 +74,7 @@ Tasks:
    - `POST /api/tenants/:tenantId/repos`
    - `GET /api/repos`
    - `GET /api/repos/:repoId`
-3. Keep `/api/apps` endpoints functional as compatibility alias.
+3. Keep `/api/repos` endpoints functional as compatibility alias.
 4. Add app-surface endpoints:
    - `POST /api/repos/:repoId/surfaces`
    - `GET /api/repos/:repoId/surfaces`
@@ -83,7 +83,7 @@ Tasks:
 Done when:
 
 - tenant/repo/surface can be created and listed end-to-end
-- `/api/apps` existing calls still pass manual smoke tests
+- `/api/repos` existing calls still pass manual smoke tests
 
 ## Step 3: Runtime profile multi-surface support
 
@@ -173,7 +173,7 @@ Done when:
 - Existing code already treats `App` like a repo (`repo_path`,
   `integration_branch`), so this change is mostly additive + naming clarity.
 - Because this is pre-production and single-user, we can keep the backfill
-  lightweight and local without rollout orchestration.
+  lightweight and local without additional orchestration.
 
 ## Automated acceptance criteria
 
@@ -183,7 +183,7 @@ When implementation is complete, these checks must pass.
 |---|---|---|
 | TRS-AC-01 | Tenant can be created and queried. | `run_tenant_repo_surface_acceptance.sh` |
 | TRS-AC-02 | Repository can be created under a tenant and queried via `/api/repos/:id`. | `run_tenant_repo_surface_acceptance.sh` |
-| TRS-AC-03 | `/api/apps/:id` compatibility still works for repo records. | `run_tenant_repo_surface_acceptance.sh` |
+| TRS-AC-03 | `/api/repos/:id` compatibility still works for repo records. | `run_tenant_repo_surface_acceptance.sh` |
 | TRS-AC-04 | Two app surfaces can be created and listed for one repo. | `run_tenant_repo_surface_acceptance.sh` |
 | TRS-AC-05 | Runtime profile stores and returns `surface_endpoints`. | `run_tenant_repo_surface_acceptance.sh` |
 | TRS-AC-06 | Environment configuration can reference runtime profiles after model change. | `run_tenant_repo_surface_acceptance.sh` |

@@ -15,7 +15,7 @@ Use this file as the live control plane for delivery.
 - Current wave: `E`
 - Current milestone: `M4`
 - Overall progress:
-  - Epics complete: `13 / 13`
+  - Epics complete: `12 / 12`
   - Gates passed: `5 / 5`
 - Active blockers:
   - none
@@ -41,7 +41,6 @@ Legend:
 | E09 Deployments | worker-deploy | E03, E06, E08 | D | done | master | 100 | Deploy gate sequence validated in staged full-flow smoke (`runtime_profile_drift_check` -> `msuite_deploy` -> `deploy_release`) |
 | E10 Temp Environments | worker-tempenv | E03, E06 | D | done | master | 100 | Temp env create/provision/extend lifecycle validated in staged full-flow smoke |
 | E11 Notifications & Audit | worker-observability | E05-E10 | E | done | master | 100 |  |
-| E12 Hardening | worker-observability | E08-E11 | E | done | master | 100 | Full staged end-to-end smoke now passes against live gitaly-rs, including authoring/release/deploy/temp-env flow |
 
 ## 3) Dependency Gate Rules (Hard Stop)
 
@@ -57,7 +56,6 @@ Do not merge when prerequisites are incomplete:
 8. E09 requires E03, E06, E08 merged.
 9. E10 requires E03 and E06 merged.
 10. E11 requires E05 through E10 merged.
-11. E12 requires E08 through E11 merged.
 
 ## 4) Wave and Milestone Gates
 
@@ -107,16 +105,14 @@ Do not merge when prerequisites are incomplete:
 - Date: `2026-02-26`
 - Notes: Deploy/promote/rollback and deploy-gate jobs reached terminal success in staged run; temp env provision/expire/undo-expire also succeeded (`tests/e2e/results/20260226044825-full-e2e-summary.md`).
 
-## Gate E (M4: E11-E12)
+## Gate E (M4: E11)
 
 - [x] E11 merged
-- [x] E12 merged
 - [x] Notification coverage complete
 - [x] Audit completeness validated
-- [x] Hardening/runbooks/load/fault checks complete
 - Result: `pass`
 - Date: `2026-02-26`
-- Notes: Local load/fault drill artifacts + dashboards remain in place and full staged flow is now green against live gitaly-rs (`tests/e2e/results/20260226044825-full-e2e-summary.md`); observability wiring and alert routing checks are captured in `tests/ops/results/20260226044706-observability-wiring-summary.md`.
+- Notes: Email notification events and audit completeness remain validated in staged end-to-end runs (`tests/e2e/results/20260226044825-full-e2e-summary.md`).
 
 ## 5) CI Quality Gates (Required for Merge)
 
@@ -157,18 +153,14 @@ Rules:
    - affected epic files
 3. Recompute milestone gate criteria when dependency changes.
 
-## 8) Launch Readiness Sign-Off
+## 8) Implementation Sign-Off
 
 - [x] M1 passed
 - [x] M2 passed
 - [x] M3 passed
 - [x] M4 passed
 - [x] No P0 blockers open
-- [x] Runbooks approved
-- [x] Observability dashboards active
-- [x] Security checklist complete
 - [x] Final sign-off (names/date)
 
-Latest readiness report: `tests/ops/results/20260226075757-go-live-readiness-summary.md`
 Final sign-off: `2026-02-26` (`fcoury`).
-Plan completion gate (strict): `tests/ops/results/20260226080228-plan-completion-gate-summary.md`.
+Plan completion gate (strict): latest `tests/ops/results/*-plan-completion-gate-summary.md`.

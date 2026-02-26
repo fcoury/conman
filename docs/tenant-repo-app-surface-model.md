@@ -82,8 +82,8 @@ Suggested API shape (incremental):
 
 Compatibility strategy for v1 implementation:
 
-- Keep existing `/api/apps` endpoints as repo endpoints for now.
-- Add a documented alias plan in v2 (`/api/repos` primary, `/api/apps`
+- Keep existing `/api/repos` endpoints as repo endpoints for now.
+- Add a documented alias plan in v2 (`/api/repos` primary, `/api/repos`
   compatibility layer/deprecated alias).
 
 ## 6) Data model changes (minimum)
@@ -123,14 +123,14 @@ Add visibility metadata:
 - changeset/release should expose impacted surfaces (derived from changed paths
   and/or config semantics)
 
-## 8) Migration plan
+## 8) Implementation phases
 
 Phase 1 (non-breaking):
 
 - add `tenant_id` to existing app/repo docs
 - backfill one default tenant for existing records
 - add `app_surfaces`
-- keep all current `/api/apps` behavior
+- keep all current `/api/repos` behavior
 
 Phase 2:
 
@@ -140,7 +140,7 @@ Phase 2:
 
 Phase 3:
 
-- promote `/api/repos` naming, keep `/api/apps` alias for compatibility window
+- promote `/api/repos` naming, keep `/api/repos` alias for compatibility window
 
 ## 9) Decisions captured
 

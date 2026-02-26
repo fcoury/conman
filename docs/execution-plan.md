@@ -36,7 +36,7 @@ Parallelizable after E06:
 8. `worker-queue-release`: E07 Queue + E08 Releases
 9. `worker-deploy`: E09 Deployments
 10. `worker-tempenv`: E10 Temp Environments
-11. `worker-observability`: E11 Notifications/Audit + E12 Hardening
+11. `worker-observability`: E11 Notifications/Audit
 
 ## 4) Wave Plan
 
@@ -85,12 +85,12 @@ Gate D exit:
 
 ## Wave E (M4)
 
-- Implement: E11 -> E12
+- Implement: E11
 
 Gate E exit:
 
 - Notification and audit coverage complete.
-- Hardening, runbooks, and launch-readiness checks pass.
+- Event fanout and user preference behavior validated.
 
 ## 5) Coordination Rules
 
@@ -118,4 +118,4 @@ Gate E exit:
 1. **M1: Authoring + Review**: E00-E06
 2. **M2: Queue + Release**: E07-E08
 3. **M3: Environments + Recovery**: E09-E10
-4. **M4: Operations + Launch**: E11-E12
+4. **M4: Notifications + Audit**: E11
