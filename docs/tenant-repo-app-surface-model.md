@@ -151,3 +151,5 @@ Phase 3:
 - Keep one configurable integration branch per repo (no per-environment Git
   branches).
 
+Implementation plan:
+[`docs/tenant-repo-app-surface-implementation-plan.md`](./tenant-repo-app-surface-implementation-plan.md)
