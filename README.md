@@ -59,6 +59,16 @@ API docs while running locally:
 open http://127.0.0.1:3000/api/docs
 ```
 
+Bootstrap first login user:
+
+```bash
+cargo run -- bootstrap-admin admin@example.com "Admin User" "AdminPassw0rd!!"
+```
+
+Manual end-to-end API testing sequence:
+
+- [docs/manual-api-testing-guide.md](docs/manual-api-testing-guide.md)
+
 Build:
 
 ```bash

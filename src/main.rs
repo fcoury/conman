@@ -1,9 +1,37 @@
 use std::sync::Arc;
 
+use clap::{Parser, Subcommand};
 use conman_api::{AppState, build_router};
+use conman_auth::hash_password;
 use conman_core::Config;
+use conman_db::UserRepo;
 use conman_git::{GitAdapter, GitalyClient, NoopGitAdapter};
 use conman_jobs::JobRunner;
+use mongodb::Client;
+
+#[derive(Debug, Parser)]
+#[command(name = "conman")]
+#[command(about = "Conman configuration manager service")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Start API + job runner (default command).
+    Serve,
+    /// Create or update an initial admin login user in MongoDB.
+    BootstrapAdmin {
+        email: String,
+        name: String,
+        password: String,
+        #[arg(long)]
+        mongo_uri: Option<String>,
+        #[arg(long)]
+        mongo_db: Option<String>,
+    },
+}
 
 #[tokio::main]
 async fn main() {
@@ -11,6 +39,26 @@ async fn main() {
         eprintln!("loaded environment from {}", path.display());
     }
 
+    let cli = Cli::parse();
+    let command = cli.command.unwrap_or(Command::Serve);
+    let result = match command {
+        Command::Serve => serve().await,
+        Command::BootstrapAdmin {
+            email,
+            name,
+            password,
+            mongo_uri,
+            mongo_db,
+        } => bootstrap_admin(email, name, password, mongo_uri, mongo_db).await,
+    };
+
+    if let Err(err) = result {
+        eprintln!("{err}");
+        std::process::exit(1);
+    }
+}
+
+async fn serve() -> Result<(), String> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -19,14 +67,15 @@ async fn main() {
         .json()
         .init();
 
-    conman_api::metrics::init_metrics().expect("failed to initialize metrics recorder");
+    conman_api::metrics::init_metrics().map_err(|err| format!("metrics init failed: {err}"))?;
 
-    let config = Config::from_env().expect("failed to load configuration");
+    let config =
+        Config::from_env().map_err(|err| format!("failed to load configuration: {err}"))?;
     tracing::info!(listen = %config.listen_addr, "configuration loaded");
 
     let db = conman_db::connect_mongo(&config)
         .await
-        .expect("failed to connect to MongoDB");
+        .map_err(|err| format!("failed to connect to MongoDB: {err}"))?;
 
     let user_repo = conman_db::UserRepo::new(db.clone());
     let membership_repo = conman_db::MembershipRepo::new(db.clone());
@@ -67,7 +116,7 @@ async fn main() {
         &notification_event_repo,
     ])
     .await
-    .expect("failed to bootstrap MongoDB indexes");
+    .map_err(|err| format!("failed to bootstrap MongoDB indexes: {err}"))?;
 
     let git_adapter: Arc<dyn GitAdapter> = match GitalyClient::connect(&config.gitaly_address).await
     {
@@ -113,14 +162,71 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(config.listen_addr)
         .await
-        .expect("failed to bind TCP listener");
+        .map_err(|err| format!("failed to bind TCP listener: {err}"))?;
 
     tracing::info!(addr = %config.listen_addr, "server listening");
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .expect("server error");
+        .map_err(|err| format!("server error: {err}"))?;
+
+    Ok(())
+}
+
+async fn bootstrap_admin(
+    email: String,
+    name: String,
+    password: String,
+    mongo_uri: Option<String>,
+    mongo_db: Option<String>,
+) -> Result<(), String> {
+    let email = email.trim().to_lowercase();
+    let name = name.trim().to_string();
+    if email.is_empty() || name.is_empty() || password.is_empty() {
+        return Err("email, name, and password are required".to_string());
+    }
+
+    let mongo_uri = mongo_uri
+        .or_else(|| std::env::var("CONMAN_MONGO_URI").ok())
+        .unwrap_or_else(|| "mongodb://localhost:27017".to_string());
+    let mongo_db = mongo_db
+        .or_else(|| std::env::var("CONMAN_MONGO_DB").ok())
+        .unwrap_or_else(|| "conman".to_string());
+
+    let password_hash = hash_password(&password).map_err(|err| err.to_string())?;
+    let client = Client::with_uri_str(&mongo_uri)
+        .await
+        .map_err(|err| format!("failed to connect mongo at {mongo_uri}: {err}"))?;
+    let users = UserRepo::new(client.database(&mongo_db));
+
+    match users
+        .find_by_email(&email)
+        .await
+        .map_err(|err| err.to_string())?
+    {
+        Some(existing) => {
+            users
+                .update_password(&existing.id, &password_hash)
+                .await
+                .map_err(|err| format!("failed to update user password: {err}"))?;
+            println!("updated existing user");
+            println!("  user_id: {}", existing.id);
+            println!("  email:   {}", existing.email);
+        }
+        None => {
+            let created = users
+                .insert(&email, &name, &password_hash)
+                .await
+                .map_err(|err| format!("failed to create user: {err}"))?;
+            println!("created new user");
+            println!("  user_id: {}", created.id);
+            println!("  email:   {}", created.email);
+        }
+    }
+    println!("  mongo:   {mongo_uri}/{mongo_db}");
+
+    Ok(())
 }
 
 async fn shutdown_signal() {
