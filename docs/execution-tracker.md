@@ -19,7 +19,7 @@ Use this file as the live control plane for delivery.
   - Gates passed: `0 / 5`
 - Active blockers:
   - E01 still needs concrete gitaly-rs RPC mappings beyond adapter stubs
-  - E06 gate hooks are still partial (submit wired, release/deploy hooks pending stricter enforcement)
+  - E06/E08 still need strict async completion checks for every publish/deploy edge case
 
 ## 2) Epic Tracker (Dependency Controlled)
 
@@ -36,12 +36,12 @@ Legend:
 | E03 App Setup | worker-app | E01, E02 | A | done | master | 100 |  |
 | E04 Workspaces | worker-workspace | E01, E03 | B | done | master | 100 |  |
 | E05 Changesets | worker-changeset | E02, E04 | B | done | master | 100 |  |
-| E06 Async Jobs | worker-jobs | E00, E05 | B | in_progress | master | 70 | Release/deploy gate policies need full enforcement |
+| E06 Async Jobs | worker-jobs | E00, E05 | B | in_progress | master | 80 | Gate completion semantics need stricter end-to-end coverage |
 | E07 Queue Orchestration | worker-queue-release | E05, E06 | C | in_progress | master | 60 | Automatic post-release revalidation worker still pending |
-| E08 Releases | worker-queue-release | E01, E06, E07 | C | in_progress | master | 75 | Git composition/publish must be tied to gitaly operations |
-| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 70 | Drift-block + full approval policy matrix enforcement pending |
-| E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 70 | Idle detection + soft-delete grace automation pending |
-| E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 35 | Event fanout/email templates and full audit coverage pending |
+| E08 Releases | worker-queue-release | E01, E06, E07 | C | in_progress | master | 80 | Git composition/publish must be tied to gitaly operations |
+| E09 Deployments | worker-deploy | E03, E06, E08 | D | in_progress | master | 80 | Drift-block edge cases + full approval policy matrix enforcement pending |
+| E10 Temp Environments | worker-tempenv | E03, E06 | D | in_progress | master | 80 | Idle detection + soft-delete grace automation pending |
+| E11 Notifications & Audit | worker-observability | E05-E10 | E | in_progress | master | 55 | Real email sender + full audit coverage assertions pending |
 | E12 Hardening | worker-observability | E08-E11 | E | not_started |  | 0 |  |
 
 ## 3) Dependency Gate Rules (Hard Stop)
@@ -64,21 +64,21 @@ Do not merge when prerequisites are incomplete:
 
 ## Gate A (M1 foundation: E00-E03)
 
-- [ ] E00 merged
+- [x] E00 merged
 - [ ] E01 merged
 - [x] E02 merged
 - [x] E03 merged
-- [ ] Service boots with shared error/pagination/request-id conventions
+- [x] Service boots with shared error/pagination/request-id conventions
 - [ ] Git adapter boundary implemented (no direct gitaly calls in handlers)
-- [ ] Auth + RBAC enforcement active
-- [ ] App/env/runtime-profile baseline APIs available
+- [x] Auth + RBAC enforcement active
+- [x] App/env/runtime-profile baseline APIs available
 - Result: `pass | fail`
 - Date:
 - Notes:
 
 ## Gate B (M1 completion: E04-E06)
 
-- [ ] E04 merged
+- [x] E04 merged
 - [x] E05 merged
 - [ ] E06 merged
 - [ ] End-to-end: author -> submit -> review path works

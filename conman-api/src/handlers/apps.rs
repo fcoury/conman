@@ -13,7 +13,8 @@ use conman_db::{EnvironmentInput, RuntimeProfileInput, RuntimeProfileUpdate};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::ApiConmanError, extractors::Pagination, response::ApiResponse, state::AppState,
+    error::ApiConmanError, events::emit_audit, extractors::Pagination, response::ApiResponse,
+    state::AppState,
 };
 
 #[derive(Debug, Deserialize)]
@@ -246,6 +247,21 @@ pub async fn create_app(
     membership_repo
         .assign_role(&auth.user_id, &app.id, Role::AppAdmin)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app.id),
+        "app",
+        &app.id,
+        "created",
+        None,
+        serde_json::to_value(&app).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
 
     Ok(Json(ApiResponse::ok(app)))
 }
@@ -310,6 +326,21 @@ pub async fn update_app_settings(
     }
 
     let app = app_repo.update_settings(&app_id, &app.settings).await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "app_settings",
+        &app.id,
+        "updated",
+        None,
+        serde_json::to_value(&app.settings).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(app)))
 }
 
@@ -384,6 +415,21 @@ pub async fn create_invite(
             state.config.invite_expiry_days,
         )
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "invite",
+        &invite.id,
+        "created",
+        None,
+        serde_json::to_value(&invite).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(invite)))
 }
 

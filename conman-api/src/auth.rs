@@ -10,6 +10,7 @@ use conman_core::ConmanError;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ApiConmanError;
+use crate::events::emit_audit;
 use crate::response::ApiResponse;
 use crate::state::AppState;
 
@@ -165,6 +166,21 @@ pub async fn reset_password(
         .update_password(&token.user_id, &password_hash)
         .await?;
     reset_repo.mark_used(&token.id).await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&token.user_id),
+        None,
+        "password",
+        &token.user_id,
+        "reset",
+        None,
+        None,
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
 
     Ok(Json(ApiResponse::ok(MessageResponse {
         message: "password updated".to_string(),
@@ -208,6 +224,21 @@ pub async fn accept_invite(
         .assign_role(&user.id, &invite.app_id, invite.role)
         .await?;
     invites.mark_accepted(&invite.id).await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&user.id),
+        Some(&invite.app_id),
+        "invite",
+        &invite.id,
+        "accepted",
+        None,
+        serde_json::to_value(&invite).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
 
     let roles = memberships.find_roles_by_user_id(&user.id).await?;
     let token = issue_token(

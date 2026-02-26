@@ -35,6 +35,10 @@ impl RequestContext {
             .unwrap_or_else(|_| "unknown".to_string())
     }
 
+    pub fn current() -> Option<Self> {
+        REQUEST_CONTEXT.try_with(|ctx| ctx.clone()).ok()
+    }
+
     pub(crate) async fn scope_request<F, Fut, R>(ctx: RequestContext, f: F) -> R
     where
         F: FnOnce() -> Fut,

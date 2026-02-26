@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod error;
+pub mod events;
 pub mod extractors;
 pub mod handlers;
 pub mod request_context;

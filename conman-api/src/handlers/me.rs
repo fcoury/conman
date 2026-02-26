@@ -3,7 +3,7 @@ use conman_auth::AuthUser;
 use conman_core::NotificationPreference;
 use serde::Deserialize;
 
-use crate::{error::ApiConmanError, response::ApiResponse, state::AppState};
+use crate::{error::ApiConmanError, events::emit_audit, response::ApiResponse, state::AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateNotificationPreferenceRequest {
@@ -28,5 +28,20 @@ pub async fn update_notification_preferences(
     let pref = conman_db::NotificationPreferenceRepo::new(state.db.clone())
         .set_email_enabled(&auth.user_id, req.email_enabled)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        None,
+        "notification_preference",
+        &pref.id,
+        "updated",
+        None,
+        serde_json::to_value(&pref).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(pref)))
 }

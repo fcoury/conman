@@ -253,6 +253,36 @@ impl JobRepo {
         Ok(row.map(Into::into))
     }
 
+    pub async fn latest_for_entity(
+        &self,
+        app_id: &str,
+        entity_type: &str,
+        entity_id: &str,
+        job_type: JobType,
+    ) -> Result<Option<Job>, ConmanError> {
+        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid app_id: {e}"),
+        })?;
+        let job_type_bson =
+            mongodb::bson::to_bson(&job_type).map_err(|e| ConmanError::Internal {
+                message: format!("failed to encode job_type filter: {e}"),
+            })?;
+        let row = self
+            .jobs
+            .find_one(doc! {
+                "app_id": app_id,
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "job_type": job_type_bson,
+            })
+            .sort(doc! {"created_at": -1})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to query latest job for entity: {e}"),
+            })?;
+        Ok(row.map(Into::into))
+    }
+
     pub async fn list_by_app(
         &self,
         app_id: &str,

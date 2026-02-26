@@ -8,7 +8,11 @@ use conman_db::{ChangesetProfileOverride, OverrideInput, ReviewAction};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::ApiConmanError, extractors::Pagination, response::ApiResponse, state::AppState,
+    error::ApiConmanError,
+    events::{emit_audit, emit_notification},
+    extractors::Pagination,
+    response::ApiResponse,
+    state::AppState,
 };
 
 #[derive(Debug, Deserialize)]
@@ -147,10 +151,25 @@ pub async fn create_changeset(
             workspace_id: req.workspace_id,
             title: req.title,
             description: req.description,
-            author_user_id: auth.user_id,
+            author_user_id: auth.user_id.clone(),
             head_sha: workspace.head_sha,
         })
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&changeset.app_id),
+        "changeset",
+        &changeset.id,
+        "created",
+        None,
+        serde_json::to_value(&changeset).ok(),
+        Some(&changeset.head_sha),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(changeset)))
 }
 
@@ -256,6 +275,33 @@ pub async fn submit_changeset(
             created_by: Some(auth.user_id.clone()),
         })
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "changeset",
+        &submitted.id,
+        "submitted",
+        None,
+        serde_json::to_value(&submitted).ok(),
+        submitted.submitted_head_sha.as_deref(),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
+    if let Err(err) = emit_notification(
+        &state,
+        &auth.user_id,
+        Some(&app_id),
+        "changeset_submitted",
+        "Changeset submitted",
+        &format!("Changeset {} was submitted for review.", submitted.title),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to enqueue notification");
+    }
     Ok(Json(ApiResponse::ok(SubmitResponse {
         changeset: submitted,
         job,
@@ -315,6 +361,21 @@ pub async fn resubmit_changeset(
             created_by: Some(auth.user_id.clone()),
         })
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "changeset",
+        &submitted.id,
+        "resubmitted",
+        None,
+        serde_json::to_value(&submitted).ok(),
+        submitted.submitted_head_sha.as_deref(),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(SubmitResponse {
         changeset: submitted,
         job,
@@ -343,6 +404,21 @@ pub async fn review_changeset(
     let reviewed = conman_db::ChangesetRepo::new(state.db.clone())
         .review(&changeset_id, &auth.user_id, role, action)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "changeset",
+        &reviewed.id,
+        "reviewed",
+        None,
+        serde_json::to_value(&reviewed).ok(),
+        reviewed.submitted_head_sha.as_deref(),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(reviewed)))
 }
 
@@ -359,12 +435,48 @@ pub async fn queue_changeset(
         }
         .into());
     }
+    let submit_job = conman_db::JobRepo::new(state.db.clone())
+        .latest_for_entity(&app_id, "changeset", &changeset_id, JobType::MsuiteSubmit)
+        .await?;
+    match submit_job {
+        Some(job) if job.state == conman_core::JobState::Succeeded => {}
+        Some(job) => {
+            return Err(ConmanError::Conflict {
+                message: format!(
+                    "changeset submit gate not satisfied; latest msuite_submit job is {:?}",
+                    job.state
+                ),
+            }
+            .into());
+        }
+        None => {
+            return Err(ConmanError::Conflict {
+                message: "changeset has not completed submit gate job".to_string(),
+            }
+            .into());
+        }
+    }
     let queue_position = conman_db::ChangesetRepo::new(state.db.clone())
         .next_queue_position(&app_id)
         .await?;
     let queued = conman_db::ChangesetRepo::new(state.db.clone())
         .queue(&changeset_id, queue_position)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "changeset",
+        &queued.id,
+        "queued",
+        None,
+        serde_json::to_value(&queued).ok(),
+        queued.submitted_head_sha.as_deref(),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(queued)))
 }
 
@@ -390,6 +502,21 @@ pub async fn move_changeset_to_draft(
     let draft = conman_db::ChangesetRepo::new(state.db.clone())
         .move_to_draft(&changeset_id)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "changeset",
+        &draft.id,
+        "moved_to_draft",
+        None,
+        serde_json::to_value(&draft).ok(),
+        draft.submitted_head_sha.as_deref(),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(draft)))
 }
 
@@ -475,5 +602,20 @@ pub async fn create_changeset_comment(
     let row = conman_db::ChangesetCommentRepo::new(state.db.clone())
         .create(&app_id, &changeset_id, &auth.user_id, &req.body)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "changeset_comment",
+        &row.id,
+        "created",
+        None,
+        serde_json::to_value(&row).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(row)))
 }

@@ -3,12 +3,16 @@ use axum::{
     extract::{Path, Query, State},
 };
 use conman_auth::AuthUser;
-use conman_core::{ConmanError, Job, JobType, ReleaseBatch, ReleaseState, Role};
+use conman_core::{ConmanError, Job, JobState, JobType, ReleaseBatch, ReleaseState, Role};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    error::ApiConmanError, extractors::Pagination, response::ApiResponse, state::AppState,
+    error::ApiConmanError,
+    events::{emit_audit, emit_notification},
+    extractors::Pagination,
+    response::ApiResponse,
+    state::AppState,
 };
 
 #[derive(Debug, Deserialize)]
@@ -56,6 +60,21 @@ pub async fn create_release(
     let repo = conman_db::ReleaseRepo::new(state.db.clone());
     let tag = repo.next_tag(&app_id).await?;
     let release = repo.create_draft(&app_id, tag).await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "release",
+        &release.id,
+        "created",
+        None,
+        serde_json::to_value(&release).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(release)))
 }
 
@@ -105,6 +124,21 @@ pub async fn set_release_changesets(
     let release = conman_db::ReleaseRepo::new(state.db.clone())
         .set_changesets(&release_id, &req.changeset_ids)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "release",
+        &release.id,
+        "changesets_set",
+        None,
+        serde_json::to_value(&release).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
     Ok(Json(ApiResponse::ok(release)))
 }
 
@@ -138,9 +172,12 @@ pub async fn assemble_release(
                 entity: "release",
                 id: release_id.clone(),
             })?;
-    if release.state != ReleaseState::DraftRelease {
+    if !matches!(
+        release.state,
+        ReleaseState::DraftRelease | ReleaseState::Assembling
+    ) {
         return Err(ConmanError::Conflict {
-            message: "release can only be assembled from draft_release".to_string(),
+            message: "release can only be assembled from draft_release/assembling".to_string(),
         }
         .into());
     }
@@ -160,17 +197,29 @@ pub async fn assemble_release(
             payload: serde_json::json!({"release_id": release_id, "changeset_ids": release.ordered_changeset_ids}),
             max_retries: 1,
             timeout_ms: 20 * 60 * 1000,
-            created_by: Some(auth.user_id),
+            created_by: Some(auth.user_id.clone()),
         })
         .await?;
 
-    release_repo
+    let release = release_repo
         .set_state(&release_id, ReleaseState::Assembling)
         .await?;
-    let release = release_repo.set_compose_job(&release_id, &job.id).await?;
-    let release = release_repo
-        .set_state(&release.id, ReleaseState::Validated)
-        .await?;
+    let release = release_repo.set_compose_job(&release.id, &job.id).await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "release",
+        &release.id,
+        "assemble_started",
+        None,
+        serde_json::to_value(&release).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
 
     Ok(Json(ApiResponse::ok(AssembleReleaseResponse {
         release,
@@ -194,13 +243,99 @@ pub async fn publish_release(
         })?;
     if !matches!(
         release.state,
-        ReleaseState::Validated | ReleaseState::DraftRelease
+        ReleaseState::Assembling | ReleaseState::Validated
     ) {
         return Err(ConmanError::Conflict {
-            message: "release can only be published from validated or draft_release".to_string(),
+            message: "release can only be published from assembling/validated".to_string(),
         }
         .into());
     }
+
+    let compose_job_id = release
+        .compose_job_id
+        .clone()
+        .ok_or_else(|| ConmanError::Conflict {
+            message: "release has no compose job; call assemble first".to_string(),
+        })?;
+    let compose_job = conman_db::JobRepo::new(state.db.clone())
+        .get(&compose_job_id)
+        .await?
+        .ok_or_else(|| ConmanError::NotFound {
+            entity: "job",
+            id: compose_job_id.clone(),
+        })?;
+    match compose_job.state {
+        JobState::Succeeded => {
+            if release.state != ReleaseState::Validated {
+                repo.set_state(&release.id, ReleaseState::Validated).await?;
+            }
+        }
+        JobState::Failed | JobState::Canceled => {
+            return Err(ConmanError::Conflict {
+                message: format!(
+                    "release assemble job is {:?}; cannot publish",
+                    compose_job.state
+                ),
+            }
+            .into());
+        }
+        _ => {
+            return Err(ConmanError::Conflict {
+                message: "release assemble job is still running; retry publish after completion"
+                    .to_string(),
+            }
+            .into());
+        }
+    }
+
+    let merge_gate = conman_db::JobRepo::new(state.db.clone())
+        .latest_for_entity(&app_id, "release", &release_id, JobType::MsuiteMerge)
+        .await?;
+    match merge_gate {
+        Some(job) if job.state == JobState::Succeeded => {}
+        Some(job) if matches!(job.state, JobState::Queued | JobState::Running) => {
+            return Err(ConmanError::Conflict {
+                message: format!(
+                    "release merge gate in progress (job {}); retry publish",
+                    job.id
+                ),
+            }
+            .into());
+        }
+        Some(_) => {
+            return Err(ConmanError::Conflict {
+                message: "release merge gate failed; re-run assemble or fix validation issues"
+                    .to_string(),
+            }
+            .into());
+        }
+        None => {
+            let job = conman_db::JobRepo::new(state.db.clone())
+                .enqueue(conman_db::EnqueueJobInput {
+                    app_id: app_id.clone(),
+                    job_type: JobType::MsuiteMerge,
+                    entity_type: "release".to_string(),
+                    entity_id: release_id.clone(),
+                    payload: serde_json::json!({
+                        "gate": "release_publish",
+                        "release_id": release_id,
+                        "app_id": app_id,
+                    }),
+                    max_retries: 1,
+                    timeout_ms: 20 * 60 * 1000,
+                    created_by: Some(auth.user_id.clone()),
+                })
+                .await?;
+            return Err(ConmanError::Conflict {
+                message: format!(
+                    "release merge gate job enqueued ({}); publish after it succeeds",
+                    job.id
+                ),
+            }
+            .into());
+        }
+    }
+
     let published_sha = Uuid::now_v7().to_string();
     let release = repo
         .publish(&release_id, published_sha, &auth.user_id)
@@ -208,6 +343,33 @@ pub async fn publish_release(
     conman_db::ChangesetRepo::new(state.db.clone())
         .mark_released_batch(&release.ordered_changeset_ids)
         .await?;
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        Some(&app_id),
+        "release",
+        &release.id,
+        "published",
+        None,
+        serde_json::to_value(&release).ok(),
+        release.published_sha.as_deref(),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
+    if let Err(err) = emit_notification(
+        &state,
+        &auth.user_id,
+        Some(&app_id),
+        "release_published",
+        "Release published",
+        &format!("Release {} was published.", release.tag),
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to enqueue notification");
+    }
     Ok(Json(ApiResponse::ok(PublishReleaseResponse {
         released_changesets: release.ordered_changeset_ids.clone(),
         release,

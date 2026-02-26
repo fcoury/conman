@@ -39,6 +39,7 @@ async fn main() {
     let temp_env_repo = conman_db::TempEnvRepo::new(db.clone());
     let audit_repo = conman_db::AuditRepo::new(db.clone());
     let notification_pref_repo = conman_db::NotificationPreferenceRepo::new(db.clone());
+    let notification_event_repo = conman_db::NotificationEventRepo::new(db.clone());
     conman_db::bootstrap_indexes(&[
         &user_repo,
         &membership_repo,
@@ -57,6 +58,7 @@ async fn main() {
         &temp_env_repo,
         &audit_repo,
         &notification_pref_repo,
+        &notification_event_repo,
     ])
     .await
     .expect("failed to bootstrap MongoDB indexes");
