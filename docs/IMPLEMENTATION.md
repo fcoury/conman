@@ -1,9 +1,5 @@
 # Conman V1 Implementation Guide
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement
-> this plan task-by-task. Each epic file in `docs/epics/` is a self-contained
-> implementation spec with an ordered checklist.
-
 **Goal:** Build a Git-backed configuration manager for DxFlow-style config
 repositories. API-only backend in Rust.
 
@@ -15,21 +11,21 @@ vars/secrets/database/data configuration for environments and temp envs.
 
 **Tech Stack:**
 
-| Component | Choice | Version |
-|-----------|--------|---------|
-| Language | Rust | edition 2024 |
-| HTTP framework | Axum | 0.8 |
-| gRPC client | Tonic | 0.12 |
-| Protobuf | Prost | 0.13 |
-| Async runtime | Tokio | 1.x |
-| MongoDB driver | mongodb (official) | latest |
-| Serialization | serde + serde_json | latest |
-| Error handling | thiserror | latest |
-| Password hashing | argon2 | latest |
-| JWT | jsonwebtoken | latest |
-| Time | chrono | latest |
-| Tracing | tracing + tracing-subscriber | latest |
-| UUID | uuid | latest (`v7` generation) |
+| Component        | Choice                       | Version                  |
+| ---------------- | ---------------------------- | ------------------------ |
+| Language         | Rust                         | edition 2024             |
+| HTTP framework   | Axum                         | 0.8                      |
+| gRPC client      | Tonic                        | 0.12                     |
+| Protobuf         | Prost                        | 0.13                     |
+| Async runtime    | Tokio                        | 1.x                      |
+| MongoDB driver   | mongodb (official)           | latest                   |
+| Serialization    | serde + serde_json           | latest                   |
+| Error handling   | thiserror                    | latest                   |
+| Password hashing | argon2                       | latest                   |
+| JWT              | jsonwebtoken                 | latest                   |
+| Time             | chrono                       | latest                   |
+| Tracing          | tracing + tracing-subscriber | latest                   |
+| UUID             | uuid                         | latest (`v7` generation) |
 
 **Full scope:** [`docs/conman-v1-scope.md`](./conman-v1-scope.md)
 and [`docs/runtime-profiles-draft.md`](./runtime-profiles-draft.md)
@@ -297,17 +293,17 @@ Audit writes are fire-and-forget (logged on failure, never block the request).
 
 Loaded from environment variables with `CONMAN_` prefix:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CONMAN_PORT` | `3000` | HTTP listen port |
-| `CONMAN_MONGO_URI` | `mongodb://localhost:27017` | MongoDB connection string |
-| `CONMAN_MONGO_DB` | `conman` | Database name |
-| `CONMAN_GITALY_ADDRESS` | `http://localhost:8075` | gitaly-rs gRPC address |
-| `CONMAN_JWT_SECRET` | (required) | JWT signing secret |
-| `CONMAN_JWT_EXPIRY_HOURS` | `24` | JWT token lifetime |
-| `CONMAN_INVITE_EXPIRY_DAYS` | `7` | Invite token lifetime |
-| `CONMAN_SECRETS_MASTER_KEY` | (required) | Master key for envelope encryption of runtime secrets |
-| `CONMAN_TEMP_URL_DOMAIN` | (required) | Base domain for generated temp runtime URLs |
+| Variable                    | Default                     | Description                                           |
+| --------------------------- | --------------------------- | ----------------------------------------------------- |
+| `CONMAN_PORT`               | `3000`                      | HTTP listen port                                      |
+| `CONMAN_MONGO_URI`          | `mongodb://localhost:27017` | MongoDB connection string                             |
+| `CONMAN_MONGO_DB`           | `conman`                    | Database name                                         |
+| `CONMAN_GITALY_ADDRESS`     | `http://localhost:8075`     | gitaly-rs gRPC address                                |
+| `CONMAN_JWT_SECRET`         | (required)                  | JWT signing secret                                    |
+| `CONMAN_JWT_EXPIRY_HOURS`   | `24`                        | JWT token lifetime                                    |
+| `CONMAN_INVITE_EXPIRY_DAYS` | `7`                         | Invite token lifetime                                 |
+| `CONMAN_SECRETS_MASTER_KEY` | (required)                  | Master key for envelope encryption of runtime secrets |
+| `CONMAN_TEMP_URL_DOMAIN`    | (required)                  | Base domain for generated temp runtime URLs           |
 
 ---
 
@@ -315,16 +311,16 @@ Loaded from environment variables with `CONMAN_` prefix:
 
 ### Terminology
 
-| Term | Definition |
-|------|------------|
-| App | A managed config repository (1 app = 1 Git repo) |
-| Workspace | User-owned mutable branch (`ws/<user>/<app>`) |
-| Changeset | Reviewable proposal: workspace HEAD vs integration baseline |
-| Release | Immutable Git tag (`rYYYY.MM.DD.N`) of composed changesets |
-| Environment | Deploy target stage (Dev, QA, UAT, Prod) |
-| Runtime Profile | Versioned runtime blueprint (URL, env vars, secrets, DB/data strategy) |
-| Canonical env | Production-facing environment for baseline calculations |
-| Baseline | The reference point workspaces branch from (integration branch HEAD or canonical env release) |
+| Term            | Definition                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------------- |
+| App             | A managed config repository (1 app = 1 Git repo)                                              |
+| Workspace       | User-owned mutable branch (`ws/<user>/<app>`)                                                 |
+| Changeset       | Reviewable proposal: workspace HEAD vs integration baseline                                   |
+| Release         | Immutable Git tag (`rYYYY.MM.DD.N`) of composed changesets                                    |
+| Environment     | Deploy target stage (Dev, QA, UAT, Prod)                                                      |
+| Runtime Profile | Versioned runtime blueprint (URL, env vars, secrets, DB/data strategy)                        |
+| Canonical env   | Production-facing environment for baseline calculations                                       |
+| Baseline        | The reference point workspaces branch from (integration branch HEAD or canonical env release) |
 
 ### Changeset states
 
@@ -340,6 +336,7 @@ draft
 ```
 
 Rules:
+
 - New commits while `submitted`/`in_review`: keep same changeset, create revision, reset approvals
 - One open changeset per workspace branch
 - After approval + further edits needed: create new changeset
@@ -360,21 +357,21 @@ pending → running → succeeded | failed | canceled
 
 ### RBAC permission matrix
 
-| Capability | user | reviewer | config_manager | app_admin |
-|---|:---:|:---:|:---:|:---:|
-| Read app/repo metadata | Y | Y | Y | Y |
-| Create/edit own workspace | Y | Y | Y | Y |
-| Create/modify own changeset | Y | Y | Y | Y |
-| Submit changeset | Y | Y | Y | Y |
-| Comment in review | Y | Y | Y | Y |
-| Approve/request changes/reject | - | Y | Y | Y |
-| Move conflicted/needs_revalidation to draft | Own | Own | Any | Any |
-| Assemble release from queue | - | - | Y | Y |
-| Publish release | - | - | Y | Y |
-| Deploy/promote release | - | - | Y | Y |
-| Skip stage / concurrent deploy approval | - | Y | Y | Y |
-| Invite users | - | - | - | Y |
-| Manage app settings/roles/envs | - | - | - | Y |
+| Capability                                  | user | reviewer | config_manager | app_admin |
+| ------------------------------------------- | :--: | :------: | :------------: | :-------: |
+| Read app/repo metadata                      |  Y   |    Y     |       Y        |     Y     |
+| Create/edit own workspace                   |  Y   |    Y     |       Y        |     Y     |
+| Create/modify own changeset                 |  Y   |    Y     |       Y        |     Y     |
+| Submit changeset                            |  Y   |    Y     |       Y        |     Y     |
+| Comment in review                           |  Y   |    Y     |       Y        |     Y     |
+| Approve/request changes/reject              |  -   |    Y     |       Y        |     Y     |
+| Move conflicted/needs_revalidation to draft | Own  |   Own    |      Any       |    Any    |
+| Assemble release from queue                 |  -   |    -     |       Y        |     Y     |
+| Publish release                             |  -   |    -     |       Y        |     Y     |
+| Deploy/promote release                      |  -   |    -     |       Y        |     Y     |
+| Skip stage / concurrent deploy approval     |  -   |    Y     |       Y        |     Y     |
+| Invite users                                |  -   |    -     |       -        |     Y     |
+| Manage app settings/roles/envs              |  -   |    -     |       -        |     Y     |
 
 `app_admin` inherits all `config_manager` capabilities.
 
@@ -433,21 +430,21 @@ Execution order is topological. Each epic file is self-contained with Rust types
 database schemas, API endpoints, proto definitions, implementation checklist, and
 test cases.
 
-| Epic | Name | Dependencies | Summary |
-|------|------|-------------|---------|
-| [E00](epics/E00-platform.md) | Platform Foundation | none | Server skeleton, MongoDB bootstrap, config, error envelope, pagination |
-| [E01](epics/E01-git-adapter.md) | Git Adapter | E00 | Tonic client wrapping gitaly-rs gRPC services |
-| [E02](epics/E02-auth.md) | Auth & RBAC | E00 | Local auth, invites, memberships, role-based access |
-| [E03](epics/E03-app-setup.md) | App Setup | E01, E02 | App CRUD, settings, environment metadata, runtime profiles |
-| [E04](epics/E04-workspaces.md) | Workspaces | E01, E03 | Workspace lifecycle, file operations, guardrails |
-| [E05](epics/E05-changesets.md) | Changesets | E02, E04 | Changeset lifecycle, review, comments, diffs, profile overrides |
-| [E06](epics/E06-async-jobs.md) | Async Jobs | E00, E05 | Job framework, msuite workers, profile-aware gates/drift jobs |
-| [E07](epics/E07-queue.md) | Queue Orchestration | E05, E06 | Queue-first workflow, revalidation loop, override-key conflicts |
-| [E08](epics/E08-releases.md) | Releases | E01, E06, E07 | Release assembly, env-profile validation, tagging, publish |
-| [E09](epics/E09-deployments.md) | Deployments | E03, E06, E08 | Deploy, promote, skip-stage, rollback, drift blocking |
-| [E10](epics/E10-temp-envs.md) | Temp Environments | E03, E06 | On-demand envs, profile derivation, TTL, cleanup |
-| [E11](epics/E11-notifications.md) | Notifications & Audit | E05-E10 | Email notifications, audit completeness, runtime profile events |
-| [E12](epics/E12-hardening.md) | Hardening | E08-E11 | Load testing, fault injection, encryption/rotation runbooks |
+| Epic                              | Name                  | Dependencies  | Summary                                                                |
+| --------------------------------- | --------------------- | ------------- | ---------------------------------------------------------------------- |
+| [E00](epics/E00-platform.md)      | Platform Foundation   | none          | Server skeleton, MongoDB bootstrap, config, error envelope, pagination |
+| [E01](epics/E01-git-adapter.md)   | Git Adapter           | E00           | Tonic client wrapping gitaly-rs gRPC services                          |
+| [E02](epics/E02-auth.md)          | Auth & RBAC           | E00           | Local auth, invites, memberships, role-based access                    |
+| [E03](epics/E03-app-setup.md)     | App Setup             | E01, E02      | App CRUD, settings, environment metadata, runtime profiles             |
+| [E04](epics/E04-workspaces.md)    | Workspaces            | E01, E03      | Workspace lifecycle, file operations, guardrails                       |
+| [E05](epics/E05-changesets.md)    | Changesets            | E02, E04      | Changeset lifecycle, review, comments, diffs, profile overrides        |
+| [E06](epics/E06-async-jobs.md)    | Async Jobs            | E00, E05      | Job framework, msuite workers, profile-aware gates/drift jobs          |
+| [E07](epics/E07-queue.md)         | Queue Orchestration   | E05, E06      | Queue-first workflow, revalidation loop, override-key conflicts        |
+| [E08](epics/E08-releases.md)      | Releases              | E01, E06, E07 | Release assembly, env-profile validation, tagging, publish             |
+| [E09](epics/E09-deployments.md)   | Deployments           | E03, E06, E08 | Deploy, promote, skip-stage, rollback, drift blocking                  |
+| [E10](epics/E10-temp-envs.md)     | Temp Environments     | E03, E06      | On-demand envs, profile derivation, TTL, cleanup                       |
+| [E11](epics/E11-notifications.md) | Notifications & Audit | E05-E10       | Email notifications, audit completeness, runtime profile events        |
+| [E12](epics/E12-hardening.md)     | Hardening             | E08-E11       | Load testing, fault injection, encryption/rotation runbooks            |
 
 ### Critical path
 
@@ -459,9 +456,9 @@ Parallelizable after E06: E08 can proceed with E10. E11 can run alongside E09/E1
 
 ### Milestone mapping
 
-| Milestone | Epics | Exit criteria |
-|-----------|-------|---------------|
-| M1: Authoring + Review | E00–E06 | Users can author, submit, and review changesets |
-| M2: Queue + Release | E07–E08 | Config managers can publish subset-based releases |
-| M3: Environments + Recovery | E09–E10 | Full release movement and recovery paths |
-| M4: Operations + Launch | E11–E12 | Production-readiness checklist passes |
+| Milestone                   | Epics   | Exit criteria                                     |
+| --------------------------- | ------- | ------------------------------------------------- |
+| M1: Authoring + Review      | E00–E06 | Users can author, submit, and review changesets   |
+| M2: Queue + Release         | E07–E08 | Config managers can publish subset-based releases |
+| M3: Environments + Recovery | E09–E10 | Full release movement and recovery paths          |
+| M4: Operations + Launch     | E11–E12 | Production-readiness checklist passes             |
