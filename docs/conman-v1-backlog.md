@@ -1,0 +1,379 @@
+# Conman V1 Implementation Backlog
+
+Source scope: [`docs/conman-v1-scope.md`](./conman-v1-scope.md)
+
+## 1) Dependency-Ordered Execution Plan
+
+Execution order (topological):
+
+1. E00 Platform foundation
+2. E01 Git adapter (`gitaly-rs`) + repository abstraction
+3. E02 Auth, invites, memberships, RBAC
+4. E03 App setup + settings + environments metadata
+5. E04 Workspace lifecycle + file operations + guardrails
+6. E05 Changeset lifecycle + review + comments + revisions
+7. E06 Async jobs + `msuite` execution pipeline
+8. E07 Queue-first orchestration + revalidation loop
+9. E08 Release assembly + tagging + publish
+10. E09 Deployment/promotion/rollback orchestration
+11. E10 Temp environments (workspace/changeset) + TTL/grace
+12. E11 Notifications + audit completeness
+13. E12 Hardening, SLOs, migration, launch readiness
+
+Parallelizable tracks after E06:
+
+- E08 (release assembly) can proceed with E10 (temp envs).
+- E11 (notifications/audit polish) can run alongside E09/E10.
+
+## 2) Epics and Issues
+
+## E00 Platform Foundation
+
+Goal: Establish service skeleton and shared primitives.
+
+Issues:
+
+1. E00-01: Create server modules and routing skeleton under `/api`.
+2. E00-02: Add MongoDB connection, health checks, and collection bootstrap.
+3. E00-03: Add config system (env vars, feature flags, limits).
+4. E00-04: Standard error envelope + request tracing IDs.
+5. E00-05: Add pagination helpers (`page`, `limit`) and validation middleware.
+
+Acceptance:
+
+- Server boots with health endpoint and typed route stubs.
+- Mongo connection resilient with startup validation.
+- Shared request/response and validation utilities are used by all new routes.
+
+Depends on: none.
+
+## E01 Git Adapter Service (`gitaly-rs` boundary)
+
+Goal: Isolate Git operations behind a Conman adapter interface.
+
+Issues:
+
+1. E01-01: Define `GitAdapter` interface (branch, read/write file, diff, commit,
+   rebase/merge, tag, revert).
+2. E01-02: Implement `GitalyRsAdapter` against current `gitaly-rs` API.
+3. E01-03: Build fake/in-memory adapter for tests.
+4. E01-04: Add optimistic operation guards and retry semantics for transient
+   Git failures.
+5. E01-05: Add integration tests for critical flows (workspace create, submit,
+   release publish, rollback).
+
+Acceptance:
+
+- No route calls `gitaly-rs` directly.
+- Adapter can be swapped in tests without networked Git backend.
+
+Depends on: E00.
+
+## E02 Auth, Invites, Memberships, RBAC
+
+Goal: Secure access and per-app role model.
+
+Issues:
+
+1. E02-01: Local email/password auth with password hashing and sessions/JWT.
+2. E02-02: Invite-only onboarding (`app_admin`), 7-day token expiry.
+3. E02-03: Forgot/reset password via email token.
+4. E02-04: App membership model with roles: `user`, `reviewer`,
+   `config_manager`, `app_admin`.
+5. E02-05: Authorization middleware + policy checks per endpoint.
+
+Acceptance:
+
+- Unauthorized access denied by default.
+- Role matrix enforced according to scope doc.
+
+Depends on: E00.
+
+## E03 App Setup, Settings, Environment Metadata
+
+Goal: Manage app-level configuration and baseline behavior.
+
+Issues:
+
+1. E03-01: `apps` CRUD and repository registration.
+2. E03-02: Settings API for baseline mode, canonical env, commit mode default,
+   blocked paths, file size limit.
+3. E03-03: Environment stage CRUD with canonical user-facing environment flag.
+4. E03-04: Membership listing and role assignment APIs.
+
+Acceptance:
+
+- App admin can configure baseline mode (`main_head` or
+  `canonical_env_release`).
+- Environment pipeline metadata is app-configurable.
+
+Depends on: E02, E01.
+
+## E04 Workspace Lifecycle + File Operations
+
+Goal: Deliver editable workspaces with Git-backed persistence.
+
+Issues:
+
+1. E04-01: Create default workspace branch (`ws/<user>/<app>`) on first use.
+2. E04-02: Workspace CRUD (reserve multi-workspace APIs, UI can hide extras).
+3. E04-03: File tree/list/read/write/delete endpoints using `path` query/body.
+4. E04-04: Guardrails for blocked paths and max file size (default 5 MB,
+   app-configurable).
+5. E04-05: Workspace reset/sync-main flow with rebase/merge fallback.
+6. E04-06: Conflict detection primitives for later changeset/release flows.
+
+Acceptance:
+
+- Users can edit full repo except blocked paths.
+- Workspace sync produces deterministic conflict status for UI.
+
+Depends on: E03, E01.
+
+## E05 Changesets, Review, Comments, Revisions
+
+Goal: Implement full changeset lifecycle through approval.
+
+Issues:
+
+1. E05-01: Changeset CRUD from workspace (one open changeset per workspace).
+2. E05-02: Submit/resubmit logic with frozen `head_sha` and revision increment.
+3. E05-03: Approval workflow with reset-on-new-commit behavior.
+4. E05-04: Review actions (approve/request changes/reject).
+5. E05-05: Diff endpoints (`raw`, `semantic`) and semantic diff contract.
+6. E05-06: Comment threads with editable comments + revision history.
+7. E05-07: AI analyze/chat endpoints scoped to workspace/changeset.
+
+Acceptance:
+
+- State transitions match spec.
+- New commits during review reset approvals and preserve revision history.
+
+Depends on: E04, E02.
+
+## E06 Async Jobs + `msuite` Pipeline
+
+Goal: Run mandatory checks asynchronously with logs and status APIs.
+
+Issues:
+
+1. E06-01: Generic jobs framework (`queued/running/succeeded/failed/canceled`).
+2. E06-02: Job worker for `msuite_submit`, `msuite_merge`, `msuite_deploy`.
+3. E06-03: Structured job logs and result payload storage.
+4. E06-04: Gate hooks in submit/queue/release/deploy flows.
+5. E06-05: Retry and timeout policies with failure reason codes.
+
+Acceptance:
+
+- Submit, release, deploy are blocked on failing `msuite`.
+- Job status pollable via API.
+
+Depends on: E00, E05.
+
+## E07 Queue-First Orchestration + Revalidation
+
+Goal: Move approved changesets into managed queue with automatic revalidation.
+
+Issues:
+
+1. E07-01: `approved -> queued` transition and queue ordering metadata.
+2. E07-02: Queue selection and manual reorder APIs (audited).
+3. E07-03: Revalidation trigger after each published release.
+4. E07-04: Conflict + full `msuite` revalidation for queued changesets.
+5. E07-05: Transition to `conflicted` or `needs_revalidation` and return-to-draft
+   operations (author or config manager).
+
+Acceptance:
+
+- Non-selected queued changesets remain queued.
+- Revalidation updates statuses correctly and emits notifications.
+
+Depends on: E06, E05.
+
+## E08 Release Assembly, Publish, and Tagging
+
+Goal: Compose subset releases from queue and publish immutable artifacts.
+
+Issues:
+
+1. E08-01: Draft release creation and selected changeset association.
+2. E08-02: Ordered composition engine (manual order by config manager).
+3. E08-03: Publish flow to `main` + lightweight tag `rYYYY.MM.DD.N`.
+4. E08-04: Persist release metadata (`published_sha`, actor, timestamps).
+5. E08-05: Release state machine enforcement.
+
+Acceptance:
+
+- Release can include subset of queued changesets.
+- Publish is immutable and auditable.
+
+Depends on: E07, E01, E06.
+
+## E09 Deploy, Promote, Skip, Rollback
+
+Goal: Deliver environment movement and recovery workflows.
+
+Issues:
+
+1. E09-01: Deploy release to environment (async).
+2. E09-02: Promote same immutable release across stages.
+3. E09-03: Skip-stage and concurrent multi-env deploy approvals:
+   2 distinct users, at least one privileged role.
+4. E09-04: Deployment lock scope per environment.
+5. E09-05: Rollback mode A: `revert(main) + new release`.
+6. E09-06: Rollback mode B: redeploy prior release tag.
+
+Acceptance:
+
+- Concurrent deploy allowed only with required approvals.
+- Both rollback modes available and audited.
+
+Depends on: E08, E06, E03.
+
+## E10 Temp Environments + TTL Lifecycle
+
+Goal: Enable on-demand validation environments for workspace/changeset.
+
+Issues:
+
+1. E10-01: Create temp env (`workspace` or `changeset`) on demand.
+2. E10-02: TTL tracking (24h idle) based on API/test/deploy activity.
+3. E10-03: Soft expiry + 1h grace + undo-expire.
+4. E10-04: Manual TTL extension endpoint.
+5. E10-05: Cleanup workers and DB teardown.
+
+Acceptance:
+
+- Temp envs expire on idle and can be restored during grace.
+- Lifecycle events generate audit + email.
+
+Depends on: E06, E03.
+
+## E11 Notifications + Audit Completeness
+
+Goal: Full observability of user-visible events and immutable history.
+
+Issues:
+
+1. E11-01: Email templates and provider integration.
+2. E11-02: Per-user on/off notification preferences.
+3. E11-03: Event fanout for required notifications.
+4. E11-04: Append-only audit event writer + schema enforcement.
+5. E11-05: Backfill audit for critical legacy transitions (if any).
+
+Acceptance:
+
+- All scoped events emit notifications (when user enabled).
+- All privileged/critical actions captured in immutable audit log.
+
+Depends on: E05, E07, E08, E09, E10.
+
+## E12 Hardening and Launch Readiness
+
+Goal: Stabilize for production rollout.
+
+Issues:
+
+1. E12-01: Load/perf test large real repos (detoxu/hepquant profiles).
+2. E12-02: Fault-injection tests for Git adapter and job worker crashes.
+3. E12-03: SLOs and operational dashboards (queue depth, job latency,
+   deployment success rate).
+4. E12-04: Runbooks for release failure, revalidation storms, temp env cleanup.
+5. E12-05: Security checklist (password policy, token expiry, RBAC tests).
+
+Acceptance:
+
+- Release-critical flows have runbooks and alerting.
+- No P0 blockers in go-live checklist.
+
+Depends on: E08, E09, E10, E11.
+
+## 3) Milestone Cuts
+
+## M1: Authoring + Review Baseline
+
+Includes: E00-E06 partially
+
+Scope:
+
+- Auth/invite/RBAC
+- App/workspace setup
+- File editing + guardrails
+- Changeset submit/review/revisions/comments
+- Async `msuite` at submit
+
+Exit criteria:
+
+- Users can author and submit changesets.
+- Reviewers can approve/reject/request changes.
+
+## M2: Queue + Release Management
+
+Includes: E07-E08
+
+Scope:
+
+- Queue-first workflow
+- Auto revalidation after release
+- Release composition/reorder/publish
+- Immutable tagging
+
+Exit criteria:
+
+- Config manager can publish subset-based releases safely.
+
+## M3: Environments + Recovery
+
+Includes: E09-E10
+
+Scope:
+
+- Deploy/promote
+- Skip-stage/concurrent deployment approvals
+- Rollback modes
+- Temp environments with TTL/grace
+
+Exit criteria:
+
+- Full release movement and recovery paths are operational.
+
+## M4: Operations and Launch
+
+Includes: E11-E12
+
+Scope:
+
+- Email notifications
+- Audit completeness
+- Observability/runbooks/perf hardening
+
+Exit criteria:
+
+- Production-readiness checklist passes.
+
+## 4) Critical Path
+
+Critical path items (must finish in order):
+
+1. E00 -> E01 -> E04 -> E05 -> E06 -> E07 -> E08 -> E09
+
+Fast-follow but not blocking first release assembly:
+
+1. E10 (temp envs)
+2. E11 (notifications/audit polish)
+3. E12 (hardening)
+
+## 5) Suggested First Sprint (Execution-Ready)
+
+1. E00-01/02/04
+2. E01-01/03
+3. E02-01/02/04/05
+4. E03-01/02
+5. E04-01/03/04
+6. E05-01/02
+
+Definition of done for Sprint 1:
+
+- Authenticated user can create app, get default workspace, edit files with
+  guardrails, create changeset, and submit it with persisted revision +
+  `head_sha`.

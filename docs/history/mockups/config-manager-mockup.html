@@ -1,0 +1,2305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DxFlow Config Manager — Interactive Mockup</title>
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --card: #ffffff;
+    --card-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    --card-outline: 1px solid rgba(26,26,26,0.1);
+    --muted: #f5f5f5;
+    --muted-fg: #8a8a8a;
+    --primary: #2d2d2d;
+    --primary-fg: #fafafa;
+    --border: #eaeaea;
+    --sidebar-bg: #fafafa;
+    --success-bg: #d1fae5;
+    --success-fg: #065f46;
+    --warning-bg: #fffbeb;
+    --warning-fg: #b45309;
+    --destructive: #dc2626;
+    --info-bg: #dbeafe;
+    --info-fg: #1e40af;
+    --radius-lg: 10px;
+    --radius-md: 8px;
+    --radius-sm: 6px;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    font-size: 14px;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* ===== LAYOUT ===== */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  #screen-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* ===== NAVIGATION BAR ===== */
+  #nav-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--sidebar-bg);
+    flex-shrink: 0;
+  }
+
+  #nav-bar button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  #nav-bar button:hover { background: var(--muted); }
+  #nav-bar button:disabled { opacity: 0.4; cursor: default; }
+  #nav-bar button:disabled:hover { background: var(--bg); }
+
+  #nav-bar select {
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font);
+    font-size: 13px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  #nav-bar .nav-info {
+    font-size: 12px;
+    color: var(--muted-fg);
+    white-space: nowrap;
+  }
+
+  /* ===== COMMON COMPONENTS ===== */
+  .screen { padding: 24px 32px; min-height: calc(100vh - 49px); }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .top-bar h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .top-bar .breadcrumb {
+    font-size: 13px;
+    color: var(--muted-fg);
+    margin-bottom: 4px;
+  }
+
+  .top-bar .breadcrumb a {
+    color: var(--muted-fg);
+    text-decoration: none;
+  }
+
+  .top-bar .breadcrumb a:hover { color: var(--fg); }
+  .top-bar .breadcrumb span { margin: 0 6px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+
+  .btn:hover { background: var(--muted); }
+
+  .btn-primary {
+    background: var(--primary);
+    color: var(--primary-fg);
+    border-color: var(--primary);
+  }
+
+  .btn-primary:hover { background: #404040; }
+
+  .btn-success {
+    background: var(--success-bg);
+    color: var(--success-fg);
+    border-color: transparent;
+  }
+
+  .btn-destructive {
+    background: var(--destructive);
+    color: white;
+    border-color: var(--destructive);
+  }
+
+  .btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--card-shadow);
+    outline: var(--card-outline);
+    padding: 20px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .badge-open { background: var(--info-bg); color: var(--info-fg); }
+  .badge-merged { background: #ede9fe; color: #6d28d9; }
+  .badge-draft { background: var(--muted); color: var(--muted-fg); }
+  .badge-approved { background: var(--success-bg); color: var(--success-fg); }
+  .badge-changes { background: var(--warning-bg); color: var(--warning-fg); }
+  .badge-deployed { background: #d1fae5; color: #065f46; }
+  .badge-env { background: var(--muted); color: var(--fg); font-weight: 500; }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  th {
+    text-align: left;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted-fg);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--muted);
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    width: fit-content;
+  }
+
+  .tab {
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--muted-fg);
+    border: none;
+    background: transparent;
+    font-family: var(--font);
+  }
+
+  .tab.active {
+    background: var(--bg);
+    color: var(--fg);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  /* ===== SIDEBAR LAYOUT ===== */
+  .layout-with-sidebar {
+    display: flex;
+    min-height: calc(100vh - 49px);
+    margin: -24px -32px;
+  }
+
+  .sidebar {
+    width: 240px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    flex-shrink: 0;
+  }
+
+  .sidebar-header {
+    padding: 8px 16px 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+
+  .sidebar-header h2 {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sidebar-header .app-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .sidebar-nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    color: var(--muted-fg);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.1s;
+  }
+
+  .sidebar-nav a:hover { color: var(--fg); background: rgba(0,0,0,0.03); }
+  .sidebar-nav a.active { color: var(--fg); background: rgba(0,0,0,0.05); }
+
+  .sidebar-nav .icon {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  .main-content {
+    flex: 1;
+    padding: 24px 32px;
+    overflow-y: auto;
+  }
+
+  /* ===== PIPELINE ===== */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 20px 0;
+  }
+
+  .pipeline-stage {
+    flex: 1;
+    padding: 16px 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    position: relative;
+  }
+
+  .pipeline-stage:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+  .pipeline-stage:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+  .pipeline-stage + .pipeline-stage { border-left: none; }
+
+  .pipeline-stage .env-name {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted-fg);
+    margin-bottom: 4px;
+  }
+
+  .pipeline-stage .env-version {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  .pipeline-stage .env-meta {
+    font-size: 12px;
+    color: var(--muted-fg);
+    margin-top: 4px;
+  }
+
+  .pipeline-arrow {
+    width: 24px;
+    text-align: center;
+    color: var(--muted-fg);
+    font-size: 16px;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+
+  .pipeline-stage.active {
+    border-color: #6366f1;
+    background: #faf5ff;
+  }
+
+  /* ===== WORKSPACE 3-PANEL ===== */
+  .workspace {
+    display: flex;
+    min-height: calc(100vh - 49px);
+  }
+
+  .workspace .file-tree {
+    width: 220px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    padding: 12px 0;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+
+  .file-tree-header {
+    padding: 8px 14px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted-fg);
+  }
+
+  .file-tree-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    font-size: 13px;
+    color: var(--fg);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .file-tree-item:hover { background: rgba(0,0,0,0.03); }
+  .file-tree-item.active { background: rgba(0,0,0,0.06); font-weight: 500; }
+
+  .file-tree-item .icon { font-size: 12px; opacity: 0.5; }
+
+  .file-tree-item .modified {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 700;
+    color: #b45309;
+    background: var(--warning-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .file-tree-item .added {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--success-fg);
+    background: var(--success-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .file-tree-folder {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted-fg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .workspace .editor-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--sidebar-bg);
+  }
+
+  .editor-toolbar .file-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+  }
+
+  .editor-body {
+    flex: 1;
+    padding: 0;
+    overflow: auto;
+    background: var(--bg);
+  }
+
+  .code-editor {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 16px 0;
+  }
+
+  .code-line {
+    display: flex;
+    padding: 0 16px;
+    min-height: 22px;
+  }
+
+  .code-line .line-num {
+    width: 40px;
+    text-align: right;
+    padding-right: 16px;
+    color: var(--muted-fg);
+    user-select: none;
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+
+  .code-line .line-content {
+    flex: 1;
+    white-space: pre;
+  }
+
+  .code-line.added {
+    background: #dcfce7;
+  }
+
+  .code-line.removed {
+    background: #fee2e2;
+  }
+
+  .code-line.highlight {
+    background: #fefce8;
+  }
+
+  /* YAML syntax colors */
+  .yaml-key { color: #0550ae; }
+  .yaml-string { color: #0a3069; }
+  .yaml-comment { color: var(--muted-fg); font-style: italic; }
+  .yaml-value { color: #116329; }
+  .yaml-bool { color: #cf222e; }
+
+  /* ===== CHAT PANEL ===== */
+  .chat-panel {
+    width: 380px;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+
+  .chat-panel.collapsed {
+    width: 48px;
+    cursor: pointer;
+  }
+
+  .chat-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .chat-msg {
+    display: flex;
+    gap: 10px;
+  }
+
+  .chat-msg .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .chat-msg .avatar.user { background: var(--muted); color: var(--fg); }
+  .chat-msg .avatar.ai { background: #ede9fe; color: #6d28d9; }
+
+  .chat-msg .msg-body {
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .chat-msg .msg-body .name {
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .chat-input {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+  }
+
+  .chat-input input {
+    flex: 1;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 13px;
+    outline: none;
+  }
+
+  .chat-input input:focus { border-color: var(--primary); }
+
+  .collapsed-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    padding: 16px 0;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted-fg);
+    width: 100%;
+  }
+
+  /* ===== DIFF VIEW ===== */
+  .diff-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .diff-side {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .diff-side-header {
+    padding: 8px 16px;
+    background: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted-fg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .diff-side:first-child { border-right: 1px solid var(--border); }
+
+  .diff-line {
+    display: flex;
+    padding: 0 16px;
+    min-height: 22px;
+  }
+
+  .diff-line .d-num {
+    width: 36px;
+    text-align: right;
+    padding-right: 12px;
+    color: var(--muted-fg);
+    user-select: none;
+    flex-shrink: 0;
+    font-size: 11px;
+  }
+
+  .diff-line .d-content {
+    flex: 1;
+    white-space: pre;
+  }
+
+  .diff-line.d-added { background: #dcfce7; }
+  .diff-line.d-removed { background: #fee2e2; }
+  .diff-line.d-empty { background: var(--muted); }
+
+  /* ===== SEMANTIC DIFF ===== */
+  .semantic-group {
+    margin-bottom: 24px;
+  }
+
+  .semantic-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .semantic-group-header .group-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .semantic-group-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .semantic-change {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+  }
+
+  .semantic-change .change-type {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .change-type.add { background: var(--success-bg); color: var(--success-fg); }
+  .change-type.modify { background: var(--warning-bg); color: var(--warning-fg); }
+
+  .semantic-change .change-detail {
+    flex: 1;
+  }
+
+  .semantic-change .change-detail .path {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--muted-fg);
+    margin-top: 2px;
+  }
+
+  /* ===== ANALYSIS CARDS ===== */
+  .analysis-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .analysis-card {
+    padding: 20px;
+  }
+
+  .analysis-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .analysis-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 0;
+    font-size: 13px;
+  }
+
+  .analysis-item .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+
+  /* ===== REVIEW ===== */
+  .review-file {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .review-file-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: monospace;
+  }
+
+  .inline-comment {
+    margin: 0 16px 12px;
+    padding: 12px 16px;
+    background: var(--info-bg);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid #3b82f6;
+  }
+
+  .inline-comment .comment-author {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--info-fg);
+  }
+
+  .inline-comment .comment-text {
+    font-size: 13px;
+    color: var(--fg);
+  }
+
+  /* ===== STATUS BANNER ===== */
+  .status-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .status-banner.warning {
+    background: var(--warning-bg);
+    color: var(--warning-fg);
+    border: 1px solid #fde68a;
+  }
+
+  .status-banner.success {
+    background: var(--success-bg);
+    color: var(--success-fg);
+    border: 1px solid #6ee7b7;
+  }
+
+  .status-banner.info {
+    background: var(--info-bg);
+    color: var(--info-fg);
+    border: 1px solid #93c5fd;
+  }
+
+  /* ===== APPROVAL STAGES ===== */
+  .approval-stages {
+    display: flex;
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .approval-stage {
+    flex: 1;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    text-align: center;
+  }
+
+  .approval-stage.approved {
+    border-color: #6ee7b7;
+    background: #f0fdf4;
+  }
+
+  .approval-stage .stage-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  .approval-stage .stage-name {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .approval-stage .stage-by {
+    font-size: 12px;
+    color: var(--muted-fg);
+  }
+
+  /* ===== APP CARDS GRID ===== */
+  .app-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .app-card {
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+
+  .app-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transform: translateY(-1px);
+  }
+
+  .app-card .app-card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 12px;
+  }
+
+  .app-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .app-card .app-desc {
+    font-size: 13px;
+    color: var(--muted-fg);
+    margin-bottom: 16px;
+  }
+
+  .app-card .app-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--muted-fg);
+  }
+
+  .app-card .app-stats strong {
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  .add-app-card {
+    border: 2px dashed var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+
+  .add-app-card:hover {
+    border-color: var(--muted-fg);
+    background: var(--muted);
+    box-shadow: none;
+    transform: none;
+  }
+
+  .add-app-card .plus {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--muted-fg);
+    margin-bottom: 8px;
+  }
+
+  .add-app-card span {
+    font-size: 13px;
+    color: var(--muted-fg);
+    font-weight: 500;
+  }
+
+  /* ===== MISC ===== */
+  .comment-card {
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+  }
+
+  .comment-card .comment-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .comment-card .comment-header .commenter-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #e0e7ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #4338ca;
+  }
+
+  .comment-card .comment-header .commenter-name {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .comment-card .comment-header .comment-time {
+    font-size: 12px;
+    color: var(--muted-fg);
+  }
+
+  .comment-card .comment-body {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--fg);
+  }
+
+  .ws-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--sidebar-bg);
+  }
+
+  .ws-header h2 {
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ws-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--sidebar-bg);
+    padding: 0 16px;
+  }
+
+  .ws-tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted-fg);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    margin-bottom: -1px;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-family: var(--font);
+  }
+
+  .ws-tab.active {
+    color: var(--fg);
+    border-bottom-color: var(--fg);
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="screen-container"></div>
+  <div id="nav-bar">
+    <button id="btn-prev" onclick="prevScreen()">← Prev</button>
+    <select id="screen-select" onchange="goToScreen(parseInt(this.value))"></select>
+    <button id="btn-next" onclick="nextScreen()">Next →</button>
+    <span class="nav-info" id="nav-info"></span>
+  </div>
+</div>
+
+<script>
+// ===== SCREEN DEFINITIONS =====
+
+const screens = [
+
+// ─── 1. DASHBOARD ───
+() => `
+<div class="screen">
+  <div class="top-bar">
+    <div>
+      <h1>DxFlow Config Manager</h1>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span style="font-size:12px;color:var(--muted-fg);">felipe@gistia.com</span>
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);color:var(--primary-fg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">FC</div>
+    </div>
+  </div>
+
+  <div class="app-grid">
+    <div class="card app-card">
+      <div class="app-card-icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);">BL</div>
+      <h3>BioAnalytics LIMS</h3>
+      <p class="app-desc">Laboratory information management system for biotech research facilities</p>
+      <div class="app-stats">
+        <span><strong>3</strong> environments</span>
+        <span><strong>5</strong> open changesets</span>
+        <span>Last deploy: <strong>2h ago</strong></span>
+      </div>
+    </div>
+
+    <div class="card app-card">
+      <div class="app-card-icon" style="background:linear-gradient(135deg,#f59e0b,#ef4444);">PT</div>
+      <h3>PharmTrack ERP</h3>
+      <p class="app-desc">Enterprise resource planning for pharmaceutical manufacturing</p>
+      <div class="app-stats">
+        <span><strong>3</strong> environments</span>
+        <span><strong>2</strong> open changesets</span>
+        <span>Last deploy: <strong>1d ago</strong></span>
+      </div>
+    </div>
+
+    <div class="card add-app-card">
+      <div class="plus">+</div>
+      <span>Add Application</span>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 2. APP OVERVIEW ───
+() => `
+<div class="screen">
+  <div class="layout-with-sidebar">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2>
+          <span class="app-icon">BL</span>
+          BioAnalytics LIMS
+        </h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="active"><span class="icon">◉</span> Overview</a>
+        <a href="#"><span class="icon">⎘</span> Changesets</a>
+        <a href="#"><span class="icon">⚙</span> Settings</a>
+      </nav>
+    </div>
+    <div class="main-content">
+      <div class="top-bar">
+        <div>
+          <div class="breadcrumb"><a href="#">Dashboard</a> <span>/</span> BioAnalytics LIMS</div>
+          <h1>Overview</h1>
+        </div>
+        <button class="btn btn-primary">+ New Changeset</button>
+      </div>
+
+      <h3 style="font-size:13px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Environment Pipeline</h3>
+
+      <div class="pipeline">
+        <div class="pipeline-stage">
+          <div class="env-name">Development</div>
+          <div class="env-version">v1.4</div>
+          <div class="env-meta">Deployed 2h ago · CS-11</div>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-stage">
+          <div class="env-name">Staging</div>
+          <div class="env-version">v1.3</div>
+          <div class="env-meta">Deployed 3d ago · CS-10</div>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-stage">
+          <div class="env-name">Production</div>
+          <div class="env-version">v1.2</div>
+          <div class="env-meta">Deployed 1w ago · CS-9</div>
+        </div>
+      </div>
+
+      <h3 style="font-size:13px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:0.05em;margin:24px 0 12px;">Recent Changesets</h3>
+      <div class="card" style="padding:0;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Author</th>
+              <th>Status</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-family:monospace;font-weight:500;">CS-12</td>
+              <td style="font-weight:500;">Add patient email field</td>
+              <td>Felipe C.</td>
+              <td><span class="badge badge-open">Open</span></td>
+              <td style="color:var(--muted-fg);">5 min ago</td>
+            </tr>
+            <tr>
+              <td style="font-family:monospace;font-weight:500;">CS-11</td>
+              <td style="font-weight:500;">Update order status workflow</td>
+              <td>Maria S.</td>
+              <td><span class="badge badge-deployed">Deployed</span></td>
+              <td style="color:var(--muted-fg);">2h ago</td>
+            </tr>
+            <tr>
+              <td style="font-family:monospace;font-weight:500;">CS-10</td>
+              <td style="font-weight:500;">Add lab results page</td>
+              <td>Felipe C.</td>
+              <td><span class="badge badge-merged">Merged</span></td>
+              <td style="color:var(--muted-fg);">3d ago</td>
+            </tr>
+            <tr>
+              <td style="font-family:monospace;font-weight:500;">CS-9</td>
+              <td style="font-weight:500;">Refactor entity relationships</td>
+              <td>John D.</td>
+              <td><span class="badge badge-merged">Merged</span></td>
+              <td style="color:var(--muted-fg);">1w ago</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 3. CHANGESET LIST ───
+() => `
+<div class="screen">
+  <div class="layout-with-sidebar">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2>
+          <span class="app-icon">BL</span>
+          BioAnalytics LIMS
+        </h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#"><span class="icon">◉</span> Overview</a>
+        <a href="#" class="active"><span class="icon">⎘</span> Changesets</a>
+        <a href="#"><span class="icon">⚙</span> Settings</a>
+      </nav>
+    </div>
+    <div class="main-content">
+      <div class="top-bar">
+        <div>
+          <div class="breadcrumb"><a href="#">Dashboard</a> <span>/</span> <a href="#">BioAnalytics LIMS</a> <span>/</span> Changesets</div>
+          <h1>Changesets</h1>
+        </div>
+        <button class="btn btn-primary">+ New Changeset</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active">Open <span style="margin-left:4px;font-size:11px;opacity:0.7;">5</span></button>
+        <button class="tab">Merged <span style="margin-left:4px;font-size:11px;opacity:0.7;">12</span></button>
+        <button class="tab">All</button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="card" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-family:monospace;font-weight:600;color:var(--muted-fg);font-size:12px;">CS-12</span>
+            <div>
+              <div style="font-weight:600;font-size:14px;">Add patient email field</div>
+              <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;">Felipe C. opened 5 min ago · 2 files changed</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="badge badge-open">Open</span>
+          </div>
+        </div>
+
+        <div class="card" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-family:monospace;font-weight:600;color:var(--muted-fg);font-size:12px;">CS-13</span>
+            <div>
+              <div style="font-weight:600;font-size:14px;">Configure notification templates</div>
+              <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;">Maria S. opened 1h ago · 4 files changed</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="badge badge-changes">Changes Requested</span>
+          </div>
+        </div>
+
+        <div class="card" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-family:monospace;font-weight:600;color:var(--muted-fg);font-size:12px;">CS-14</span>
+            <div>
+              <div style="font-weight:600;font-size:14px;">Add batch processing workflow</div>
+              <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;">John D. opened 3h ago · 6 files changed</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="badge badge-approved">Approved</span>
+          </div>
+        </div>
+
+        <div class="card" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-family:monospace;font-weight:600;color:var(--muted-fg);font-size:12px;">CS-15</span>
+            <div>
+              <div style="font-weight:600;font-size:14px;">Update reagent tracking fields</div>
+              <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;">Felipe C. opened 5h ago · 1 file changed</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="badge badge-draft">Draft</span>
+          </div>
+        </div>
+
+        <div class="card" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-family:monospace;font-weight:600;color:var(--muted-fg);font-size:12px;">CS-16</span>
+            <div>
+              <div style="font-weight:600;font-size:14px;">Add sample type configuration</div>
+              <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;">Maria S. opened 8h ago · 3 files changed</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="badge badge-open">Open</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 4. WORKSPACE: EDITOR ───
+() => `
+<div class="screen" style="padding:0;">
+  <div class="workspace">
+    <div class="file-tree">
+      <div class="file-tree-header">CS-12 · Files</div>
+
+      <div class="file-tree-folder">▾ entities/</div>
+      <div class="file-tree-item active">
+        <span class="icon">📄</span> patient.yml
+        <span class="modified">M</span>
+      </div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> order.yml
+      </div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> sample.yml
+      </div>
+
+      <div class="file-tree-folder">▾ pages/</div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> patients.page.yml
+      </div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> orders.page.yml
+      </div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> dashboard.page.yml
+      </div>
+
+      <div class="file-tree-folder">▸ workflows/</div>
+      <div class="file-tree-folder">▸ reports/</div>
+    </div>
+
+    <div class="editor-panel">
+      <div class="ws-header">
+        <h2>
+          <span class="badge badge-open" style="font-size:10px;">Open</span>
+          CS-12: Add patient email field
+        </h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm">Save</button>
+          <button class="btn btn-sm btn-primary">Submit for Review</button>
+        </div>
+      </div>
+
+      <div class="ws-tabs">
+        <button class="ws-tab active">Editor</button>
+        <button class="ws-tab">Raw Diff</button>
+        <button class="ws-tab">Semantic Diff</button>
+        <button class="ws-tab">AI Analysis</button>
+      </div>
+
+      <div class="editor-toolbar">
+        <div class="file-tab">
+          📄 entities/patient.yml
+          <span class="modified" style="margin-left:4px;">M</span>
+        </div>
+      </div>
+
+      <div class="editor-body">
+        <div class="code-editor">
+          <div class="code-line"><span class="line-num">1</span><span class="line-content"><span class="yaml-key">entity</span>: patient</span></div>
+          <div class="code-line"><span class="line-num">2</span><span class="line-content"><span class="yaml-key">label</span>: <span class="yaml-string">"Patient"</span></span></div>
+          <div class="code-line"><span class="line-num">3</span><span class="line-content"><span class="yaml-key">plural</span>: <span class="yaml-string">"Patients"</span></span></div>
+          <div class="code-line"><span class="line-num">4</span><span class="line-content"></span></div>
+          <div class="code-line"><span class="line-num">5</span><span class="line-content"><span class="yaml-key">fields</span>:</span></div>
+          <div class="code-line"><span class="line-num">6</span><span class="line-content">  - <span class="yaml-key">name</span>: first_name</span></div>
+          <div class="code-line"><span class="line-num">7</span><span class="line-content">    <span class="yaml-key">type</span>: <span class="yaml-value">string</span></span></div>
+          <div class="code-line"><span class="line-num">8</span><span class="line-content">    <span class="yaml-key">required</span>: <span class="yaml-bool">true</span></span></div>
+          <div class="code-line"><span class="line-num">9</span><span class="line-content">  - <span class="yaml-key">name</span>: last_name</span></div>
+          <div class="code-line"><span class="line-num">10</span><span class="line-content">    <span class="yaml-key">type</span>: <span class="yaml-value">string</span></span></div>
+          <div class="code-line"><span class="line-num">11</span><span class="line-content">    <span class="yaml-key">required</span>: <span class="yaml-bool">true</span></span></div>
+          <div class="code-line"><span class="line-num">12</span><span class="line-content">  - <span class="yaml-key">name</span>: date_of_birth</span></div>
+          <div class="code-line"><span class="line-num">13</span><span class="line-content">    <span class="yaml-key">type</span>: <span class="yaml-value">date</span></span></div>
+          <div class="code-line"><span class="line-num">14</span><span class="line-content">    <span class="yaml-key">required</span>: <span class="yaml-bool">true</span></span></div>
+          <div class="code-line added"><span class="line-num">15</span><span class="line-content">  - <span class="yaml-key">name</span>: email</span></div>
+          <div class="code-line added"><span class="line-num">16</span><span class="line-content">    <span class="yaml-key">type</span>: <span class="yaml-value">email</span></span></div>
+          <div class="code-line added"><span class="line-num">17</span><span class="line-content">    <span class="yaml-key">required</span>: <span class="yaml-bool">false</span></span></div>
+          <div class="code-line added"><span class="line-num">18</span><span class="line-content">    <span class="yaml-key">label</span>: <span class="yaml-string">"Email Address"</span></span></div>
+          <div class="code-line"><span class="line-num">19</span><span class="line-content"></span></div>
+          <div class="code-line"><span class="line-num">20</span><span class="line-content"><span class="yaml-key">indexes</span>:</span></div>
+          <div class="code-line"><span class="line-num">21</span><span class="line-content">  - <span class="yaml-key">fields</span>: [last_name, first_name]</span></div>
+          <div class="code-line"><span class="line-num">22</span><span class="line-content">  - <span class="yaml-key">fields</span>: [date_of_birth]</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-panel collapsed" title="Open AI Chat">
+      <div class="collapsed-label">💬 AI Assistant</div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 5. WORKSPACE: AI CHAT ───
+() => `
+<div class="screen" style="padding:0;">
+  <div class="workspace">
+    <div class="file-tree">
+      <div class="file-tree-header">CS-12 · Files</div>
+
+      <div class="file-tree-folder">▾ entities/</div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> patient.yml
+        <span class="modified">M</span>
+      </div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> order.yml
+      </div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> sample.yml
+      </div>
+
+      <div class="file-tree-folder">▾ pages/</div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> patients.page.yml
+      </div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> orders.page.yml
+        <span class="modified">M</span>
+      </div>
+      <div class="file-tree-item">
+        <span class="icon">📄</span> dashboard.page.yml
+      </div>
+
+      <div class="file-tree-folder">▸ workflows/</div>
+      <div class="file-tree-folder">▸ reports/</div>
+    </div>
+
+    <div class="editor-panel">
+      <div class="ws-header">
+        <h2>
+          <span class="badge badge-open" style="font-size:10px;">Open</span>
+          CS-12: Add patient email field
+        </h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm">Save</button>
+          <button class="btn btn-sm btn-primary">Submit for Review</button>
+        </div>
+      </div>
+
+      <div class="ws-tabs">
+        <button class="ws-tab active">Editor</button>
+        <button class="ws-tab">Raw Diff</button>
+        <button class="ws-tab">Semantic Diff</button>
+        <button class="ws-tab">AI Analysis</button>
+      </div>
+
+      <div class="editor-toolbar">
+        <div class="file-tab">
+          📄 pages/orders.page.yml
+          <span class="modified" style="margin-left:4px;">M</span>
+        </div>
+      </div>
+
+      <div class="editor-body">
+        <div class="code-editor">
+          <div class="code-line"><span class="line-num">1</span><span class="line-content"><span class="yaml-key">page</span>: orders</span></div>
+          <div class="code-line"><span class="line-num">2</span><span class="line-content"><span class="yaml-key">title</span>: <span class="yaml-string">"Orders"</span></span></div>
+          <div class="code-line"><span class="line-num">3</span><span class="line-content"></span></div>
+          <div class="code-line"><span class="line-num">4</span><span class="line-content"><span class="yaml-key">columns</span>:</span></div>
+          <div class="code-line"><span class="line-num">5</span><span class="line-content">  - <span class="yaml-key">field</span>: order_id</span></div>
+          <div class="code-line"><span class="line-num">6</span><span class="line-content">  - <span class="yaml-key">field</span>: patient.last_name</span></div>
+          <div class="code-line added"><span class="line-num">7</span><span class="line-content">  - <span class="yaml-key">field</span>: patient.email</span></div>
+          <div class="code-line"><span class="line-num">8</span><span class="line-content">  - <span class="yaml-key">field</span>: status</span></div>
+          <div class="code-line"><span class="line-num">9</span><span class="line-content">  - <span class="yaml-key">field</span>: created_at</span></div>
+          <div class="code-line"><span class="line-num">10</span><span class="line-content"></span></div>
+          <div class="code-line"><span class="line-num">11</span><span class="line-content"><span class="yaml-key">filters</span>:</span></div>
+          <div class="code-line"><span class="line-num">12</span><span class="line-content">  - <span class="yaml-key">field</span>: status</span></div>
+          <div class="code-line"><span class="line-num">13</span><span class="line-content">    <span class="yaml-key">type</span>: <span class="yaml-value">select</span></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-panel">
+      <div class="chat-header">
+        <span>💬 AI Assistant</span>
+        <button class="btn btn-sm" style="height:24px;padding:0 6px;font-size:11px;">✕</button>
+      </div>
+      <div class="chat-messages">
+        <div class="chat-msg">
+          <div class="avatar user">FC</div>
+          <div class="msg-body">
+            <div class="name">Felipe C.</div>
+            <div>I added the email field to the patient entity. Can you also add it as a column in the orders page so we can see patient emails directly?</div>
+          </div>
+        </div>
+        <div class="chat-msg">
+          <div class="avatar ai">AI</div>
+          <div class="msg-body">
+            <div class="name">AI Assistant</div>
+            <div>I'll add <code>patient.email</code> as a column in the orders page. I'll place it right after <code>patient.last_name</code> since they're related fields.</div>
+            <div style="margin-top:8px;padding:8px 12px;background:var(--success-bg);border-radius:var(--radius-sm);font-size:12px;color:var(--success-fg);">
+              ✓ Modified <code>pages/orders.page.yml</code> — added patient.email column at line 7
+            </div>
+          </div>
+        </div>
+        <div class="chat-msg">
+          <div class="avatar user">FC</div>
+          <div class="msg-body">
+            <div class="name">Felipe C.</div>
+            <div>Perfect, that looks great. The file tree updated too — I can see orders.page.yml is now marked as modified.</div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input">
+        <input type="text" placeholder="Ask AI about this changeset…" />
+        <button class="btn btn-sm btn-primary" style="height:36px;">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 6. WORKSPACE: RAW DIFF ───
+() => `
+<div class="screen" style="padding:0;">
+  <div class="workspace">
+    <div class="file-tree">
+      <div class="file-tree-header">CS-12 · Files</div>
+      <div class="file-tree-folder">▾ entities/</div>
+      <div class="file-tree-item active">
+        <span class="icon">📄</span> patient.yml
+        <span class="modified">M</span>
+      </div>
+      <div class="file-tree-item"><span class="icon">📄</span> order.yml</div>
+      <div class="file-tree-item"><span class="icon">📄</span> sample.yml</div>
+      <div class="file-tree-folder">▾ pages/</div>
+      <div class="file-tree-item"><span class="icon">📄</span> patients.page.yml</div>
+      <div class="file-tree-item"><span class="icon">📄</span> orders.page.yml <span class="modified">M</span></div>
+      <div class="file-tree-item"><span class="icon">📄</span> dashboard.page.yml</div>
+      <div class="file-tree-folder">▸ workflows/</div>
+      <div class="file-tree-folder">▸ reports/</div>
+    </div>
+
+    <div class="editor-panel">
+      <div class="ws-header">
+        <h2>
+          <span class="badge badge-open" style="font-size:10px;">Open</span>
+          CS-12: Add patient email field
+        </h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm">Save</button>
+          <button class="btn btn-sm btn-primary">Submit for Review</button>
+        </div>
+      </div>
+
+      <div class="ws-tabs">
+        <button class="ws-tab">Editor</button>
+        <button class="ws-tab active">Raw Diff</button>
+        <button class="ws-tab">Semantic Diff</button>
+        <button class="ws-tab">AI Analysis</button>
+      </div>
+
+      <div class="editor-toolbar">
+        <div class="file-tab">📄 entities/patient.yml</div>
+        <span style="font-size:12px;color:var(--success-fg);font-weight:500;">+4 lines</span>
+      </div>
+
+      <div class="editor-body" style="padding:16px;">
+        <div class="diff-container">
+          <div class="diff-side">
+            <div class="diff-side-header">Original (v1.4)</div>
+            <div class="diff-line"><span class="d-num">1</span><span class="d-content">entity: patient</span></div>
+            <div class="diff-line"><span class="d-num">2</span><span class="d-content">label: "Patient"</span></div>
+            <div class="diff-line"><span class="d-num">3</span><span class="d-content">plural: "Patients"</span></div>
+            <div class="diff-line"><span class="d-num">4</span><span class="d-content"></span></div>
+            <div class="diff-line"><span class="d-num">5</span><span class="d-content">fields:</span></div>
+            <div class="diff-line"><span class="d-num">6</span><span class="d-content">  - name: first_name</span></div>
+            <div class="diff-line"><span class="d-num">7</span><span class="d-content">    type: string</span></div>
+            <div class="diff-line"><span class="d-num">8</span><span class="d-content">    required: true</span></div>
+            <div class="diff-line"><span class="d-num">9</span><span class="d-content">  - name: last_name</span></div>
+            <div class="diff-line"><span class="d-num">10</span><span class="d-content">    type: string</span></div>
+            <div class="diff-line"><span class="d-num">11</span><span class="d-content">    required: true</span></div>
+            <div class="diff-line"><span class="d-num">12</span><span class="d-content">  - name: date_of_birth</span></div>
+            <div class="diff-line"><span class="d-num">13</span><span class="d-content">    type: date</span></div>
+            <div class="diff-line"><span class="d-num">14</span><span class="d-content">    required: true</span></div>
+            <div class="diff-line d-empty"><span class="d-num"></span><span class="d-content"></span></div>
+            <div class="diff-line d-empty"><span class="d-num"></span><span class="d-content"></span></div>
+            <div class="diff-line d-empty"><span class="d-num"></span><span class="d-content"></span></div>
+            <div class="diff-line d-empty"><span class="d-num"></span><span class="d-content"></span></div>
+            <div class="diff-line"><span class="d-num">15</span><span class="d-content"></span></div>
+            <div class="diff-line"><span class="d-num">16</span><span class="d-content">indexes:</span></div>
+            <div class="diff-line"><span class="d-num">17</span><span class="d-content">  - fields: [last_name, first_name]</span></div>
+            <div class="diff-line"><span class="d-num">18</span><span class="d-content">  - fields: [date_of_birth]</span></div>
+          </div>
+          <div class="diff-side">
+            <div class="diff-side-header">Modified (CS-12)</div>
+            <div class="diff-line"><span class="d-num">1</span><span class="d-content">entity: patient</span></div>
+            <div class="diff-line"><span class="d-num">2</span><span class="d-content">label: "Patient"</span></div>
+            <div class="diff-line"><span class="d-num">3</span><span class="d-content">plural: "Patients"</span></div>
+            <div class="diff-line"><span class="d-num">4</span><span class="d-content"></span></div>
+            <div class="diff-line"><span class="d-num">5</span><span class="d-content">fields:</span></div>
+            <div class="diff-line"><span class="d-num">6</span><span class="d-content">  - name: first_name</span></div>
+            <div class="diff-line"><span class="d-num">7</span><span class="d-content">    type: string</span></div>
+            <div class="diff-line"><span class="d-num">8</span><span class="d-content">    required: true</span></div>
+            <div class="diff-line"><span class="d-num">9</span><span class="d-content">  - name: last_name</span></div>
+            <div class="diff-line"><span class="d-num">10</span><span class="d-content">    type: string</span></div>
+            <div class="diff-line"><span class="d-num">11</span><span class="d-content">    required: true</span></div>
+            <div class="diff-line"><span class="d-num">12</span><span class="d-content">  - name: date_of_birth</span></div>
+            <div class="diff-line"><span class="d-num">13</span><span class="d-content">    type: date</span></div>
+            <div class="diff-line"><span class="d-num">14</span><span class="d-content">    required: true</span></div>
+            <div class="diff-line d-added"><span class="d-num">15</span><span class="d-content">  - name: email</span></div>
+            <div class="diff-line d-added"><span class="d-num">16</span><span class="d-content">    type: email</span></div>
+            <div class="diff-line d-added"><span class="d-num">17</span><span class="d-content">    required: false</span></div>
+            <div class="diff-line d-added"><span class="d-num">18</span><span class="d-content">    label: "Email Address"</span></div>
+            <div class="diff-line"><span class="d-num">19</span><span class="d-content"></span></div>
+            <div class="diff-line"><span class="d-num">20</span><span class="d-content">indexes:</span></div>
+            <div class="diff-line"><span class="d-num">21</span><span class="d-content">  - fields: [last_name, first_name]</span></div>
+            <div class="diff-line"><span class="d-num">22</span><span class="d-content">  - fields: [date_of_birth]</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-panel collapsed" title="Open AI Chat">
+      <div class="collapsed-label">💬 AI Assistant</div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 7. WORKSPACE: SEMANTIC DIFF ───
+() => `
+<div class="screen" style="padding:0;">
+  <div class="workspace">
+    <div class="file-tree">
+      <div class="file-tree-header">CS-12 · Files</div>
+      <div class="file-tree-folder">▾ entities/</div>
+      <div class="file-tree-item"><span class="icon">📄</span> patient.yml <span class="modified">M</span></div>
+      <div class="file-tree-item"><span class="icon">📄</span> order.yml</div>
+      <div class="file-tree-item"><span class="icon">📄</span> sample.yml</div>
+      <div class="file-tree-folder">▾ pages/</div>
+      <div class="file-tree-item"><span class="icon">📄</span> patients.page.yml</div>
+      <div class="file-tree-item"><span class="icon">📄</span> orders.page.yml <span class="modified">M</span></div>
+      <div class="file-tree-item"><span class="icon">📄</span> dashboard.page.yml</div>
+      <div class="file-tree-folder">▸ workflows/</div>
+      <div class="file-tree-folder">▸ reports/</div>
+    </div>
+
+    <div class="editor-panel">
+      <div class="ws-header">
+        <h2>
+          <span class="badge badge-open" style="font-size:10px;">Open</span>
+          CS-12: Add patient email field
+        </h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm">Save</button>
+          <button class="btn btn-sm btn-primary">Submit for Review</button>
+        </div>
+      </div>
+
+      <div class="ws-tabs">
+        <button class="ws-tab">Editor</button>
+        <button class="ws-tab">Raw Diff</button>
+        <button class="ws-tab active">Semantic Diff</button>
+        <button class="ws-tab">AI Analysis</button>
+      </div>
+
+      <div class="editor-body" style="padding:24px;">
+        <div class="semantic-group">
+          <div class="semantic-group-header">
+            <div class="group-icon" style="background:#ede9fe;color:#6d28d9;">🧬</div>
+            <div>
+              <h3>Entities</h3>
+              <span style="font-size:12px;color:var(--muted-fg);">1 entity modified</span>
+            </div>
+          </div>
+
+          <div class="semantic-change">
+            <span class="change-type add">ADD</span>
+            <div class="change-detail">
+              <div style="font-weight:500;">New field: <code>email</code> added to <strong>Patient</strong></div>
+              <div class="path">entities/patient.yml → fields[3]</div>
+              <div style="margin-top:8px;padding:8px 12px;background:var(--muted);border-radius:var(--radius-sm);font-family:monospace;font-size:12px;">
+                type: email · required: false · label: "Email Address"
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="semantic-group">
+          <div class="semantic-group-header">
+            <div class="group-icon" style="background:#dbeafe;color:#1e40af;">📋</div>
+            <div>
+              <h3>Pages</h3>
+              <span style="font-size:12px;color:var(--muted-fg);">1 page modified</span>
+            </div>
+          </div>
+
+          <div class="semantic-change">
+            <span class="change-type add">ADD</span>
+            <div class="change-detail">
+              <div style="font-weight:500;">New column: <code>patient.email</code> added to <strong>Orders</strong> page</div>
+              <div class="path">pages/orders.page.yml → columns[2]</div>
+              <div style="margin-top:8px;padding:8px 12px;background:var(--muted);border-radius:var(--radius-sm);font-family:monospace;font-size:12px;">
+                Positioned after patient.last_name column
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;padding:16px;background:var(--muted);border-radius:var(--radius-md);">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Summary</div>
+          <div style="font-size:13px;color:var(--muted-fg);display:flex;gap:24px;">
+            <span>📁 <strong style="color:var(--fg);">2</strong> files changed</span>
+            <span style="color:var(--success-fg);">+5 additions</span>
+            <span>0 deletions</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-panel collapsed" title="Open AI Chat">
+      <div class="collapsed-label">💬 AI Assistant</div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 8. AI ANALYSIS + SUBMIT ───
+() => `
+<div class="screen" style="padding:0;">
+  <div class="workspace">
+    <div class="file-tree">
+      <div class="file-tree-header">CS-12 · Files</div>
+      <div class="file-tree-folder">▾ entities/</div>
+      <div class="file-tree-item"><span class="icon">📄</span> patient.yml <span class="modified">M</span></div>
+      <div class="file-tree-item"><span class="icon">📄</span> order.yml</div>
+      <div class="file-tree-item"><span class="icon">📄</span> sample.yml</div>
+      <div class="file-tree-folder">▾ pages/</div>
+      <div class="file-tree-item"><span class="icon">📄</span> patients.page.yml</div>
+      <div class="file-tree-item"><span class="icon">📄</span> orders.page.yml <span class="modified">M</span></div>
+      <div class="file-tree-item"><span class="icon">📄</span> dashboard.page.yml</div>
+      <div class="file-tree-folder">▸ workflows/</div>
+      <div class="file-tree-folder">▸ reports/</div>
+    </div>
+
+    <div class="editor-panel">
+      <div class="ws-header">
+        <h2>
+          <span class="badge badge-open" style="font-size:10px;">Open</span>
+          CS-12: Add patient email field
+        </h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-primary">Submit for Review</button>
+        </div>
+      </div>
+
+      <div class="ws-tabs">
+        <button class="ws-tab">Editor</button>
+        <button class="ws-tab">Raw Diff</button>
+        <button class="ws-tab">Semantic Diff</button>
+        <button class="ws-tab active">AI Analysis</button>
+      </div>
+
+      <div class="editor-body" style="padding:24px;overflow-y:auto;">
+        <div class="card" style="margin-bottom:16px;">
+          <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:16px;">📝</span> Summary
+          </h3>
+          <p style="font-size:13px;line-height:1.7;color:var(--fg);">
+            This changeset adds an <strong>email</strong> field to the <strong>Patient</strong> entity and exposes it as a column on the <strong>Orders</strong> page. The email field is optional (not required), uses the <code>email</code> type for built-in validation, and is labeled "Email Address" for display purposes.
+          </p>
+        </div>
+
+        <div class="analysis-grid">
+          <div class="card analysis-card">
+            <h3><span style="color:#f59e0b;">⚡</span> Impact Analysis</h3>
+            <div class="analysis-item">
+              <span class="dot" style="background:var(--success-fg);"></span>
+              <div>
+                <div style="font-weight:500;">Low risk change</div>
+                <div style="color:var(--muted-fg);font-size:12px;">New optional field — no existing data affected</div>
+              </div>
+            </div>
+            <div class="analysis-item">
+              <span class="dot" style="background:#3b82f6;"></span>
+              <div>
+                <div style="font-weight:500;">Database migration required</div>
+                <div style="color:var(--muted-fg);font-size:12px;">New column will be added to the patients table</div>
+              </div>
+            </div>
+            <div class="analysis-item">
+              <span class="dot" style="background:#3b82f6;"></span>
+              <div>
+                <div style="font-weight:500;">UI update on Orders page</div>
+                <div style="color:var(--muted-fg);font-size:12px;">New column visible to all users with Orders access</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card analysis-card">
+            <h3><span style="color:#6366f1;">💡</span> Suggestions</h3>
+            <div class="analysis-item">
+              <span class="dot" style="background:#f59e0b;"></span>
+              <div>
+                <div style="font-weight:500;">Consider adding email to Patients page</div>
+                <div style="color:var(--muted-fg);font-size:12px;">patients.page.yml doesn't display the email column yet</div>
+              </div>
+            </div>
+            <div class="analysis-item">
+              <span class="dot" style="background:#8b5cf6;"></span>
+              <div>
+                <div style="font-weight:500;">Add uniqueness constraint?</div>
+                <div style="color:var(--muted-fg);font-size:12px;">Consider adding a unique index on email for data integrity</div>
+              </div>
+            </div>
+            <div class="analysis-item">
+              <span class="dot" style="background:var(--muted-fg);"></span>
+              <div>
+                <div style="font-weight:500;">Email notifications</div>
+                <div style="color:var(--muted-fg);font-size:12px;">This field could enable patient email notifications in future</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;padding:16px;background:var(--muted);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:13px;font-weight:600;">Ready to submit?</div>
+            <div style="font-size:12px;color:var(--muted-fg);">2 files changed · +5 additions · 0 deletions</div>
+          </div>
+          <button class="btn btn-primary">Submit for Review →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-panel collapsed" title="Open AI Chat">
+      <div class="collapsed-label">💬 AI Assistant</div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 9. REVIEW INTERFACE ───
+() => `
+<div class="screen">
+  <div class="top-bar">
+    <div>
+      <div class="breadcrumb"><a href="#">Dashboard</a> <span>/</span> <a href="#">BioAnalytics LIMS</a> <span>/</span> <a href="#">Changesets</a> <span>/</span> CS-12</div>
+      <h1 style="display:flex;align-items:center;gap:10px;">
+        CS-12: Add patient email field
+        <span class="badge badge-open">Open · In Review</span>
+      </h1>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn">Request Changes</button>
+      <button class="btn btn-success">Approve</button>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:24px;margin-bottom:20px;font-size:13px;color:var(--muted-fg);">
+    <span>Opened by <strong style="color:var(--fg);">Felipe C.</strong></span>
+    <span>2 files changed</span>
+    <span>+5 additions</span>
+    <span>Submitted 10 min ago</span>
+  </div>
+
+  <div class="tabs" style="margin-bottom:24px;">
+    <button class="tab active">Files</button>
+    <button class="tab">Semantic View</button>
+    <button class="tab">AI Analysis</button>
+    <button class="tab">Activity</button>
+  </div>
+
+  <div class="review-file">
+    <div class="review-file-header">
+      <span>entities/patient.yml</span>
+      <span style="font-size:12px;color:var(--success-fg);">+4 lines</span>
+    </div>
+    <div class="code-editor" style="padding:8px 0;">
+      <div class="code-line"><span class="line-num">12</span><span class="line-content">  - name: date_of_birth</span></div>
+      <div class="code-line"><span class="line-num">13</span><span class="line-content">    type: date</span></div>
+      <div class="code-line"><span class="line-num">14</span><span class="line-content">    required: true</span></div>
+      <div class="code-line added"><span class="line-num">15</span><span class="line-content">  - name: email</span></div>
+      <div class="code-line added"><span class="line-num">16</span><span class="line-content">    type: email</span></div>
+      <div class="code-line added"><span class="line-num">17</span><span class="line-content">    required: false</span></div>
+      <div class="code-line added"><span class="line-num">18</span><span class="line-content">    label: "Email Address"</span></div>
+    </div>
+    <div class="inline-comment">
+      <div class="comment-author">Maria S. · 2 min ago</div>
+      <div class="comment-text">Should we add a <code>validation</code> property here? The <code>email</code> type provides basic format checking, but we might want to enforce domain restrictions (e.g., only corporate emails for certain use cases).</div>
+    </div>
+  </div>
+
+  <div class="review-file">
+    <div class="review-file-header">
+      <span>pages/orders.page.yml</span>
+      <span style="font-size:12px;color:var(--success-fg);">+1 line</span>
+    </div>
+    <div class="code-editor" style="padding:8px 0;">
+      <div class="code-line"><span class="line-num">5</span><span class="line-content">  - field: order_id</span></div>
+      <div class="code-line"><span class="line-num">6</span><span class="line-content">  - field: patient.last_name</span></div>
+      <div class="code-line added"><span class="line-num">7</span><span class="line-content">  - field: patient.email</span></div>
+      <div class="code-line"><span class="line-num">8</span><span class="line-content">  - field: status</span></div>
+      <div class="code-line"><span class="line-num">9</span><span class="line-content">  - field: created_at</span></div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 10. CHANGES REQUESTED ───
+() => `
+<div class="screen" style="padding:0;">
+  <div class="workspace">
+    <div class="file-tree">
+      <div class="file-tree-header">CS-12 · Files</div>
+      <div class="file-tree-folder">▾ entities/</div>
+      <div class="file-tree-item active"><span class="icon">📄</span> patient.yml <span class="modified">M</span></div>
+      <div class="file-tree-item"><span class="icon">📄</span> order.yml</div>
+      <div class="file-tree-item"><span class="icon">📄</span> sample.yml</div>
+      <div class="file-tree-folder">▾ pages/</div>
+      <div class="file-tree-item"><span class="icon">📄</span> patients.page.yml</div>
+      <div class="file-tree-item"><span class="icon">📄</span> orders.page.yml <span class="modified">M</span></div>
+      <div class="file-tree-item"><span class="icon">📄</span> dashboard.page.yml</div>
+      <div class="file-tree-folder">▸ workflows/</div>
+      <div class="file-tree-folder">▸ reports/</div>
+    </div>
+
+    <div class="editor-panel">
+      <div class="ws-header">
+        <h2>
+          <span class="badge badge-changes" style="font-size:10px;">Changes Requested</span>
+          CS-12: Add patient email field
+        </h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm">Save</button>
+          <button class="btn btn-sm btn-primary">Re-submit for Review</button>
+        </div>
+      </div>
+
+      <div style="padding:16px;border-bottom:1px solid var(--border);">
+        <div class="status-banner warning">
+          <span style="font-size:16px;">⚠</span>
+          <div>
+            <strong>Changes Requested</strong> by Maria S. · 5 min ago
+            <div style="font-size:12px;font-weight:400;margin-top:2px;">1 comment needs to be resolved before this changeset can be approved.</div>
+          </div>
+        </div>
+
+        <div class="comment-card">
+          <div class="comment-header">
+            <span class="commenter-avatar">MS</span>
+            <span class="commenter-name">Maria S.</span>
+            <span class="comment-time">5 min ago · entities/patient.yml:15</span>
+          </div>
+          <div class="comment-body">
+            Should we add a <code>validation</code> property here? The <code>email</code> type provides basic format checking, but we might want to enforce domain restrictions.
+          </div>
+        </div>
+      </div>
+
+      <div class="ws-tabs">
+        <button class="ws-tab active">Editor</button>
+        <button class="ws-tab">Raw Diff</button>
+        <button class="ws-tab">Semantic Diff</button>
+        <button class="ws-tab">AI Analysis</button>
+      </div>
+
+      <div class="editor-toolbar">
+        <div class="file-tab">📄 entities/patient.yml <span class="modified" style="margin-left:4px;">M</span></div>
+      </div>
+
+      <div class="editor-body">
+        <div class="code-editor">
+          <div class="code-line"><span class="line-num">1</span><span class="line-content"><span class="yaml-key">entity</span>: patient</span></div>
+          <div class="code-line"><span class="line-num">2</span><span class="line-content"><span class="yaml-key">label</span>: <span class="yaml-string">"Patient"</span></span></div>
+          <div class="code-line"><span class="line-num">3</span><span class="line-content"><span class="yaml-key">plural</span>: <span class="yaml-string">"Patients"</span></span></div>
+          <div class="code-line"><span class="line-num">4</span><span class="line-content"></span></div>
+          <div class="code-line"><span class="line-num">5</span><span class="line-content"><span class="yaml-key">fields</span>:</span></div>
+          <div class="code-line"><span class="line-num">6</span><span class="line-content">  - <span class="yaml-key">name</span>: first_name</span></div>
+          <div class="code-line"><span class="line-num">7</span><span class="line-content">    <span class="yaml-key">type</span>: <span class="yaml-value">string</span></span></div>
+          <div class="code-line"><span class="line-num">8</span><span class="line-content">    <span class="yaml-key">required</span>: <span class="yaml-bool">true</span></span></div>
+          <div class="code-line"><span class="line-num">9</span><span class="line-content">  - <span class="yaml-key">name</span>: last_name</span></div>
+          <div class="code-line"><span class="line-num">10</span><span class="line-content">    <span class="yaml-key">type</span>: <span class="yaml-value">string</span></span></div>
+          <div class="code-line"><span class="line-num">11</span><span class="line-content">    <span class="yaml-key">required</span>: <span class="yaml-bool">true</span></span></div>
+          <div class="code-line"><span class="line-num">12</span><span class="line-content">  - <span class="yaml-key">name</span>: date_of_birth</span></div>
+          <div class="code-line"><span class="line-num">13</span><span class="line-content">    <span class="yaml-key">type</span>: <span class="yaml-value">date</span></span></div>
+          <div class="code-line"><span class="line-num">14</span><span class="line-content">    <span class="yaml-key">required</span>: <span class="yaml-bool">true</span></span></div>
+          <div class="code-line added"><span class="line-num">15</span><span class="line-content">  - <span class="yaml-key">name</span>: email</span></div>
+          <div class="code-line added"><span class="line-num">16</span><span class="line-content">    <span class="yaml-key">type</span>: <span class="yaml-value">email</span></span></div>
+          <div class="code-line added"><span class="line-num">17</span><span class="line-content">    <span class="yaml-key">required</span>: <span class="yaml-bool">false</span></span></div>
+          <div class="code-line added"><span class="line-num">18</span><span class="line-content">    <span class="yaml-key">label</span>: <span class="yaml-string">"Email Address"</span></span></div>
+          <div class="code-line added highlight"><span class="line-num">19</span><span class="line-content">    <span class="yaml-key">validation</span>:</span></div>
+          <div class="code-line added highlight"><span class="line-num">20</span><span class="line-content">      <span class="yaml-key">pattern</span>: <span class="yaml-string">"^[\\w.+-]+@[\\w-]+\\.[\\w.-]+$"</span></span></div>
+          <div class="code-line"><span class="line-num">21</span><span class="line-content"></span></div>
+          <div class="code-line"><span class="line-num">22</span><span class="line-content"><span class="yaml-key">indexes</span>:</span></div>
+          <div class="code-line"><span class="line-num">23</span><span class="line-content">  - <span class="yaml-key">fields</span>: [last_name, first_name]</span></div>
+          <div class="code-line"><span class="line-num">24</span><span class="line-content">  - <span class="yaml-key">fields</span>: [date_of_birth]</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-panel collapsed" title="Open AI Chat">
+      <div class="collapsed-label">💬 AI Assistant</div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 11. APPROVED ───
+() => `
+<div class="screen">
+  <div class="top-bar">
+    <div>
+      <div class="breadcrumb"><a href="#">Dashboard</a> <span>/</span> <a href="#">BioAnalytics LIMS</a> <span>/</span> <a href="#">Changesets</a> <span>/</span> CS-12</div>
+      <h1 style="display:flex;align-items:center;gap:10px;">
+        CS-12: Add patient email field
+        <span class="badge badge-approved">Approved</span>
+      </h1>
+    </div>
+    <button class="btn btn-primary">Deploy to Dev →</button>
+  </div>
+
+  <div style="display:flex;gap:24px;margin-bottom:20px;font-size:13px;color:var(--muted-fg);">
+    <span>Opened by <strong style="color:var(--fg);">Felipe C.</strong></span>
+    <span>2 files changed</span>
+    <span>+7 additions</span>
+    <span>Approved 1 min ago</span>
+  </div>
+
+  <div class="status-banner success">
+    <span style="font-size:16px;">✓</span>
+    <div>
+      <strong>All approvals received</strong>
+      <div style="font-size:12px;font-weight:400;margin-top:2px;">This changeset has been approved and is ready for deployment to Dev.</div>
+    </div>
+  </div>
+
+  <h3 style="font-size:13px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Approval Stages</h3>
+
+  <div class="approval-stages">
+    <div class="approval-stage approved">
+      <div class="stage-icon">✅</div>
+      <div class="stage-name">Technical Review</div>
+      <div class="stage-by">Maria S. · 3 min ago</div>
+    </div>
+    <div class="approval-stage approved">
+      <div class="stage-icon">✅</div>
+      <div class="stage-name">AI Validation</div>
+      <div class="stage-by">Automated · 2 min ago</div>
+    </div>
+    <div class="approval-stage approved">
+      <div class="stage-icon">✅</div>
+      <div class="stage-name">Config Owner</div>
+      <div class="stage-by">John D. · 1 min ago</div>
+    </div>
+  </div>
+
+  <h3 style="font-size:13px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:0.05em;margin:24px 0 12px;">Activity</h3>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:flex-start;gap:12px;font-size:13px;">
+      <div style="width:24px;height:24px;border-radius:50%;background:#d1fae5;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">✓</div>
+      <div>
+        <span style="font-weight:500;">John D.</span> approved as Config Owner
+        <span style="color:var(--muted-fg);margin-left:4px;">1 min ago</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:12px;font-size:13px;">
+      <div style="width:24px;height:24px;border-radius:50%;background:#d1fae5;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">✓</div>
+      <div>
+        <span style="font-weight:500;">AI Validation</span> passed — no issues found
+        <span style="color:var(--muted-fg);margin-left:4px;">2 min ago</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:12px;font-size:13px;">
+      <div style="width:24px;height:24px;border-radius:50%;background:#d1fae5;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">✓</div>
+      <div>
+        <span style="font-weight:500;">Maria S.</span> approved after changes
+        <span style="color:var(--muted-fg);margin-left:4px;">3 min ago</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:12px;font-size:13px;">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--warning-bg);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">↻</div>
+      <div>
+        <span style="font-weight:500;">Felipe C.</span> pushed updates addressing review feedback
+        <span style="color:var(--muted-fg);margin-left:4px;">5 min ago</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:12px;font-size:13px;">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--warning-bg);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">⚠</div>
+      <div>
+        <span style="font-weight:500;">Maria S.</span> requested changes — add validation property
+        <span style="color:var(--muted-fg);margin-left:4px;">10 min ago</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:12px;font-size:13px;">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--info-bg);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">→</div>
+      <div>
+        <span style="font-weight:500;">Felipe C.</span> submitted for review
+        <span style="color:var(--muted-fg);margin-left:4px;">15 min ago</span>
+      </div>
+    </div>
+  </div>
+</div>
+`,
+
+// ─── 12. DEPLOYED ───
+() => `
+<div class="screen">
+  <div class="layout-with-sidebar">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2>
+          <span class="app-icon">BL</span>
+          BioAnalytics LIMS
+        </h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="active"><span class="icon">◉</span> Overview</a>
+        <a href="#"><span class="icon">⎘</span> Changesets</a>
+        <a href="#"><span class="icon">⚙</span> Settings</a>
+      </nav>
+    </div>
+    <div class="main-content">
+      <div class="top-bar">
+        <div>
+          <div class="breadcrumb"><a href="#">Dashboard</a> <span>/</span> BioAnalytics LIMS</div>
+          <h1>Overview</h1>
+        </div>
+        <button class="btn btn-primary">+ New Changeset</button>
+      </div>
+
+      <div class="status-banner success" style="margin-bottom:20px;">
+        <span style="font-size:16px;">🚀</span>
+        <div>
+          <strong>CS-12 deployed to Dev</strong>
+          <div style="font-size:12px;font-weight:400;margin-top:2px;">Configuration version updated to v1.5 in Development environment · just now</div>
+        </div>
+      </div>
+
+      <h3 style="font-size:13px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Environment Pipeline</h3>
+
+      <div class="pipeline">
+        <div class="pipeline-stage active">
+          <div class="env-name">Development</div>
+          <div class="env-version">v1.5</div>
+          <div class="env-meta" style="color:var(--success-fg);font-weight:500;">Deployed just now · CS-12</div>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-stage">
+          <div class="env-name">Staging</div>
+          <div class="env-version">v1.3</div>
+          <div class="env-meta">Deployed 3d ago · CS-10</div>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-stage">
+          <div class="env-name">Production</div>
+          <div class="env-version">v1.2</div>
+          <div class="env-meta">Deployed 1w ago · CS-9</div>
+        </div>
+      </div>
+
+      <h3 style="font-size:13px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:0.05em;margin:24px 0 12px;">Recent Changesets</h3>
+      <div class="card" style="padding:0;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Title</th>
+              <th>Author</th>
+              <th>Status</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#f0fdf4;">
+              <td style="font-family:monospace;font-weight:500;">CS-12</td>
+              <td style="font-weight:500;">Add patient email field</td>
+              <td>Felipe C.</td>
+              <td><span class="badge badge-deployed">Deployed to Dev</span></td>
+              <td style="color:var(--muted-fg);">just now</td>
+            </tr>
+            <tr>
+              <td style="font-family:monospace;font-weight:500;">CS-11</td>
+              <td style="font-weight:500;">Update order status workflow</td>
+              <td>Maria S.</td>
+              <td><span class="badge badge-deployed">Deployed</span></td>
+              <td style="color:var(--muted-fg);">2h ago</td>
+            </tr>
+            <tr>
+              <td style="font-family:monospace;font-weight:500;">CS-10</td>
+              <td style="font-weight:500;">Add lab results page</td>
+              <td>Felipe C.</td>
+              <td><span class="badge badge-merged">Merged</span></td>
+              <td style="color:var(--muted-fg);">3d ago</td>
+            </tr>
+            <tr>
+              <td style="font-family:monospace;font-weight:500;">CS-9</td>
+              <td style="font-weight:500;">Refactor entity relationships</td>
+              <td>John D.</td>
+              <td><span class="badge badge-merged">Merged</span></td>
+              <td style="color:var(--muted-fg);">1w ago</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+`
+];
+
+// ===== SCREEN TITLES =====
+const screenTitles = [
+  "1. Dashboard",
+  "2. App Overview",
+  "3. Changeset List",
+  "4. Workspace: Editor",
+  "5. Workspace: AI Chat",
+  "6. Workspace: Raw Diff",
+  "7. Workspace: Semantic Diff",
+  "8. AI Analysis + Submit",
+  "9. Review Interface",
+  "10. Changes Requested",
+  "11. Approved",
+  "12. Deployed"
+];
+
+// ===== NAVIGATION STATE =====
+let currentScreen = 0;
+
+function render() {
+  document.getElementById('screen-container').innerHTML = screens[currentScreen]();
+  document.getElementById('screen-container').scrollTop = 0;
+
+  // Update nav
+  document.getElementById('btn-prev').disabled = currentScreen === 0;
+  document.getElementById('btn-next').disabled = currentScreen === screens.length - 1;
+  document.getElementById('screen-select').value = currentScreen;
+  document.getElementById('nav-info').textContent =
+    `Screen ${currentScreen + 1} of ${screens.length} · Use ← → arrows`;
+}
+
+function nextScreen() {
+  if (currentScreen < screens.length - 1) { currentScreen++; render(); }
+}
+
+function prevScreen() {
+  if (currentScreen > 0) { currentScreen--; render(); }
+}
+
+function goToScreen(idx) {
+  currentScreen = idx;
+  render();
+}
+
+// Populate dropdown
+const select = document.getElementById('screen-select');
+screenTitles.forEach((title, i) => {
+  const opt = document.createElement('option');
+  opt.value = i;
+  opt.textContent = title;
+  select.appendChild(opt);
+});
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nextScreen(); }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); prevScreen(); }
+});
+
+// Initial render
+render();
+</script>
+</body>
+</html>
