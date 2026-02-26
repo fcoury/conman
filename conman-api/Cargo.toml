@@ -12,6 +12,8 @@ conman-core = { path = "../conman-core" }
 conman-db = { path = "../conman-db" }
 conman-git = { path = "../conman-git" }
 mongodb.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

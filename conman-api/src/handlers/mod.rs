@@ -4,6 +4,7 @@ pub mod deployments;
 pub mod health;
 pub mod jobs;
 pub mod me;
+pub mod metrics;
 pub mod releases;
 pub mod temp_envs;
 pub mod workspaces;

@@ -24,6 +24,7 @@ use crate::handlers::deployments::{
 use crate::handlers::health::health_check;
 use crate::handlers::jobs::{get_job, list_jobs};
 use crate::handlers::me::{get_notification_preferences, update_notification_preferences};
+use crate::handlers::metrics::scrape_metrics;
 use crate::handlers::releases::{
     assemble_release, create_release, get_release, list_releases, publish_release,
     reorder_release_changesets, set_release_changesets,
@@ -43,6 +44,7 @@ use crate::state::AppState;
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/api/health", get(health_check))
+        .route("/api/metrics", get(scrape_metrics))
         .route("/api/auth/login", post(login))
         .route("/api/auth/logout", post(logout))
         .route("/api/auth/forgot-password", post(forgot_password))
@@ -193,6 +195,13 @@ pub fn build_router(state: AppState) -> Router {
         .fallback(fallback_404)
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
+            crate::rate_limit::rate_limit_middleware,
+        ))
+        .layer(axum::middleware::from_fn(
+            crate::metrics::http_metrics_middleware,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
             auth_middleware,
         ))
         .layer(axum::middleware::from_fn(request_id_middleware))
@@ -331,9 +340,11 @@ mod tests {
                 invite_expiry_days: 7,
                 secrets_master_key: "master".to_string(),
                 temp_url_domain: "example.test".to_string(),
+                http_rate_limit_per_second: 200,
             }),
             db: client.database("conman"),
             git_adapter: Arc::new(NoopGitAdapter),
+            rate_limiter: crate::rate_limit::new_shared_rate_limiter(200),
         };
 
         let app = build_router(state);
@@ -349,5 +360,27 @@ mod tests {
             .expect("response");
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn metrics_route_returns_scrape_payload() {
+        crate::metrics::init_metrics().expect("metrics init");
+        let app = Router::new().route(
+            "/api/metrics",
+            get(crate::handlers::metrics::scrape_metrics),
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/metrics")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response.headers().contains_key("content-type"));
     }
 }

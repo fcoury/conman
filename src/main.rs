@@ -15,6 +15,8 @@ async fn main() {
         .json()
         .init();
 
+    conman_api::metrics::init_metrics().expect("failed to initialize metrics recorder");
+
     let config = Config::from_env().expect("failed to load configuration");
     tracing::info!(listen = %config.listen_addr, "configuration loaded");
 
@@ -83,6 +85,9 @@ async fn main() {
         config: Arc::new(config.clone()),
         db,
         git_adapter,
+        rate_limiter: conman_api::rate_limit::new_shared_rate_limiter(
+            config.http_rate_limit_per_second,
+        ),
     };
 
     let _job_runner = JobRunner::new(state.db.clone()).spawn();

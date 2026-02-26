@@ -3,6 +3,8 @@ pub mod error;
 pub mod events;
 pub mod extractors;
 pub mod handlers;
+pub mod metrics;
+pub mod rate_limit;
 pub mod request_context;
 pub mod response;
 pub mod router;

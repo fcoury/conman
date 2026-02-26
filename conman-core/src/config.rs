@@ -13,6 +13,7 @@ pub struct Config {
     pub invite_expiry_days: u64,
     pub secrets_master_key: String,
     pub temp_url_domain: String,
+    pub http_rate_limit_per_second: u64,
 }
 
 impl Config {
@@ -61,6 +62,13 @@ impl Config {
                 message: "CONMAN_TEMP_URL_DOMAIN is required".to_string(),
             })?;
 
+        let http_rate_limit_per_second: u64 = std::env::var("CONMAN_HTTP_RATE_LIMIT_PER_SECOND")
+            .unwrap_or_else(|_| "200".to_string())
+            .parse()
+            .map_err(|_| ConmanError::Validation {
+                message: "CONMAN_HTTP_RATE_LIMIT_PER_SECOND must be a valid u64".to_string(),
+            })?;
+
         Ok(Self {
             listen_addr,
             mongo_uri: std::env::var("CONMAN_MONGO_URI")
@@ -73,6 +81,7 @@ impl Config {
             invite_expiry_days,
             secrets_master_key,
             temp_url_domain,
+            http_rate_limit_per_second,
         })
     }
 }
@@ -96,6 +105,7 @@ mod tests {
             "CONMAN_INVITE_EXPIRY_DAYS",
             "CONMAN_SECRETS_MASTER_KEY",
             "CONMAN_TEMP_URL_DOMAIN",
+            "CONMAN_HTTP_RATE_LIMIT_PER_SECOND",
         ] {
             unsafe { std::env::remove_var(key) };
         }
@@ -119,6 +129,7 @@ mod tests {
         assert_eq!(config.gitaly_address, "http://localhost:8075");
         assert_eq!(config.jwt_expiry_hours, 24);
         assert_eq!(config.invite_expiry_days, 7);
+        assert_eq!(config.http_rate_limit_per_second, 200);
     }
 
     #[test]
