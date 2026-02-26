@@ -13,6 +13,8 @@ use crate::EnsureIndexes;
 struct AppDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
+    #[serde(default)]
+    tenant_id: Option<ObjectId>,
     name: String,
     repo_path: String,
     integration_branch: String,
@@ -28,6 +30,7 @@ impl From<AppDoc> for App {
     fn from(value: AppDoc) -> Self {
         Self {
             id: value.id.to_hex(),
+            tenant_id: value.tenant_id.map(|v| v.to_hex()),
             name: value.name,
             repo_path: value.repo_path,
             integration_branch: value.integration_branch,
@@ -64,6 +67,44 @@ impl AppRepo {
         let now = Utc::now();
         let doc = AppDoc {
             id: ObjectId::new(),
+            tenant_id: None,
+            name: name.to_string(),
+            repo_path: repo_path.to_string(),
+            integration_branch: integration_branch.to_string(),
+            settings: AppSettings::default(),
+            created_by,
+            created_at: now,
+            updated_at: now,
+        };
+
+        self.collection
+            .insert_one(doc.clone())
+            .await
+            .map_err(|e| ConmanError::Conflict {
+                message: format!("failed to insert app: {e}"),
+            })?;
+
+        Ok(doc.into())
+    }
+
+    pub async fn insert_for_tenant(
+        &self,
+        tenant_id: &str,
+        name: &str,
+        repo_path: &str,
+        integration_branch: &str,
+        created_by: &str,
+    ) -> Result<App, ConmanError> {
+        let created_by = ObjectId::parse_str(created_by).map_err(|e| ConmanError::Validation {
+            message: format!("invalid created_by: {e}"),
+        })?;
+        let tenant_id = ObjectId::parse_str(tenant_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid tenant_id: {e}"),
+        })?;
+        let now = Utc::now();
+        let doc = AppDoc {
+            id: ObjectId::new(),
+            tenant_id: Some(tenant_id),
             name: name.to_string(),
             repo_path: repo_path.to_string(),
             integration_branch: integration_branch.to_string(),
@@ -198,9 +239,17 @@ impl EnsureIndexes for AppRepo {
                     .build(),
             )
             .build();
+        let tenant_idx = IndexModel::builder()
+            .keys(doc! {"tenant_id": 1})
+            .options(
+                IndexOptions::builder()
+                    .name("apps_tenant_id_idx".to_string())
+                    .build(),
+            )
+            .build();
 
         self.collection
-            .create_indexes(vec![name_idx, repo_idx])
+            .create_indexes(vec![name_idx, repo_idx, tenant_idx])
             .await
             .map_err(|e| ConmanError::Internal {
                 message: format!("failed to ensure app indexes: {e}"),

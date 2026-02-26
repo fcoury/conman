@@ -79,7 +79,9 @@ async fn serve() -> Result<(), String> {
 
     let user_repo = conman_db::UserRepo::new(db.clone());
     let membership_repo = conman_db::MembershipRepo::new(db.clone());
+    let tenant_repo = conman_db::TenantRepo::new(db.clone());
     let app_repo = conman_db::AppRepo::new(db.clone());
+    let app_surface_repo = conman_db::AppSurfaceRepo::new(db.clone());
     let environment_repo = conman_db::EnvironmentRepo::new(db.clone());
     let invite_repo = conman_db::InviteRepo::new(db.clone());
     let runtime_profile_repo = conman_db::RuntimeProfileRepo::new(db.clone());
@@ -98,7 +100,9 @@ async fn serve() -> Result<(), String> {
     conman_db::bootstrap_indexes(&[
         &user_repo,
         &membership_repo,
+        &tenant_repo,
         &app_repo,
+        &app_surface_repo,
         &environment_repo,
         &invite_repo,
         &runtime_profile_repo,

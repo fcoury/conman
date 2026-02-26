@@ -1,4 +1,5 @@
 pub mod app;
+pub mod app_surface;
 pub mod audit;
 pub mod auth_types;
 pub mod changeset;
@@ -14,9 +15,11 @@ pub mod rbac;
 pub mod release;
 pub mod runtime_profile;
 pub mod temp_env;
+pub mod tenant;
 pub mod workspace;
 
 pub use app::{App, AppSettings, BaselineMode, CommitMode, ProfileApprovalPolicy};
+pub use app_surface::{AppSurface, SurfaceBranding};
 pub use audit::{AuditEvent, AuditRequestContext};
 pub use auth_types::{AppMembership, Invite, PasswordResetToken, User};
 pub use changeset::{
@@ -35,4 +38,5 @@ pub use rbac::{Capability, Role};
 pub use release::{ReleaseBatch, ReleaseState};
 pub use runtime_profile::{EnvVarValue, RuntimeProfile, RuntimeProfileKind, mask_secret};
 pub use temp_env::{TempEnvKind, TempEnvState, TempEnvironment};
+pub use tenant::Tenant;
 pub use workspace::{BaseRefType, ConflictStatus, FileEntry, FileEntryType, Workspace};
