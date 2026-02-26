@@ -340,6 +340,13 @@ blockquote p:last-child {
   padding: 0 var(--space-xl);
 }
 
+.landing-logo {
+  display: block;
+  width: 120px;
+  height: 120px;
+  margin: 0 0 var(--space-lg);
+}
+
 .landing h1 {
   font-size: 2.25rem;
   font-weight: 800;

@@ -9,6 +9,9 @@ DIST_DIR="$SITE_DIR/dist"
 mkdir -p "$DIST_DIR"
 
 cp "$SITE_DIR/style.css" "$DIST_DIR/style.css"
+# Copy logo with cropped viewBox (original is 500x500 but content ends at ~385)
+sed 's/viewBox="0.00 0.00 500.00 500.00"/viewBox="0 0 385 385"/' \
+  "$ROOT_DIR/assets/conman.svg" > "$DIST_DIR/conman.svg"
 
 # Common Pandoc flags for doc pages
 PANDOC_OPTS=(
@@ -72,6 +75,7 @@ cat > "$DIST_DIR/index.html" <<EOF
   </head>
   <body>
     <div class="landing">
+      <img src="conman.svg" alt="Conman" class="landing-logo" />
       <h1>Conman Docs</h1>
       <p class="subtitle">Documentation for Conman v1 planning &amp; specification.</p>
       <div class="doc-cards">

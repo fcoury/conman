@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/conman.svg" alt="Conman" width="200" />
+</p>
+
 # Conman
 
 Conman is a Git-backed configuration manager backend (Rust, API-first).
