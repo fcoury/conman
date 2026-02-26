@@ -14,7 +14,7 @@ $endfor$
 <body>
   <div class="wrapper">
     <nav id="TOC" role="doc-toc">
-      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <div class="home-link"><a href="$if(home-link)$$home-link$$else$index.html$endif$">&larr; All Docs</a></div>
 $if(toc)$
       <h2 class="toc-title">$toc-title$</h2>
       $table-of-contents$

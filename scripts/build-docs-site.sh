@@ -20,21 +20,23 @@ PANDOC_OPTS=(
   --metadata toc-title="Contents"
   --template="$SITE_DIR/template.html"
   --syntax-highlighting=breezedark
-  --css style.css
 )
 
 pandoc "$SRC_DIR/conman-v1-scope.md" \
   "${PANDOC_OPTS[@]}" \
+  --css style.css \
   --metadata title="Conman V1 Scope" \
   -o "$DIST_DIR/conman-v1-scope.html"
 
 pandoc "$SRC_DIR/conman-v1-backlog.md" \
   "${PANDOC_OPTS[@]}" \
+  --css style.css \
   --metadata title="Conman V1 Backlog" \
   -o "$DIST_DIR/conman-v1-backlog.html"
 
 pandoc "$SRC_DIR/IMPLEMENTATION.md" \
   "${PANDOC_OPTS[@]}" \
+  --css style.css \
   --metadata title="V1 Implementation Guide" \
   -o "$DIST_DIR/implementation.html"
 
@@ -46,9 +48,11 @@ mkdir -p "$DIST_DIR/epics"
 for epic in "$SRC_DIR"/epics/*.md; do
   basename="$(basename "$epic" .md)"
   # Extract title from first H1 line, falling back to filename
-  title="$(head -1 "$epic" | sed 's/^#\+ *//')"
+  title="$(head -1 "$epic" | sed -E 's/^#+ *//')"
   pandoc "$epic" \
     "${PANDOC_OPTS[@]}" \
+    --css ../style.css \
+    --metadata home-link="../index.html" \
     --metadata title="$title" \
     -o "$DIST_DIR/epics/${basename}.html"
 done
