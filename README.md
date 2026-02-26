@@ -84,6 +84,16 @@ CONMAN_SECRETS_MASTER_KEY='<prod-key>' ./tests/ops/run_plan_completion_gate.sh -
 This verifies milestone/checklist completion, runs tests + clippy, rebuilds
 the docs site, and records a summary under `tests/ops/results/`.
 
+## CI/CD
+
+- PRs and pushes to `master`/`main` run `.github/workflows/ci.yml` and execute:
+  - `./tests/ops/run_plan_completion_gate.sh --strict`
+- Docs changes run `.github/workflows/docs-pages.yml`:
+  - Always builds the docs artifact.
+  - Deploys to Cloudflare Pages production branch `main` when
+    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are configured in repo
+    secrets.
+
 ## Notes
 
 - Git operations are planned behind an internal adapter boundary, with

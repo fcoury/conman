@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  strict-gate:
+    runs-on: ubuntu-latest
+    env:
+      CONMAN_SECRETS_MASTER_KEY: ci-master-key
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Run strict completion gate
+        run: ./tests/ops/run_plan_completion_gate.sh --strict
+
+      - name: Upload ops artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops-results
+          path: tests/ops/results/*.md

@@ -110,7 +110,13 @@ done
 
 # Rewrite .md links to .html so cross-doc links resolve correctly
 for html in "$DIST_DIR"/*.html "$DIST_DIR"/epics/*.html "$DIST_DIR"/runbooks/*.html; do
-  [ -f "$html" ] && sed -i '' 's/\.md"/.html"/g; s/\.md#/.html#/g' "$html"
+  if [ -f "$html" ]; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      sed -i '' 's/\.md"/.html"/g; s/\.md#/.html#/g' "$html"
+    else
+      sed -i 's/\.md"/.html"/g; s/\.md#/.html#/g' "$html"
+    fi
+  fi
 done
 
 GENERATED_AT="$(date -u +"%Y-%m-%d %H:%M:%S UTC")"
