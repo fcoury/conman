@@ -15,7 +15,7 @@ Use this file as the live control plane for delivery.
 - Current wave: `A`
 - Current milestone: `M1`
 - Overall progress:
-  - Epics complete: `3 / 13`
+  - Epics complete: `4 / 13`
   - Gates passed: `0 / 5`
 - Active blockers:
   - E01 still needs concrete gitaly-rs RPC mappings beyond adapter stubs
@@ -33,8 +33,8 @@ Legend:
 | E01 Git Adapter | worker-git | E00 | A | in_review | master | 80 | Full gitaly-rs RPC mappings pending |
 | E02 Auth & RBAC | worker-auth | E00 | A | done | master | 100 |  |
 | E03 App Setup | worker-app | E01, E02 | A | done | master | 100 |  |
-| E04 Workspaces | worker-workspace | E01, E03 | B | in_progress | master | 70 | Real staging/checkpoint model for submit_commit still pending |
-| E05 Changesets | worker-changeset | E02, E04 | B | not_started |  | 0 |  |
+| E04 Workspaces | worker-workspace | E01, E03 | B | done | master | 100 |  |
+| E05 Changesets | worker-changeset | E02, E04 | B | in_progress | master | 70 | Comment edit endpoint + AI endpoints pending |
 | E06 Async Jobs | worker-jobs | E00, E05 | B | not_started |  | 0 |  |
 | E07 Queue Orchestration | worker-queue-release | E05, E06 | C | not_started |  | 0 |  |
 | E08 Releases | worker-queue-release | E01, E06, E07 | C | not_started |  | 0 |  |

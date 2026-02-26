@@ -13,6 +13,11 @@ use crate::handlers::apps::{
     list_apps, list_environments, list_members, list_runtime_profiles, replace_environments,
     reveal_runtime_profile_secret, update_app_settings, update_runtime_profile,
 };
+use crate::handlers::changesets::{
+    create_changeset, create_changeset_comment, get_changeset, get_changeset_diff,
+    list_changeset_comments, list_changesets, move_changeset_to_draft, queue_changeset,
+    resubmit_changeset, review_changeset, submit_changeset, update_changeset,
+};
 use crate::handlers::health::health_check;
 use crate::handlers::workspaces::{
     create_workspace, create_workspace_checkpoint, delete_workspace_file, get_workspace,
@@ -67,39 +72,39 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/apps/{appId}/changesets",
-            get(not_implemented).post(not_implemented),
+            get(list_changesets).post(create_changeset),
         )
         .route(
             "/api/apps/{appId}/changesets/{changesetId}",
-            get(not_implemented).patch(not_implemented),
+            get(get_changeset).patch(update_changeset),
         )
         .route(
             "/api/apps/{appId}/changesets/{changesetId}/submit",
-            post(not_implemented),
+            post(submit_changeset),
         )
         .route(
             "/api/apps/{appId}/changesets/{changesetId}/resubmit",
-            post(not_implemented),
+            post(resubmit_changeset),
         )
         .route(
             "/api/apps/{appId}/changesets/{changesetId}/review",
-            post(not_implemented),
+            post(review_changeset),
         )
         .route(
             "/api/apps/{appId}/changesets/{changesetId}/queue",
-            post(not_implemented),
+            post(queue_changeset),
         )
         .route(
             "/api/apps/{appId}/changesets/{changesetId}/move-to-draft",
-            post(not_implemented),
+            post(move_changeset_to_draft),
         )
         .route(
             "/api/apps/{appId}/changesets/{changesetId}/diff",
-            get(not_implemented),
+            get(get_changeset_diff),
         )
         .route(
             "/api/apps/{appId}/changesets/{changesetId}/comments",
-            get(not_implemented).post(not_implemented),
+            get(list_changeset_comments).post(create_changeset_comment),
         )
         .route(
             "/api/apps/{appId}/releases",

@@ -3,6 +3,9 @@ use conman_core::{Config, ConmanError};
 use mongodb::{Client, Database, bson::doc, options::ClientOptions};
 
 pub mod app_repo;
+pub mod changeset_comment_repo;
+pub mod changeset_profile_override_repo;
+pub mod changeset_repo;
 pub mod environment_repo;
 pub mod invite_repo;
 pub mod membership_repo;
@@ -12,6 +15,11 @@ pub mod user_repo;
 pub mod workspace_repo;
 
 pub use app_repo::AppRepo;
+pub use changeset_comment_repo::ChangesetCommentRepo;
+pub use changeset_profile_override_repo::{
+    ChangesetProfileOverride, ChangesetProfileOverrideRepo, OverrideInput,
+};
+pub use changeset_repo::{ChangesetRepo, CreateChangesetInput, ReviewAction};
 pub use environment_repo::{EnvironmentInput, EnvironmentRepo};
 pub use invite_repo::InviteRepo;
 pub use membership_repo::MembershipRepo;
