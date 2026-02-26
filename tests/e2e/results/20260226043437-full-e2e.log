@@ -1,0 +1,12 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.51s
+     Running `target/debug/conman`
+{"timestamp":"2026-02-26T07:34:39.756112Z","level":"INFO","fields":{"message":"configuration loaded","listen":"127.0.0.1:3925"},"target":"conman"}
+{"timestamp":"2026-02-26T07:34:39.828335Z","level":"INFO","fields":{"message":"MongoDB connected","db":"conman_e2e_full_20260226043437"},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:34:43.292868Z","level":"INFO","fields":{"message":"All MongoDB indexes ensured","repo_count":18},"target":"conman_db"}
+{"timestamp":"2026-02-26T07:34:43.317090Z","level":"INFO","fields":{"message":"gitaly-rs adapter connected","addr":"http://127.0.0.1:2305"},"target":"conman"}
+{"timestamp":"2026-02-26T07:34:43.321593Z","level":"INFO","fields":{"message":"smtp not configured, using logging notification sender"},"target":"conman"}
+{"timestamp":"2026-02-26T07:34:43.335302Z","level":"INFO","fields":{"message":"server listening","addr":"127.0.0.1:3925"},"target":"conman"}
+{"timestamp":"2026-02-26T07:34:43.567015Z","level":"WARN","fields":{"message":"failed to enqueue notification","error":"not found: user ab8d2280c50f81d37a0b90bc"},"target":"conman_api::handlers::changesets"}
+{"timestamp":"2026-02-26T07:34:47.000501Z","level":"WARN","fields":{"message":"failed to enqueue notification","error":"not found: user ab8d2280c50f81d37a0b90bc"},"target":"conman_api::handlers::releases"}
+{"timestamp":"2026-02-26T07:34:49.239421Z","level":"WARN","fields":{"message":"failed to enqueue notification","error":"not found: user ab8d2280c50f81d37a0b90bc"},"target":"conman_api::handlers::deployments"}
+{"timestamp":"2026-02-26T07:34:50.330316Z","level":"WARN","fields":{"message":"failed to enqueue notification","error":"not found: user ab8d2280c50f81d37a0b90bc"},"target":"conman_api::handlers::temp_envs"}
