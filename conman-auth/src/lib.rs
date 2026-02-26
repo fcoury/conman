@@ -1,5 +1,7 @@
-//! Placeholder crate for E02 auth and RBAC implementation.
+pub mod auth_user;
+pub mod password;
+pub mod token;
 
-pub fn crate_ready() -> bool {
-    true
-}
+pub use auth_user::AuthUser;
+pub use password::{PasswordPolicy, hash_password, verify_password};
+pub use token::{Claims, issue_token, validate_token};

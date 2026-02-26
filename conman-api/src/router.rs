@@ -7,6 +7,7 @@ use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use uuid::Uuid;
 
+use crate::auth::{auth_middleware, login, logout};
 use crate::handlers::health::health_check;
 use crate::request_context::RequestContext;
 use crate::response::{ApiError, ApiErrorBody};
@@ -15,8 +16,8 @@ use crate::state::AppState;
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/api/health", get(health_check))
-        .route("/api/auth/login", post(not_implemented))
-        .route("/api/auth/logout", post(not_implemented))
+        .route("/api/auth/login", post(login))
+        .route("/api/auth/logout", post(logout))
         .route("/api/auth/forgot-password", post(not_implemented))
         .route("/api/auth/reset-password", post(not_implemented))
         .route("/api/auth/accept-invite", post(not_implemented))
@@ -151,6 +152,10 @@ pub fn build_router(state: AppState) -> Router {
             get(not_implemented).patch(not_implemented),
         )
         .fallback(fallback_404)
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
         .layer(axum::middleware::from_fn(request_id_middleware))
         .with_state(state)
 }
@@ -222,6 +227,7 @@ mod tests {
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use axum::routing::get;
+    use conman_git::NoopGitAdapter;
     use mongodb::Client;
     use tower::ServiceExt;
 
@@ -299,7 +305,7 @@ mod tests {
                 temp_url_domain: "example.test".to_string(),
             }),
             db: client.database("conman"),
-            gitaly_channel: None,
+            git_adapter: Arc::new(NoopGitAdapter),
         };
 
         let app = build_router(state);

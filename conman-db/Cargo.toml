@@ -5,8 +5,10 @@ edition = "2024"
 
 [dependencies]
 async-trait.workspace = true
+chrono.workspace = true
 conman-core = { path = "../conman-core" }
 mongodb.workspace = true
+serde.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]

@@ -11,10 +11,12 @@ resolver = "2"
 
 [workspace.dependencies]
 anyhow = "1"
+argon2 = "0.5"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 http = "1"
+jsonwebtoken = "9"
 mongodb = "3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -36,6 +38,7 @@ axum.workspace = true
 conman-api = { path = "./conman-api" }
 conman-core = { path = "./conman-core" }
 conman-db = { path = "./conman-db" }
+conman-git = { path = "./conman-git" }
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true

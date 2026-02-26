@@ -2,6 +2,12 @@ use async_trait::async_trait;
 use conman_core::{Config, ConmanError};
 use mongodb::{Client, Database, bson::doc, options::ClientOptions};
 
+pub mod membership_repo;
+pub mod user_repo;
+
+pub use membership_repo::MembershipRepo;
+pub use user_repo::UserRepo;
+
 #[async_trait]
 pub trait EnsureIndexes: Send + Sync {
     async fn ensure_indexes(&self) -> Result<(), ConmanError>;

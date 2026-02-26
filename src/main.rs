@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use conman_api::{AppState, build_router};
 use conman_core::Config;
+use conman_git::{GitAdapter, GitalyClient, NoopGitAdapter};
 
 #[tokio::main]
 async fn main() {
@@ -20,26 +21,32 @@ async fn main() {
         .await
         .expect("failed to connect to MongoDB");
 
-    conman_db::bootstrap_indexes(&[])
+    let user_repo = conman_db::UserRepo::new(db.clone());
+    let membership_repo = conman_db::MembershipRepo::new(db.clone());
+    conman_db::bootstrap_indexes(&[&user_repo, &membership_repo])
         .await
         .expect("failed to bootstrap MongoDB indexes");
 
-    let gitaly_channel = match tonic::transport::Channel::from_shared(config.gitaly_address.clone())
+    let git_adapter: Arc<dyn GitAdapter> = match GitalyClient::connect(&config.gitaly_address).await
     {
-        Ok(endpoint) => endpoint.connect().await.ok(),
-        Err(_) => None,
+        Ok(client) => {
+            tracing::info!(addr = %config.gitaly_address, "gitaly-rs adapter connected");
+            Arc::new(client)
+        }
+        Err(err) => {
+            tracing::warn!(
+                addr = %config.gitaly_address,
+                error = %err,
+                "gitaly-rs adapter unavailable, using noop adapter"
+            );
+            Arc::new(NoopGitAdapter)
+        }
     };
-
-    if gitaly_channel.is_some() {
-        tracing::info!(addr = %config.gitaly_address, "gitaly-rs channel connected");
-    } else {
-        tracing::warn!(addr = %config.gitaly_address, "gitaly-rs channel not available (will retry on use)");
-    }
 
     let state = AppState {
         config: Arc::new(config.clone()),
         db,
-        gitaly_channel,
+        git_adapter,
     };
 
     let app = build_router(state);

@@ -5,8 +5,10 @@ edition = "2024"
 
 [dependencies]
 axum.workspace = true
+conman-auth = { path = "../conman-auth" }
 conman-core = { path = "../conman-core" }
 conman-db = { path = "../conman-db" }
+conman-git = { path = "../conman-git" }
 mongodb.workspace = true
 serde.workspace = true
 serde_json.workspace = true

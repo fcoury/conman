@@ -18,7 +18,7 @@ Use this file as the live control plane for delivery.
   - Epics complete: `1 / 13`
   - Gates passed: `0 / 5`
 - Active blockers:
-  - None (E00 complete, proceeding to E01/E02)
+  - None (E00 complete, E01/E02 in progress)
 
 ## 2) Epic Tracker (Dependency Controlled)
 
@@ -30,8 +30,8 @@ Legend:
 | Epic | Owner | Depends On | Gate | Status | PR/Branch | Checklist % | Blocker |
 |---|---|---|---|---|---|---:|---|
 | E00 Platform Foundation | worker-platform | none | A | done | master | 100 |  |
-| E01 Git Adapter | worker-git | E00 | A | not_started |  | 0 |  |
-| E02 Auth & RBAC | worker-auth | E00 | A | not_started |  | 0 |  |
+| E01 Git Adapter | worker-git | E00 | A | in_review | master | 80 | Full gitaly-rs RPC mappings pending |
+| E02 Auth & RBAC | worker-auth | E00 | A | in_progress | master | 55 | Invite/reset and onboarding endpoints pending |
 | E03 App Setup | worker-app | E01, E02 | A | not_started |  | 0 |  |
 | E04 Workspaces | worker-workspace | E01, E03 | B | not_started |  | 0 |  |
 | E05 Changesets | worker-changeset | E02, E04 | B | not_started |  | 0 |  |

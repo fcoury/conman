@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use conman_core::Config;
+use conman_git::GitAdapter;
 use mongodb::Database;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
     pub db: Database,
-    pub gitaly_channel: Option<tonic::transport::Channel>,
+    pub git_adapter: Arc<dyn GitAdapter>,
 }

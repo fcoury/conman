@@ -1,5 +1,9 @@
-//! Placeholder crate for E01 git adapter implementation.
+pub mod adapter;
+pub mod client;
+pub mod mock;
+pub mod retry;
 
-pub fn crate_ready() -> bool {
-    true
-}
+pub use adapter::{GitAdapter, NoopGitAdapter};
+pub use client::GitalyClient;
+pub use mock::{MockCall, MockGitalyClient};
+pub use retry::{map_grpc_error, retry_grpc};
