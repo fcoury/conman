@@ -168,6 +168,8 @@ Rationale:
   `aes-gcm`, `rand`, and `zeroize` (no external secret manager dependency).
 - URL short IDs: use human-readable word IDs (for example from a wordlist or a
   petname-style generator) instead of opaque UUID-only hostnames.
+- If opaque UUIDs are used anywhere in runtime-profile tooling/metadata, use
+  UUIDv7.
 - Use a typed env var value enum and validate per-key type at write-time.
 - Persist applied migration metadata (`migration_executions`) keyed by app/env/
   runtime profile revision.

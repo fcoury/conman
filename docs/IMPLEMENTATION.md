@@ -29,7 +29,7 @@ vars/secrets/database/data configuration for environments and temp envs.
 | JWT | jsonwebtoken | latest |
 | Time | chrono | latest |
 | Tracing | tracing + tracing-subscriber | latest |
-| UUID | uuid | latest |
+| UUID | uuid | latest (`v7` generation) |
 
 **Full scope:** [`docs/conman-v1-scope.md`](./conman-v1-scope.md)
 and [`docs/runtime-profiles-draft.md`](./runtime-profiles-draft.md)
@@ -206,6 +206,7 @@ pub struct Pagination {
 ### Request tracing
 
 Every request gets a UUID via middleware (`X-Request-Id` header or generated).
+Conman standard is UUIDv7 for generated IDs.
 Propagated through tracing spans and included in error responses.
 
 ### MongoDB patterns

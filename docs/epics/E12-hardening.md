@@ -670,7 +670,7 @@ Rate limit response (HTTP 429):
   "error": {
     "code": "rate_limited",
     "message": "Too many requests. Please wait and try again.",
-    "request_id": "req-uuid"
+    "request_id": "018f2f35-2e63-7b3b-b5e1-9f0d3a2c4b10"
   }
 }
 ```

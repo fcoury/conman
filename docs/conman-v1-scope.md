@@ -166,6 +166,7 @@ Conman v1 model:
 - Base path starts at `/api` (no version prefix in v1).
 - Pagination uses `page` + `limit`.
 - File path is sent as query/body field (not `/:path`).
+- Generated request IDs use UUIDv7.
 - Long-running operations (`msuite`, deployments, compose) run async with
   status and logs.
 - Conman uses an internal Git adapter service boundary; adapter
