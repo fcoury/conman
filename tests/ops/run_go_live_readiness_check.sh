@@ -22,6 +22,16 @@ find_latest() {
   find "$dir" -maxdepth 1 -type f -name "$pattern" -print | sort | tail -1
 }
 
+has_pattern() {
+  local pattern="$1"
+  local file="$2"
+  if command -v rg >/dev/null 2>&1; then
+    rg -q -- "$pattern" "$file"
+  else
+    grep -Eq -- "$pattern" "$file"
+  fi
+}
+
 PASS_COUNT=0
 FAIL_COUNT=0
 WARN_COUNT=0
@@ -77,9 +87,9 @@ else
 fi
 
 if [[ -f "$SIGNOFF_FILE" ]]; then
-  if rg -q '^- \[ \]' "$SIGNOFF_FILE"; then
+  if has_pattern '^- \[ \]' "$SIGNOFF_FILE"; then
     record_warn "Runbook owner sign-off" "Incomplete checklist in \`docs/runbooks/REVIEW-SIGNOFF.md\`."
-  elif rg -q '^Date:\s*$' "$SIGNOFF_FILE" || rg -q '^Reviewer:\s*$' "$SIGNOFF_FILE"; then
+  elif has_pattern '^Date:\s*$' "$SIGNOFF_FILE" || has_pattern '^Reviewer:\s*$' "$SIGNOFF_FILE"; then
     record_warn "Runbook owner sign-off" "Checklist complete but date/reviewer metadata missing."
   else
     record_pass "Runbook owner sign-off" "Runbook sign-off file is complete."

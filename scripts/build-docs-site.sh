@@ -22,8 +22,13 @@ PANDOC_OPTS=(
   --toc-depth=3
   --metadata toc-title="Contents"
   --template="$SITE_DIR/template.html"
-  --syntax-highlighting=breezedark
 )
+
+if pandoc --help 2>/dev/null | grep -q -- "--syntax-highlighting"; then
+  PANDOC_OPTS+=(--syntax-highlighting=breezedark)
+else
+  PANDOC_OPTS+=(--highlight-style=breezedark)
+fi
 
 build_page() {
   local source="$1"

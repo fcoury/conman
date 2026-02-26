@@ -36,11 +36,21 @@ record_warn() {
   RESULTS+=("| $1 | warn | $2 |")
 }
 
+has_pattern() {
+  local pattern="$1"
+  local file="$2"
+  if command -v rg >/dev/null 2>&1; then
+    rg -q -- "$pattern" "$file"
+  else
+    grep -Eq -- "$pattern" "$file"
+  fi
+}
+
 require_match() {
   local label="$1"
   local pattern="$2"
   local file="$3"
-  if rg -q "$pattern" "$file"; then
+  if has_pattern "$pattern" "$file"; then
     record_pass "$label" "\`$(basename "$file")\` matches \`$pattern\`."
   else
     record_fail "$label" "\`$(basename "$file")\` is missing expected pattern \`$pattern\`."
@@ -50,7 +60,7 @@ require_match() {
 ensure_no_unchecked() {
   local label="$1"
   local file="$2"
-  if rg -q '^- \[ \]' "$file"; then
+  if has_pattern '^- \[ \]' "$file"; then
     record_fail "$label" "\`$(basename "$file")\` contains unchecked checklist items."
   else
     record_pass "$label" "\`$(basename "$file")\` has no unchecked checklist items."
