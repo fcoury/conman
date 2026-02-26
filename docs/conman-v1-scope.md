@@ -23,6 +23,36 @@ Conman v1 model:
 - **Environment**: A deploy target stage (configurable per app).
 - **Canonical user-facing environment**: The environment designated as
   production-facing for baseline calculations.
+- **Integration branch**: The app-level branch where published releases are
+  applied (default `main`, configurable per app).
+- **Baseline mode**: How new workspace baselines are resolved:
+  `integration_head` or `canonical_env_release`.
+- **Runtime profile**: The runtime blueprint for an environment or temp env.
+  Contains URL, typed env vars, encrypted secrets, database settings,
+  migration settings, data strategy, and lifecycle controls.
+- **Changeset profile override**: Runtime-profile deltas attached to a
+  changeset. They are auto-included on submit and travel with release/promotion.
+- **Queue states**:
+  - `queued`: Approved and waiting for release selection.
+  - `conflicted`: Cannot be cleanly composed/revalidated against latest
+    integration context.
+  - `needs_revalidation`: Conflict-free but failed required validation.
+- **Drift**: Runtime mismatch between expected profile state and target
+  environment state (env vars, secrets, URL, DB settings, or migration set).
+- **Temp environment**: On-demand ephemeral validation environment tied to a
+  workspace or changeset, with idle TTL + grace lifecycle.
+- **Release assemble**: Compose selected queued changesets in chosen order into
+  a candidate release artifact.
+- **Release publish**: Move the integration branch/tag to the assembled
+  artifact, making it deployable.
+- **Validation scopes**:
+  - submit: temp profile only
+  - release publish: environment profiles only
+  - deploy: target environment profile only
+- **Migration execution metadata**: Conman-tracked records of migration runs
+  used by drift checks and deployment gating.
+- **Emergency profile edit**: Direct `app_admin` runtime-profile update outside
+  normal changeset flow; fully audited and still subject to drift blocking.
 
 ## 3) Core V1 Decisions
 
