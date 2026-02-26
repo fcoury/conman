@@ -18,6 +18,11 @@ import secrets
 print(secrets.token_hex(12))
 PY
 )
+REVIEWER_ID=$(python3 - <<"PY"
+import secrets
+print(secrets.token_hex(12))
+PY
+)
 JWT_SECRET="test-secret-test-secret-test-1234"
 MONGO_URI="${MONGO_URI:-mongodb://127.0.0.1:27019}"
 
@@ -154,6 +159,19 @@ if command -v mongosh >/dev/null 2>&1; then
     },
     { upsert: true }
   )" >/dev/null
+  mongosh "${MONGO_URI}/${DB}" --quiet --eval "db.users.updateOne(
+    { _id: ObjectId(\"${REVIEWER_ID}\") },
+    {
+      \$set: {
+        email: \"reviewer@example.com\",
+        name: \"E2E Reviewer\",
+        password_hash: \"not-used-in-staged-smoke\",
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+    },
+    { upsert: true }
+  )" >/dev/null
 fi
 
 echo "[3/11] Creating app"
@@ -162,6 +180,7 @@ APP_ID=$(jq -r ".data.id" "$file")
 rm -f "$file"
 
 TOKEN_APP=$(make_token "{\"${APP_ID}\":\"app_admin\"}")
+request_assert_200 POST "/api/apps/${APP_ID}/members" "$TOKEN_APP" "{\"user_id\":\"${REVIEWER_ID}\",\"role\":\"reviewer\"}" >/dev/null
 
 echo "[4/11] Setting environments + creating workspace"
 file=$(request_assert_200 PATCH "/api/apps/${APP_ID}/environments" "$TOKEN_APP" "{\"environments\":[{\"name\":\"prod\",\"position\":1,\"is_canonical\":true,\"runtime_profile_id\":null}]}")
@@ -247,6 +266,18 @@ DEPLOYMENT_ID=$(jq -r ".data.deployment.id" "$file")
 rm -f "$file"
 wait_job "$APP_ID" "$TOKEN_APP" "$DEPLOYMENT_JOB_ID" "deploy_release"
 
+file=$(request_assert_200 POST "/api/apps/${APP_ID}/environments/${ENV_ID}/promote" "$TOKEN_APP" "{\"release_id\":\"${RELEASE_ID}\"}")
+PROMOTE_JOB_ID=$(jq -r ".data.job.id" "$file")
+PROMOTE_DEPLOYMENT_ID=$(jq -r ".data.deployment.id" "$file")
+rm -f "$file"
+wait_job "$APP_ID" "$TOKEN_APP" "$PROMOTE_JOB_ID" "promote_release"
+
+file=$(request_assert_200 POST "/api/apps/${APP_ID}/environments/${ENV_ID}/rollback" "$TOKEN_APP" "{\"release_id\":\"${RELEASE_ID}\",\"mode\":\"redeploy_prior_tag\",\"approvals\":[\"${USER_ID}\",\"${REVIEWER_ID}\"]}")
+ROLLBACK_JOB_ID=$(jq -r ".data.job.id" "$file")
+ROLLBACK_DEPLOYMENT_ID=$(jq -r ".data.deployment.id" "$file")
+rm -f "$file"
+wait_job "$APP_ID" "$TOKEN_APP" "$ROLLBACK_JOB_ID" "rollback_release"
+
 echo "[9/11] Temp environment lifecycle"
 file=$(request_assert_200 POST "/api/apps/${APP_ID}/temp-envs" "$TOKEN_APP" "{\"kind\":\"workspace\",\"source_id\":\"${WORKSPACE_ID}\"}")
 TEMP_ENV_ID=$(jq -r ".data.temp_env.id" "$file")
@@ -255,6 +286,11 @@ TEMP_PROVISION_JOB_ID=$(jq -r ".data.job.id" "$file")
 rm -f "$file"
 wait_job "$APP_ID" "$TOKEN_APP" "$TEMP_PROVISION_JOB_ID" "temp_env_provision"
 request_assert_200 POST "/api/apps/${APP_ID}/temp-envs/${TEMP_ENV_ID}/extend" "$TOKEN_APP" "{\"seconds\":7200}" >/dev/null
+file=$(request_assert_200 DELETE "/api/apps/${APP_ID}/temp-envs/${TEMP_ENV_ID}" "$TOKEN_APP")
+TEMP_EXPIRE_JOB_ID=$(jq -r ".data.job.id" "$file")
+rm -f "$file"
+wait_job "$APP_ID" "$TOKEN_APP" "$TEMP_EXPIRE_JOB_ID" "temp_env_expire"
+request_assert_200 POST "/api/apps/${APP_ID}/temp-envs/${TEMP_ENV_ID}/undo-expire" "$TOKEN_APP" >/dev/null
 
 echo "[10/11] Collecting final states"
 file=$(request_assert_200 GET "/api/apps/${APP_ID}/jobs?page=1&limit=100" "$TOKEN_APP")
@@ -266,8 +302,13 @@ rm -f "$file"
 file=$(request_assert_200 GET "/api/apps/${APP_ID}/releases/${RELEASE_ID}" "$TOKEN_APP")
 RELEASE_STATE=$(jq -r ".data.state" "$file")
 rm -f "$file"
-file=$(request_assert_200 GET "/api/apps/${APP_ID}/deployments?page=1&limit=20" "$TOKEN_APP")
-DEPLOY_STATE=$(jq -r ".data[0].state" "$file")
+file=$(request_assert_200 GET "/api/apps/${APP_ID}/deployments?page=1&limit=50" "$TOKEN_APP")
+DEPLOY_STATE=$(jq -r ".data[] | select(.id==\"${DEPLOYMENT_ID}\") | .state" "$file")
+PROMOTE_STATE=$(jq -r ".data[] | select(.id==\"${PROMOTE_DEPLOYMENT_ID}\") | .state" "$file")
+ROLLBACK_STATE=$(jq -r ".data[] | select(.id==\"${ROLLBACK_DEPLOYMENT_ID}\") | .state" "$file")
+rm -f "$file"
+file=$(request_assert_200 GET "/api/apps/${APP_ID}/temp-envs?page=1&limit=50" "$TOKEN_APP")
+TEMP_ENV_FINAL_STATE=$(jq -r ".data[] | select(.id==\"${TEMP_ENV_ID}\") | .state" "$file")
 rm -f "$file"
 
 cat > "$SUMMARY_FILE" <<EOF
@@ -280,6 +321,8 @@ cat > "$SUMMARY_FILE" <<EOF
 - release_id: ${RELEASE_ID}
 - release_tag: ${RELEASE_TAG}
 - deployment_id: ${DEPLOYMENT_ID}
+- promote_deployment_id: ${PROMOTE_DEPLOYMENT_ID}
+- rollback_deployment_id: ${ROLLBACK_DEPLOYMENT_ID}
 - temp_env_id: ${TEMP_ENV_ID}
 - temp_env_url: ${TEMP_ENV_URL}
 - workspace_write_commit_sha: ${WRITE_SHA}
@@ -287,6 +330,9 @@ cat > "$SUMMARY_FILE" <<EOF
 - final_changeset_state: ${CHANGESET_STATE}
 - final_release_state: ${RELEASE_STATE}
 - final_deployment_state: ${DEPLOY_STATE}
+- final_promote_state: ${PROMOTE_STATE}
+- final_rollback_state: ${ROLLBACK_STATE}
+- final_temp_env_state: ${TEMP_ENV_FINAL_STATE}
 - terminal_job_succeeded: $(jq "[.data[] | select(.state==\"succeeded\")] | length" "$JOBS_FILE")
 - terminal_job_failed: $(jq "[.data[] | select(.state==\"failed\")] | length" "$JOBS_FILE")
 - terminal_job_canceled: $(jq "[.data[] | select(.state==\"canceled\")] | length" "$JOBS_FILE")
@@ -294,8 +340,8 @@ cat > "$SUMMARY_FILE" <<EOF
 ## Notes
 
 - Validated live gitaly-rs UserCommitFiles write path via PUT /workspaces/:id/files.
-- Drove submit/merge/deploy gates through async jobs to terminal success.
-- Drove temp-env provisioning path through async job success.
+- Drove submit/merge/deploy/promote/rollback gates through async jobs to terminal success.
+- Drove temp-env provision/expire/undo-expire paths through async jobs and API transitions.
 EOF
 
 cp "$CREATE_REPO_JSON" "$RESULTS/latest-create-repo.json"

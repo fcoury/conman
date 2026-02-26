@@ -8,8 +8,8 @@
 ## Product Flows
 - [x] Workspace authoring and changeset review smoke-tested.
 - [x] Queue-first release publish smoke-tested.
-- [ ] Deploy/promote/rollback smoke-tested.
-- [ ] Temp env create/expire/undo-expire smoke-tested.
+- [x] Deploy/promote/rollback smoke-tested.
+- [x] Temp env create/expire/undo-expire smoke-tested.
 
 ## Operations
 - [ ] Dashboards include API, jobs, deployments, and auth-failure metrics.
