@@ -37,6 +37,11 @@ impl Config {
             std::env::var("CONMAN_JWT_SECRET").map_err(|_| ConmanError::Validation {
                 message: "CONMAN_JWT_SECRET is required".to_string(),
             })?;
+        if jwt_secret.len() < 32 {
+            return Err(ConmanError::Validation {
+                message: "CONMAN_JWT_SECRET must be at least 32 characters".to_string(),
+            });
+        }
 
         let jwt_expiry_hours: u64 = std::env::var("CONMAN_JWT_EXPIRY_HOURS")
             .unwrap_or_else(|_| "24".to_string())
@@ -116,7 +121,7 @@ mod tests {
         let _guard = ENV_LOCK.lock().expect("env lock");
         clear_env();
         unsafe {
-            std::env::set_var("CONMAN_JWT_SECRET", "test-secret");
+            std::env::set_var("CONMAN_JWT_SECRET", "test-secret-test-secret-test-1234");
             std::env::set_var("CONMAN_SECRETS_MASTER_KEY", "master-key");
             std::env::set_var("CONMAN_TEMP_URL_DOMAIN", "example.test");
         }
@@ -157,7 +162,7 @@ mod tests {
         let _guard = ENV_LOCK.lock().expect("env lock");
         clear_env();
         unsafe {
-            std::env::set_var("CONMAN_JWT_SECRET", "test-secret");
+            std::env::set_var("CONMAN_JWT_SECRET", "test-secret-test-secret-test-1234");
             std::env::set_var("CONMAN_PORT", "bad-port");
             std::env::set_var("CONMAN_SECRETS_MASTER_KEY", "master-key");
             std::env::set_var("CONMAN_TEMP_URL_DOMAIN", "example.test");

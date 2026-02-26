@@ -1,3 +1,4 @@
+use axum::extract::DefaultBodyLimit;
 use axum::extract::Request;
 use axum::http::HeaderValue;
 use axum::http::StatusCode;
@@ -193,6 +194,7 @@ pub fn build_router(state: AppState) -> Router {
             get(get_notification_preferences).patch(update_notification_preferences),
         )
         .fallback(fallback_404)
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             crate::rate_limit::rate_limit_middleware,
@@ -335,7 +337,7 @@ mod tests {
                 mongo_uri: "mongodb://localhost:27017".to_string(),
                 mongo_db: "conman".to_string(),
                 gitaly_address: "http://localhost:8075".to_string(),
-                jwt_secret: "secret".to_string(),
+                jwt_secret: "secret-secret-secret-secret-1234".to_string(),
                 jwt_expiry_hours: 24,
                 invite_expiry_days: 7,
                 secrets_master_key: "master".to_string(),

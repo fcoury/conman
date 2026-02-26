@@ -7,7 +7,7 @@ use conman_core::ConmanError;
 pub struct PasswordPolicy;
 
 impl PasswordPolicy {
-    pub const MIN_LENGTH: usize = 8;
+    pub const MIN_LENGTH: usize = 12;
     pub const MAX_LENGTH: usize = 128;
 
     pub fn validate(password: &str) -> Result<(), ConmanError> {
@@ -59,7 +59,7 @@ mod tests {
     fn policy_validates_length() {
         assert!(PasswordPolicy::validate("short").is_err());
         assert!(PasswordPolicy::validate(&"a".repeat(129)).is_err());
-        assert!(PasswordPolicy::validate("good-password").is_ok());
+        assert!(PasswordPolicy::validate("good-password1").is_ok());
     }
 
     #[test]
