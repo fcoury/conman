@@ -53,6 +53,12 @@ Run:
 cargo run
 ```
 
+API docs while running locally:
+
+```bash
+open http://127.0.0.1:3000/api/docs
+```
+
 Build:
 
 ```bash

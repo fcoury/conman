@@ -38,6 +38,7 @@ use crate::handlers::workspaces::{
     get_workspace_file_or_tree, list_workspaces, reset_workspace, sync_workspace_integration,
     update_workspace, write_workspace_file,
 };
+use crate::openapi::{openapi_docs, openapi_json};
 use crate::request_context::RequestContext;
 use crate::response::{ApiError, ApiErrorBody};
 use crate::state::AppState;
@@ -46,6 +47,8 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/api/health", get(health_check))
         .route("/api/metrics", get(scrape_metrics))
+        .route("/api/openapi.json", get(openapi_json))
+        .route("/api/docs", get(openapi_docs))
         .route("/api/auth/login", post(login))
         .route("/api/auth/logout", post(logout))
         .route("/api/auth/forgot-password", post(forgot_password))
