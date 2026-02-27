@@ -130,6 +130,13 @@ INVITE_JSON=$(api_auth POST "/api/teams/$TEAM_ID/invites" -d '{
 
 echo "$INVITE_JSON" | jq
 export INVITE_TOKEN=$(echo "$INVITE_JSON" | jq -r '.data.token')
+export INVITE_ID=$(echo "$INVITE_JSON" | jq -r '.data.id')
+
+# Optional resend flow (rotates token/expiry for pending invite).
+api_auth POST "/api/teams/$TEAM_ID/invites/$INVITE_ID/resend" -d '{}' | jq
+
+# Optional revoke flow (for pending invite only).
+# api_auth DELETE "/api/teams/$TEAM_ID/invites/$INVITE_ID" | jq
 ```
 
 Accept invite as second user:

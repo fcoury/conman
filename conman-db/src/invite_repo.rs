@@ -110,6 +110,124 @@ impl InviteRepo {
         Ok(invite.map(Into::into))
     }
 
+    pub async fn find_by_id_for_team(
+        &self,
+        team_id: &str,
+        invite_id: &str,
+    ) -> Result<Option<Invite>, ConmanError> {
+        let team_id = ObjectId::parse_str(team_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid team_id: {e}"),
+        })?;
+        let invite_id = ObjectId::parse_str(invite_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid invite_id: {e}"),
+        })?;
+        let invite = self
+            .collection
+            .find_one(doc! {"_id": invite_id, "team_id": team_id})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to query invite by id: {e}"),
+            })?;
+        Ok(invite.map(Into::into))
+    }
+
+    pub async fn resend(
+        &self,
+        team_id: &str,
+        invite_id: &str,
+        invited_by: &str,
+        expiry_days: u64,
+    ) -> Result<Invite, ConmanError> {
+        let team_id = ObjectId::parse_str(team_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid team_id: {e}"),
+        })?;
+        let invite_id = ObjectId::parse_str(invite_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid invite_id: {e}"),
+        })?;
+        let invited_by = ObjectId::parse_str(invited_by).map_err(|e| ConmanError::Validation {
+            message: format!("invalid invited_by: {e}"),
+        })?;
+        let now = Utc::now();
+        let updated = self
+            .collection
+            .find_one_and_update(
+                doc! {"_id": invite_id, "team_id": team_id, "accepted_at": null},
+                doc! {"$set": {
+                    "token": Uuid::now_v7().to_string(),
+                    "invited_by": invited_by,
+                    "expires_at": now + Duration::days(expiry_days as i64),
+                }},
+            )
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to resend invite: {e}"),
+            })?;
+
+        if let Some(row) = updated {
+            return Ok(row.into());
+        }
+
+        let existing = self
+            .collection
+            .find_one(doc! {"_id": invite_id, "team_id": team_id})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to load invite after resend miss: {e}"),
+            })?;
+        if let Some(row) = existing {
+            if row.accepted_at.is_some() {
+                return Err(ConmanError::Conflict {
+                    message: "invite already accepted".to_string(),
+                });
+            }
+        }
+        Err(ConmanError::NotFound {
+            entity: "invite",
+            id: invite_id.to_hex(),
+        })
+    }
+
+    pub async fn revoke(&self, team_id: &str, invite_id: &str) -> Result<Invite, ConmanError> {
+        let team_id = ObjectId::parse_str(team_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid team_id: {e}"),
+        })?;
+        let invite_id = ObjectId::parse_str(invite_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid invite_id: {e}"),
+        })?;
+
+        let deleted = self
+            .collection
+            .find_one_and_delete(doc! {"_id": invite_id, "team_id": team_id, "accepted_at": null})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to revoke invite: {e}"),
+            })?;
+
+        if let Some(row) = deleted {
+            return Ok(row.into());
+        }
+
+        let existing = self
+            .collection
+            .find_one(doc! {"_id": invite_id, "team_id": team_id})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to load invite after revoke miss: {e}"),
+            })?;
+        if let Some(row) = existing {
+            if row.accepted_at.is_some() {
+                return Err(ConmanError::Conflict {
+                    message: "invite already accepted".to_string(),
+                });
+            }
+        }
+        Err(ConmanError::NotFound {
+            entity: "invite",
+            id: invite_id.to_hex(),
+        })
+    }
+
     pub async fn mark_accepted(&self, invite_id: &str) -> Result<(), ConmanError> {
         let invite_id = ObjectId::parse_str(invite_id).map_err(|e| ConmanError::Validation {
             message: format!("invalid invite_id: {e}"),

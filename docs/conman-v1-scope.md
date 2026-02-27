@@ -482,6 +482,8 @@ Base path: `/api`
 - `GET /api/teams/:teamId`
 - `POST /api/teams/:teamId/repos`
 - `POST /api/teams/:teamId/invites`
+- `POST /api/teams/:teamId/invites/:inviteId/resend`
+- `DELETE /api/teams/:teamId/invites/:inviteId`
 - `GET /api/repos?page=&limit=`
 - `GET /api/repos/:appId`
 - `PATCH /api/repos/:appId/settings`

@@ -33,8 +33,9 @@ use crate::handlers::releases::{
     reorder_release_changesets, set_release_changesets,
 };
 use crate::handlers::teams::{
-    create_repo_surface, create_repo_under_team, create_team, create_team_invite, get_team,
-    list_repo_surfaces, list_teams, update_repo_surface,
+    create_repo_surface, create_repo_under_team, create_team, create_team_invite,
+    delete_team_invite, get_team, list_repo_surfaces, list_teams, resend_team_invite,
+    update_repo_surface,
 };
 use crate::handlers::temp_envs::{
     create_temp_env, delete_temp_env, extend_temp_env, list_temp_envs, undo_expire_temp_env,
@@ -80,6 +81,11 @@ pub fn build_router(state: AppState) -> Router {
             get(list_members).post(assign_member),
         )
         .route("/api/teams/{teamId}/invites", post(create_team_invite))
+        .route(
+            "/api/teams/{teamId}/invites/{inviteId}/resend",
+            post(resend_team_invite),
+        )
+        .route("/api/teams/{teamId}/invites/{inviteId}", delete(delete_team_invite))
         .route(
             "/api/repos/{appId}/workspaces",
             get(list_workspaces).post(create_workspace),

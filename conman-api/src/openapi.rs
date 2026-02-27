@@ -106,6 +106,20 @@ const ROUTES: &[RouteDoc] = &[
         protected: true,
     },
     RouteDoc {
+        method: "post",
+        path: "/api/teams/{teamId}/invites/{inviteId}/resend",
+        summary: "Resend team invite",
+        tag: "teams",
+        protected: true,
+    },
+    RouteDoc {
+        method: "delete",
+        path: "/api/teams/{teamId}/invites/{inviteId}",
+        summary: "Revoke team invite",
+        tag: "teams",
+        protected: true,
+    },
+    RouteDoc {
         method: "get",
         path: "/api/repos/{appId}/apps",
         summary: "List apps in repository",

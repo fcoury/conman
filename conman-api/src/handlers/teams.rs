@@ -114,6 +114,25 @@ async fn team_role_for(
         .await?)
 }
 
+async fn require_team_admin(
+    state: &AppState,
+    user_id: &str,
+    team_id: &str,
+) -> Result<(), ApiConmanError> {
+    let role = team_role_for(state, user_id, team_id)
+        .await?
+        .ok_or_else(|| ConmanError::Forbidden {
+            message: format!("requires team membership on team {team_id}"),
+        })?;
+    if !role.satisfies(Role::Admin) {
+        return Err(ConmanError::Forbidden {
+            message: format!("requires role admin on team {team_id}"),
+        }
+        .into());
+    }
+    Ok(())
+}
+
 pub async fn list_teams(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
@@ -330,17 +349,7 @@ pub async fn create_team_invite(
         .into());
     }
 
-    let role = team_role_for(&state, &auth.user_id, &team_id)
-        .await?
-        .ok_or_else(|| ConmanError::Forbidden {
-            message: format!("requires team membership on team {team_id}"),
-        })?;
-    if !role.satisfies(Role::Admin) {
-        return Err(ConmanError::Forbidden {
-            message: format!("requires role admin on team {team_id}"),
-        }
-        .into());
-    }
+    require_team_admin(&state, &auth.user_id, &team_id).await?;
 
     let invite = conman_db::InviteRepo::new(state.db.clone())
         .create(
@@ -361,6 +370,72 @@ pub async fn create_team_invite(
         "created",
         None,
         serde_json::to_value(&invite).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
+
+    Ok(Json(ApiResponse::ok(invite)))
+}
+
+pub async fn resend_team_invite(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path((team_id, invite_id)): Path<(String, String)>,
+) -> Result<Json<ApiResponse<Invite>>, ApiConmanError> {
+    require_team_admin(&state, &auth.user_id, &team_id).await?;
+
+    let invite_repo = conman_db::InviteRepo::new(state.db.clone());
+    let before = invite_repo.find_by_id_for_team(&team_id, &invite_id).await?;
+    let invite = invite_repo
+        .resend(
+            &team_id,
+            &invite_id,
+            &auth.user_id,
+            state.config.invite_expiry_days,
+        )
+        .await?;
+
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        None,
+        "team_invite",
+        &invite.id,
+        "resent",
+        before.and_then(|v| serde_json::to_value(v).ok()),
+        serde_json::to_value(&invite).ok(),
+        None,
+    )
+    .await
+    {
+        tracing::warn!(error = %err, "failed to write audit event");
+    }
+
+    Ok(Json(ApiResponse::ok(invite)))
+}
+
+pub async fn delete_team_invite(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path((team_id, invite_id)): Path<(String, String)>,
+) -> Result<Json<ApiResponse<Invite>>, ApiConmanError> {
+    require_team_admin(&state, &auth.user_id, &team_id).await?;
+
+    let invite_repo = conman_db::InviteRepo::new(state.db.clone());
+    let invite = invite_repo.revoke(&team_id, &invite_id).await?;
+
+    if let Err(err) = emit_audit(
+        &state,
+        Some(&auth.user_id),
+        None,
+        "team_invite",
+        &invite.id,
+        "revoked",
+        serde_json::to_value(&invite).ok(),
+        None,
         None,
     )
     .await
