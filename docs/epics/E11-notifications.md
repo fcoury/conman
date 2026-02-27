@@ -353,17 +353,17 @@ impl NotificationService {
     /// Resolve recipient user IDs for a given event type.
     ///
     /// Recipient rules by event:
-    /// - ChangesetSubmitted: all reviewers + config_managers + app_admins
+    /// - ChangesetSubmitted: all reviewers + config_managers + admins
     /// - ReviewRequested: the specifically requested reviewer
     /// - ChangesetApproved: changeset author
     /// - ChangesRequested: changeset author
     /// - ChangesetRejected: changeset author
-    /// - ChangesetQueued: changeset author + config_managers + app_admins
-    /// - ReleaseCreated: all config_managers + app_admins
+    /// - ChangesetQueued: changeset author + config_managers + admins
+    /// - ReleaseCreated: all config_managers + admins
     /// - ReleasePublished: all app members
-    /// - DeploymentStarted: all config_managers + app_admins
+    /// - DeploymentStarted: all config_managers + admins
     /// - DeploymentSucceeded: all app members
-    /// - DeploymentFailed: all config_managers + app_admins
+    /// - DeploymentFailed: all config_managers + admins
     /// - TempEnvExpiryWarning: temp env creator
     /// - TempEnvExpired: temp env creator
     async fn resolve_recipients(
@@ -376,7 +376,7 @@ impl NotificationService {
                 self.membership_repo
                     .find_users_with_roles(
                         &ctx.app_id,
-                        &["reviewer", "config_manager", "app_admin"],
+                        &["reviewer", "config_manager", "admin"],
                     )
                     .await
             }
@@ -409,7 +409,7 @@ impl NotificationService {
                     .membership_repo
                     .find_users_with_roles(
                         &ctx.app_id,
-                        &["config_manager", "app_admin"],
+                        &["config_manager", "admin"],
                     )
                     .await?;
                 if let Some(author_id) = ctx.extra.get("author_user_id") {
@@ -426,7 +426,7 @@ impl NotificationService {
                 self.membership_repo
                     .find_users_with_roles(
                         &ctx.app_id,
-                        &["config_manager", "app_admin"],
+                        &["config_manager", "admin"],
                     )
                     .await
             }
@@ -1055,7 +1055,7 @@ Read-only paginated query of the audit log for an app.
 | Attribute | Value |
 |-----------|-------|
 | Auth | Authenticated user |
-| RBAC | `app_admin` on this app |
+| RBAC | `admin` on this app |
 | Query params | `page` (default 1), `limit` (default 20, max 100), `entity_type` (optional), `entity_id` (optional), `action` (optional), `actor_user_id` (optional) |
 
 **Response 200:**
@@ -1090,7 +1090,7 @@ Read-only paginated query of the audit log for an app.
 | Status | Code | Condition |
 |--------|------|-----------|
 | 401 | `unauthorized` | Missing or invalid JWT |
-| 403 | `forbidden` | Caller is not `app_admin` on this app |
+| 403 | `forbidden` | Caller is not `admin` on this app |
 | 404 | `not_found` | App does not exist |
 
 ---
@@ -1106,17 +1106,17 @@ filters by preference and actor exclusion, and sends emails.
 
 | Event | Recipients |
 |-------|-----------|
-| `ChangesetSubmitted` | All users with `reviewer`, `config_manager`, or `app_admin` role in the app |
+| `ChangesetSubmitted` | All users with `reviewer`, `config_manager`, or `admin` role in the app |
 | `ReviewRequested` | The specifically requested reviewer |
 | `ChangesetApproved` | Changeset author |
 | `ChangesRequested` | Changeset author |
 | `ChangesetRejected` | Changeset author |
-| `ChangesetQueued` | Changeset author + all `config_manager` + `app_admin` users |
-| `ReleaseCreated` | All `config_manager` + `app_admin` users |
+| `ChangesetQueued` | Changeset author + all `config_manager` + `admin` users |
+| `ReleaseCreated` | All `config_manager` + `admin` users |
 | `ReleasePublished` | All app members |
-| `DeploymentStarted` | All `config_manager` + `app_admin` users |
+| `DeploymentStarted` | All `config_manager` + `admin` users |
 | `DeploymentSucceeded` | All app members |
-| `DeploymentFailed` | All `config_manager` + `app_admin` users |
+| `DeploymentFailed` | All `config_manager` + `admin` users |
 | `TempEnvExpiryWarning` | Temp environment creator |
 | `TempEnvExpired` | Temp environment creator |
 
@@ -1172,7 +1172,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `workspace` | `created` | `POST /api/repos/:appId/workspaces` | E04 |
+| `workspace` | `created` | `POST /api/teams/:teamId/repos/:appId/workspaces` | E04 |
 | `workspace` | `updated` | `PATCH /api/repos/:appId/workspaces/:workspaceId` | E04 |
 | `workspace` | `reset` | `POST .../workspaces/:workspaceId/reset` | E04 |
 | `workspace` | `synced_integration` | `POST .../workspaces/:workspaceId/sync-integration` | E04 |
@@ -1189,7 +1189,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `changeset` | `created` | `POST /api/repos/:appId/changesets` | E05 |
+| `changeset` | `created` | `POST /api/teams/:teamId/repos/:appId/changesets` | E05 |
 | `changeset` | `updated` | `PATCH .../changesets/:changesetId` | E05 |
 | `changeset` | `submitted` | `POST .../changesets/:changesetId/submit` | E05 |
 | `changeset` | `resubmitted` | `POST .../changesets/:changesetId/resubmit` | E05 |
@@ -1212,7 +1212,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `release` | `created` | `POST /api/repos/:appId/releases` | E08 |
+| `release` | `created` | `POST /api/teams/:teamId/repos/:appId/releases` | E08 |
 | `release` | `changesets_modified` | `POST .../releases/:releaseId/changesets` | E08 |
 | `release` | `reordered` | `POST .../releases/:releaseId/reorder` | E08 |
 | `release` | `assembled` | `POST .../releases/:releaseId/assemble` | E08 |
@@ -1232,7 +1232,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `temp_environment` | `created` | `POST /api/repos/:appId/temp-envs` | E10 |
+| `temp_environment` | `created` | `POST /api/teams/:teamId/repos/:appId/temp-envs` | E10 |
 | `temp_environment` | `extended` | `POST .../temp-envs/:tempEnvId/extend` | E10 |
 | `temp_environment` | `expired` | TTL cleanup job | E10 |
 | `temp_environment` | `undo_expired` | `POST .../temp-envs/:tempEnvId/undo-expire` | E10 |
@@ -1242,7 +1242,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `app` | `created` | `POST /api/repos` | E03 |
+| `app` | `created` | `POST /api/teams/:teamId/repos` | E03 |
 | `app` | `settings_updated` | `PATCH /api/repos/:appId/settings` | E03 |
 | `app` | `environments_updated` | `PATCH /api/repos/:appId/environments` | E03 |
 
@@ -1250,7 +1250,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `invite` | `created` | `POST /api/repos/:appId/invites` | E02 |
+| `invite` | `created` | `POST /api/teams/:teamId/invites` | E02 |
 | `invite` | `resent` | `POST .../invites/:inviteId/resend` | E02 |
 | `invite` | `revoked` | `DELETE .../invites/:inviteId` | E02 |
 | `invite` | `accepted` | `POST /api/auth/accept-invite` | E02 |
@@ -1358,7 +1358,7 @@ from MongoDB (audit events and notification preferences) and the email provider.
 - [ ] Add `AuditRepo` to `conman-db` with `ensure_indexes()`
 - [ ] Implement `emit()`: insert-only, fire-and-forget error handling
 - [ ] Implement `query()`: filtered, paginated, ordered by occurred_at desc
-- [ ] Add `GET /api/repos/:appId/audit` handler with RBAC (`app_admin` only)
+- [ ] Add `GET /api/repos/:appId/audit` handler with RBAC (`admin` only)
 - [ ] Add pagination and filter support (entity_type, entity_id, action, actor_user_id)
 - [ ] Verify `AuditRepo` has no public update or delete methods (code review gate)
 - [ ] Write unit test: `AuditEvent` serializes to expected JSON shape
@@ -1399,7 +1399,7 @@ from MongoDB (audit events and notification preferences) and the email provider.
 | 7 | `EmailPayload` serialization | JSON includes `to`, `subject`, `template_name`, `template_data` |
 | 8 | `build_subject` for ChangesetSubmitted | Returns `"[app_name] Changeset submitted: title"` |
 | 9 | `build_subject` for DeploymentFailed | Returns `"[app_name] Deployment failed: title"` |
-| 10 | `resolve_recipients` for ChangesetSubmitted | Returns users with reviewer, config_manager, app_admin roles |
+| 10 | `resolve_recipients` for ChangesetSubmitted | Returns users with reviewer, config_manager, admin roles |
 | 11 | `resolve_recipients` for ChangesetApproved | Returns changeset author only |
 | 12 | `resolve_recipients` for ReleasePublished | Returns all app members |
 | 13 | `resolve_recipients` for TempEnvExpired | Returns temp env creator only |
@@ -1454,7 +1454,7 @@ from MongoDB (audit events and notification preferences) and the email provider.
 - [ ] `PATCH /api/me/notification-preferences` toggles the email preference and
   persists the change.
 - [ ] `GET /api/repos/:appId/audit` returns a paginated, filterable, read-only
-  audit log accessible only to `app_admin` users.
+  audit log accessible only to `admin` users.
 - [ ] Every mutation handler in the system (as enumerated in section 6.3) emits
   an `AuditEvent` with correct `entity_type`, `action`, and `before`/`after`
   snapshots.

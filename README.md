@@ -8,7 +8,7 @@ Conman is a Git-backed configuration manager backend (Rust, API-first).
 
 It models and orchestrates:
 
-- tenants
+- teams
 - repositories (Git-backed, exposed by `/api/repos`)
 - apps (multiple user-facing apps per repository)
 - workspaces (user editing branches)
@@ -28,8 +28,8 @@ plan are documented and continuously refined in `docs/`.
 - Implementation guide: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 - Backlog: [docs/conman-v1-backlog.md](docs/conman-v1-backlog.md)
 - Runtime profiles draft: [docs/runtime-profiles-draft.md](docs/runtime-profiles-draft.md)
-- Tenant/repo/app model: [docs/tenant-repo-app-model.md](docs/tenant-repo-app-model.md)
-- Tenant/repo/app implementation plan: [docs/tenant-repo-app-implementation-plan.md](docs/tenant-repo-app-implementation-plan.md)
+- Team/repo/app model: [docs/team-repo-app-model.md](docs/team-repo-app-model.md)
+- Team/repo/app implementation plan: [docs/team-repo-app-implementation-plan.md](docs/team-repo-app-implementation-plan.md)
 - Epics: [docs/epics/](docs/epics/)
 
 ## Repository Layout
@@ -63,10 +63,12 @@ API docs while running locally:
 open http://127.0.0.1:3000/api/docs
 ```
 
-Bootstrap first login user:
+Create the first account (open signup):
 
 ```bash
-cargo run -- bootstrap-admin admin@example.com "Admin User" "AdminPassw0rd!!"
+curl -sS -X POST http://127.0.0.1:3000/api/auth/signup \
+  -H 'content-type: application/json' \
+  -d '{"name":"Admin User","email":"admin@example.com","password":"AdminPassw0rd!!"}'
 ```
 
 Manual end-to-end API testing sequence:

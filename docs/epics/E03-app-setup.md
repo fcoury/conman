@@ -1,19 +1,19 @@
-# E03 Tenant/Repo Setup, Settings, Environment Metadata
+# E03 Team/Repo Setup, Settings, Environment Metadata
 
 ## 1. Goal
 
-Deliver tenant/repository setup, repository settings management, environment
+Deliver team/repository setup, repository settings management, environment
 pipeline metadata, and membership listing/role assignment. After this epic, an
-authenticated app admin can create a tenant, create a repository under that
-tenant, define apps, configure baseline mode, define the environment
+authenticated admin can create a team, create a repository under that
+team, define apps, configure baseline mode, define the environment
 promotion pipeline, and manage team membership. This epic also establishes
 runtime profiles (including per-surface endpoints) and links them to
 environments.
 
 **Issues:**
 
-- E03-01: `tenants` create/list/get.
-- E03-02: `repos` create under tenant + list/get.
+- E03-01: `teams` create/list/get.
+- E03-02: `repos` create under team + list/get.
 - E03-03: `app_surfaces` create/list/update per repository app.
 - E03-04: Settings API for baseline mode, canonical env, commit mode default,
   blocked paths, file size limit.
@@ -22,7 +22,7 @@ environments.
 - E03-07: Runtime profile CRUD/revisions, environment linkage, and canonical
   profile approval policy settings.
 - E03-08: Runtime profile typed env-var validation + secret visibility policy
-  (`app_admin` reveal, others masked).
+  (`admin` reveal, others masked).
 - E03-09: Runtime profile `surface_endpoints` validation against app
   keys.
 - E03-10: Direct app-admin runtime profile emergency edits (audited).
@@ -113,8 +113,8 @@ impl Default for AppSettings {
 pub struct App {
     /// MongoDB ObjectId hex string.
     pub id: String,
-    /// Owning tenant id.
-    pub tenant_id: Option<String>,
+    /// Owning team id.
+    pub team_id: Option<String>,
     /// Human-readable app name (unique).
     pub name: String,
     /// Gitaly-relative path to the repository (e.g. "conman/my-app.git").
@@ -442,13 +442,13 @@ List apps visible to the authenticated user.
 
 ---
 
-### 5.2 `POST /api/repos`
+### 5.2 `POST /api/teams/:teamId/repos`
 
 Create a new app and register its Git repository.
 
 | Attribute | Value |
 |-----------|-------|
-| Auth | Any authenticated user (becomes `app_admin` of the new app) |
+| Auth | Any authenticated user (becomes `admin` of the new app) |
 | RBAC | No pre-existing membership required — caller bootstraps the app |
 
 **Request body:**
@@ -494,7 +494,7 @@ Create a new app and register its Git repository.
 1. Verify repo exists via gitaly `RepositoryExists`. If not, create it via
    `CreateRepository` with `default_branch = app.integration_branch`.
 2. Insert `apps` document with default settings.
-3. Insert `app_memberships` record: caller as `app_admin`.
+3. Insert `app_memberships` record: caller as `admin`.
 4. Insert default environment pipeline: Development (0), QA (1), UAT (2),
    Production (3, `is_canonical: true`).
 5. Set `settings.canonical_env_id` to the Production environment id.
@@ -539,7 +539,7 @@ Update app settings. Partial update — only supplied fields are changed.
 | Attribute | Value |
 |-----------|-------|
 | Auth | Authenticated user |
-| RBAC | `app_admin` on this app |
+| RBAC | `admin` on this app |
 
 **Request body (all fields optional):**
 
@@ -575,7 +575,7 @@ Full updated app object (same shape as `GET /api/repos/:appId`).
 | Status | Code | Condition |
 |--------|------|-----------|
 | 400 | `validation_error` | Invalid field values |
-| 403 | `forbidden` | Caller is not `app_admin` |
+| 403 | `forbidden` | Caller is not `admin` |
 | 404 | `not_found` | App or referenced environment not found |
 
 ---
@@ -651,7 +651,7 @@ and canonical flag reassignment in a single atomic operation.
 | Attribute | Value |
 |-----------|-------|
 | Auth | Authenticated user |
-| RBAC | `app_admin` on this app |
+| RBAC | `admin` on this app |
 
 **Request body:**
 
@@ -693,7 +693,7 @@ Full list of environments after update (same shape as `GET .../environments`).
 | Status | Code | Condition |
 |--------|------|-----------|
 | 400 | `validation_error` | Duplicate names, positions, or missing canonical flag |
-| 403 | `forbidden` | Caller is not `app_admin` |
+| 403 | `forbidden` | Caller is not `admin` |
 | 404 | `not_found` | App or referenced environment id not found |
 | 409 | `conflict` | Attempting to remove environment with active deployments |
 
@@ -717,7 +717,7 @@ List members of an app with their roles.
     {
       "user_id": "664f1a2b3c4d5e6f70809001",
       "email": "admin@example.com",
-      "role": "app_admin",
+      "role": "admin",
       "joined_at": "2025-06-01T10:00:00Z"
     },
     {
@@ -753,7 +753,7 @@ List members of an app with their roles.
    b. If not exists → call CreateRepository(repo_path, default_branch: app.integration_branch).
    c. If gitaly unreachable → return Git error.
 5. Insert App document with default settings.
-6. Insert AppMembership: caller as app_admin.
+6. Insert AppMembership: caller as admin.
 7. Insert default environments:
    - Development (position: 0)
    - QA (position: 1)
@@ -829,7 +829,7 @@ Two RPCs from `RepositoryService` are needed for app creation.
 
 ### 7.1 RepositoryService.RepositoryExists
 
-Used during `POST /api/repos` to verify the repo path is valid before
+Used during `POST /api/teams/:teamId/repos` to verify the repo path is valid before
 persisting the app record.
 
 **Proto definitions** (from `gitaly/proto/repository.proto` and
@@ -902,7 +902,7 @@ impl GitalyClient {
 
 ### 7.2 RepositoryService.CreateRepository
 
-Used during `POST /api/repos` when the repo does not yet exist.
+Used during `POST /api/teams/:teamId/repos` when the repo does not yet exist.
 
 ```protobuf
 // repository.proto
@@ -978,19 +978,19 @@ impl GitalyClient {
 
 ## 8. Implementation Checklist
 
-### E03-01: Tenant and repository bootstrap
+### E03-01: Team and repository bootstrap
 
-- [ ] Add `Tenant` + `App` (`repo`) model support in `conman-core`.
-- [ ] Add `TenantRepo` + `AppRepo` persistence/indexes (`tenants.slug` unique,
-  `apps.tenant_id` indexed).
-- [ ] Add `POST/GET /api/tenants`, `GET /api/tenants/:tenantId`, and
-  `POST /api/tenants/:tenantId/repos` handlers.
-- [ ] Emit audit events for tenant/repository creation.
+- [ ] Add `Team` + `App` (`repo`) model support in `conman-core`.
+- [ ] Add `TeamRepo` + `AppRepo` persistence/indexes (`teams.slug` unique,
+  `apps.team_id` indexed).
+- [ ] Add `POST/GET /api/teams`, `GET /api/teams/:teamId`, and
+  `POST /api/teams/:teamId/repos` handlers.
+- [ ] Emit audit events for team/repository creation.
 
 ### E03-02: App model
 
 - [ ] Add `AppSurface` model and `AppSurfaceRepo` (`repo_id + key` unique).
-- [ ] Add `GET/POST /api/repos/:appId/apps` and
+- [ ] Add `GET/POST /api/teams/:teamId/repos/:appId/apps` and
   `PATCH /api/repos/:appId/apps/:surfaceId` handlers.
 - [ ] Enforce `surface.key` validation and repo ownership checks.
 - [ ] Emit audit events for surface create/update.
@@ -1049,7 +1049,7 @@ impl GitalyClient {
 
 | # | Test | Setup | Assertion |
 |---|------|-------|-----------|
-| 14 | Create app — happy path | Mock gitaly returns `exists: true` | App created, 4 default envs, caller is app_admin, canonical_env_id set |
+| 14 | Create app — happy path | Mock gitaly returns `exists: true` | App created, 4 default envs, caller is admin, canonical_env_id set |
 | 15 | Create app — repo does not exist | Mock gitaly returns `exists: false`, then `CreateRepository` succeeds | App created, repo created |
 | 16 | Create app — gitaly unreachable | Mock gitaly returns UNAVAILABLE | Returns 502 `git_error` |
 | 17 | Create app — duplicate name | App with same name exists | Returns 409 `conflict` |
@@ -1057,8 +1057,8 @@ impl GitalyClient {
 | 19 | Get app — member | User is member | Returns 200 with full app |
 | 20 | Get app — non-member | User has no membership | Returns 403 `forbidden` |
 | 21 | List apps — filtered by membership | User is member of 1 of 3 apps | Returns 1 app |
-| 22 | Update settings — all fields | app_admin sends all fields | All updated, audit emitted |
-| 23 | Update settings — partial | app_admin sends only `baseline_mode` | Only baseline_mode changed |
+| 22 | Update settings — all fields | admin sends all fields | All updated, audit emitted |
+| 23 | Update settings — partial | admin sends only `baseline_mode` | Only baseline_mode changed |
 | 24 | Update settings — non-admin | `user` role attempts update | Returns 403 `forbidden` |
 | 25 | Update settings — invalid canonical_env_id | References env from other app | Returns 404 `not_found` |
 | 26 | List environments | App with 4 envs | Returns ordered list |
@@ -1074,13 +1074,13 @@ impl GitalyClient {
 
 ## 10. Acceptance Criteria
 
-- [ ] Any authenticated user can create an app and becomes its `app_admin`.
+- [ ] Any authenticated user can create an app and becomes its `admin`.
 - [ ] App creation verifies repository existence via gitaly and creates it if needed.
 - [ ] New apps receive default settings: `canonical_env_release` baseline mode, `submit_commit` commit mode, standard blocked paths, 5 MB file size limit.
 - [ ] New apps receive a default 4-stage environment pipeline (Development, QA, UAT, Production) with Production marked as canonical.
-- [ ] `app_admin` can configure baseline mode to either `integration_head` or `canonical_env_release`.
-- [ ] `app_admin` can update blocked paths, file size limit, and commit mode default.
-- [ ] `app_admin` can add, remove, rename, and reorder environment stages.
+- [ ] `admin` can configure baseline mode to either `integration_head` or `canonical_env_release`.
+- [ ] `admin` can update blocked paths, file size limit, and commit mode default.
+- [ ] `admin` can add, remove, rename, and reorder environment stages.
 - [ ] Exactly one environment per app is marked canonical at all times.
 - [ ] Environment removal is blocked when the environment has active deployments.
 - [ ] Any app member can list environments and members.
@@ -1090,7 +1090,7 @@ impl GitalyClient {
   (`same_as_changeset` or `stricter_two_approvals`).
 - [ ] Runtime profile env vars are validated as typed values
   (`string|number|boolean|json`) on write.
-- [ ] `app_admin` can reveal secret plaintext; other roles receive masked values
+- [ ] `admin` can reveal secret plaintext; other roles receive masked values
   only (length <= 8 => last 4, otherwise first 4 + last 4).
 - [ ] Direct app-admin persistent profile edits are allowed, audited, and mark
   deployment drift until revalidation.

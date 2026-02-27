@@ -30,7 +30,7 @@ default workspace per user per app.
 |------------|----------------------|
 | **E01 -- Git Adapter** | `GitalyClient` with a connected tonic `Channel`. Helper `app_to_gitaly_repo()`. |
 | **E03 -- App Setup** | `App` document with `repo_path`, `blocked_paths`, `file_size_limit_bytes`, `baseline_mode`, `canonical_env_id`, `commit_mode_default`. `AppRepo` for lookup. |
-| **E02 -- Auth** (transitive via E03) | `AuthUser` extractor, `require_role()` guard. Every workspace endpoint requires at least `Role::User`. |
+| **E02 -- Auth** (transitive via E03) | `AuthUser` extractor, `require_role()` guard. Every workspace endpoint requires at least `Role::Member`. |
 
 ---
 
@@ -317,7 +317,7 @@ impl WorkspaceRepo {
 
 ## 5. API Endpoints
 
-All endpoints require `Authorization: Bearer <token>` and at minimum `Role::User` on the target app.
+All endpoints require `Authorization: Bearer <token>` and at minimum `Role::Member` on the target app.
 
 ### 5.1 Workspace CRUD
 
@@ -342,7 +342,7 @@ All endpoints require `Authorization: Bearer <token>` and at minimum `Role::User
 ### 5.3 Ownership and authorization rules
 
 - Any authenticated user can list and read workspaces in apps they belong to.
-- Users can only write to their own workspaces (or `app_admin` can write to any).
+- Users can only write to their own workspaces (or `admin` can write to any).
 - `reset` and `sync-integration` follow the same ownership rules.
 - Default workspace is auto-created on first `POST /workspaces` if none exists for the user.
 
@@ -1328,8 +1328,8 @@ test suite before moving to the next.
 | A15 | `POST /workspaces/:id/sync-integration` (clean) | Returns `200` with `clean: true` |
 | A16 | `POST /workspaces/:id/sync-integration` (conflict) | Returns `200` with `clean: false` and conflicting paths |
 | A17 | `POST /workspaces/:id/checkpoints` | Returns `200` with commit SHA |
-| A18 | Write to another user's workspace as `Role::User` | Returns `403 Forbidden` |
-| A19 | Write to another user's workspace as `Role::AppAdmin` | Returns `200` (admin override) |
+| A18 | Write to another user's workspace as `Role::Member` | Returns `403 Forbidden` |
+| A19 | Write to another user's workspace as `Role::Admin` | Returns `200` (admin override) |
 | A20 | Unauthenticated request to any endpoint | Returns `401` |
 
 ---
@@ -1354,4 +1354,4 @@ test suite before moving to the next.
 
 9. **Audit trail**: Every mutation (create workspace, write file, delete file, reset, sync, checkpoint) emits an audit event with actor, entity, before/after state, and git SHA.
 
-10. **Ownership enforcement**: Non-admin users cannot mutate another user's workspace. `app_admin` can operate on any workspace in their app.
+10. **Ownership enforcement**: Non-admin users cannot mutate another user's workspace. `admin` can operate on any workspace in their app.

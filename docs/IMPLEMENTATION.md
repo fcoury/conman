@@ -5,7 +5,7 @@ repositories. API-only backend in Rust.
 
 **Architecture:** Axum HTTP server exposing a REST API. Git operations delegated
 to a running gitaly-rs instance via gRPC (Tonic client). MongoDB stores workflow
-state, audit trails, and tenant/repository metadata. Async job runner handles long-running
+state, audit trails, and team/repository metadata. Async job runner handles long-running
 operations (msuite, revalidation, deployments). Runtime profiles model URL/env
 vars/secrets/database/data configuration for environments and temp envs, including
 per-surface endpoint mappings.
@@ -62,7 +62,7 @@ conman (binary)
 
 **`conman-core`** — Pure domain layer. No IO, no frameworks. Contains:
 
-- Domain structs: `Tenant`, `App` (repository record), `AppSurface`,
+- Domain structs: `Team`, `App` (repository record), `AppSurface`,
   `Workspace`, `Changeset`, `Release`, `Deployment`, etc.
 - Enums: `ChangesetState`, `ReleaseState`, `DeploymentState`, `Role`, `BaselineMode`
 - State machine transition functions with guard conditions
@@ -94,7 +94,7 @@ conman (binary)
 **`conman-api`** — HTTP layer. Contains:
 
 - Axum router with all route definitions
-- Handler functions (resources include tenants, repos/apps,
+- Handler functions (resources include teams, repos/apps,
   workspaces, changesets, etc.)
 - Middleware: auth extraction, request ID injection, error mapping
 - Request/response types (API-facing DTOs, not domain types)
@@ -260,9 +260,11 @@ Audit writes are fire-and-forget (logged on failure, never block the request).
 
 ### Authentication flow
 
-1. `POST /api/auth/login` — validate email/password → issue JWT (24h expiry)
-2. Axum middleware extracts `Authorization: Bearer <token>` header
-3. Middleware decodes JWT → queries `app_memberships` → populates
+1. `POST /api/auth/signup` — create user, bootstrap first team + repository,
+   assign `owner`, issue JWT.
+2. `POST /api/auth/login` — validate email/password → issue JWT (24h expiry).
+3. Axum middleware extracts `Authorization: Bearer <token>` header.
+4. Middleware decodes JWT → queries `app_memberships` → populates
    `Extension<AuthUser>`:
    ```rust
    pub struct AuthUser {
@@ -271,8 +273,8 @@ Audit writes are fire-and-forget (logged on failure, never block the request).
        pub roles: HashMap<ObjectId, Role>,  // app_id -> role
    }
    ```
-4. Route handlers call `auth_user.require_role(app_id, Role::ConfigManager)?`
-5. Returns `ConmanError::Forbidden` on failure
+5. Route handlers call `auth_user.require_role(app_id, Role::ConfigManager)?`.
+6. Returns `ConmanError::Forbidden` on failure.
 
 ### Gitaly-rs connection
 
@@ -316,7 +318,7 @@ Loaded from environment variables with `CONMAN_` prefix:
 
 | Term            | Definition                                                                                    |
 | --------------- | --------------------------------------------------------------------------------------------- |
-| Tenant          | Top-level customer/account boundary for repositories                                           |
+| Team          | Top-level customer/account boundary for repositories                                           |
 | Repository      | Managed config repository (stored in `App`; exposed by `/api/repos`)                           |
 | App             | User-facing app within a repository (domains/branding/role hints)                              |
 | Workspace       | User-owned mutable branch (`ws/<user>/<app>`)                                                 |
@@ -362,23 +364,23 @@ pending → running → succeeded | failed | canceled
 
 ### RBAC permission matrix
 
-| Capability                                  | user | reviewer | config_manager | app_admin |
-| ------------------------------------------- | :--: | :------: | :------------: | :-------: |
-| Read app/repo metadata                      |  Y   |    Y     |       Y        |     Y     |
-| Create/edit own workspace                   |  Y   |    Y     |       Y        |     Y     |
-| Create/modify own changeset                 |  Y   |    Y     |       Y        |     Y     |
-| Submit changeset                            |  Y   |    Y     |       Y        |     Y     |
-| Comment in review                           |  Y   |    Y     |       Y        |     Y     |
-| Approve/request changes/reject              |  -   |    Y     |       Y        |     Y     |
-| Move conflicted/needs_revalidation to draft | Own  |   Own    |      Any       |    Any    |
-| Assemble release from queue                 |  -   |    -     |       Y        |     Y     |
-| Publish release                             |  -   |    -     |       Y        |     Y     |
-| Deploy/promote release                      |  -   |    -     |       Y        |     Y     |
-| Skip stage / concurrent deploy approval     |  -   |    Y     |       Y        |     Y     |
-| Invite users                                |  -   |    -     |       -        |     Y     |
-| Manage app settings/roles/envs              |  -   |    -     |       -        |     Y     |
+| Capability                                  | member | reviewer | config_manager | admin | owner |
+| ------------------------------------------- | :----: | :------: | :------------: | :---: | :---: |
+| Read app/repo metadata                      |   Y    |    Y     |       Y        |   Y   |   Y   |
+| Create/edit own workspace                   |   Y    |    Y     |       Y        |   Y   |   Y   |
+| Create/modify own changeset                 |   Y    |    Y     |       Y        |   Y   |   Y   |
+| Submit changeset                            |   Y    |    Y     |       Y        |   Y   |   Y   |
+| Comment in review                           |   Y    |    Y     |       Y        |   Y   |   Y   |
+| Approve/request changes/reject              |   -    |    Y     |       Y        |   Y   |   Y   |
+| Move conflicted/needs_revalidation to draft |  Own   |   Own    |      Any       |  Any  |  Any  |
+| Assemble release from queue                 |   -    |    -     |       Y        |   Y   |   Y   |
+| Publish release                             |   -    |    -     |       Y        |   Y   |   Y   |
+| Deploy/promote release                      |   -    |    -     |       Y        |   Y   |   Y   |
+| Skip stage / concurrent deploy approval     |   -    |    Y     |       Y        |   Y   |   Y   |
+| Invite users                                |   -    |    -     |       -        |   Y   |   Y   |
+| Manage app settings/roles/envs              |   -    |    -     |       -        |   Y   |   Y   |
 
-`app_admin` inherits all `config_manager` capabilities.
+`owner` inherits all `admin` capabilities.
 
 ### Baseline resolution
 
@@ -416,12 +418,12 @@ Runtime profile rules in v1:
 - `surface_endpoints` keys must map to existing app keys for that repo.
 - Secrets are encrypted at rest via envelope encryption (master key from
   config, per-record data keys).
-- Secret plaintext reveal is `app_admin`-only; other roles get masked previews.
+- Secret plaintext reveal is `admin`-only; other roles get masked previews.
 - Env vars are typed (`string | number | boolean | json`).
 - Runtime profile schema is strict typed (no arbitrary top-level custom fields).
 - Canonical environment profile changes default to stricter two-approval policy
   (configurable to `same_as_changeset`).
-- `app_admin` emergency direct profile edits are allowed, audited, and still
+- `admin` emergency direct profile edits are allowed, audited, and still
   trigger deploy drift blocking until revalidation passes.
 - Changeset profile overrides are auto-included on submit and shown in submit
   summary.
@@ -441,7 +443,7 @@ test cases.
 | [E00](epics/E00-platform.md)      | Platform Foundation   | none          | Server skeleton, MongoDB bootstrap, config, error envelope, pagination |
 | [E01](epics/E01-git-adapter.md)   | Git Adapter           | E00           | Tonic client wrapping gitaly-rs gRPC services                          |
 | [E02](epics/E02-auth.md)          | Auth & RBAC           | E00           | Local auth, invites, memberships, role-based access                    |
-| [E03](epics/E03-app-setup.md)     | Tenant/Repo Setup     | E01, E02      | Tenant + repo + surface APIs, settings, environment metadata, runtime profiles |
+| [E03](epics/E03-app-setup.md)     | Team/Repo Setup     | E01, E02      | Team + repo + surface APIs, settings, environment metadata, runtime profiles |
 | [E04](epics/E04-workspaces.md)    | Workspaces            | E01, E03      | Workspace lifecycle, file operations, guardrails                       |
 | [E05](epics/E05-changesets.md)    | Changesets            | E02, E04      | Changeset lifecycle, review, comments, diffs, profile overrides        |
 | [E06](epics/E06-async-jobs.md)    | Async Jobs            | E00, E05      | Job framework, msuite workers, profile-aware gates/drift jobs          |

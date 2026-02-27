@@ -10,7 +10,7 @@ diffs, runtime profile overrides, and AI analysis endpoints.
 
 | Dependency | What it provides |
 |------------|-----------------|
-| **E02 Auth & RBAC** | `AuthUser` extractor, role checks (`reviewer`, `config_manager`, `app_admin`) for review actions |
+| **E02 Auth & RBAC** | `AuthUser` extractor, role checks (`reviewer`, `config_manager`, `admin`) for review actions |
 | **E04 Workspaces** | `Workspace` domain type, workspace repository, `head_sha` resolution, branch naming (`ws/<user>/<app>`) |
 | **E03 App Setup** | Runtime profiles and environment linkage metadata |
 | **E01 Git Adapter** | `GitalyClient` for diff generation, commit resolution, and blob content retrieval |
@@ -252,7 +252,7 @@ pub enum SemanticConfigType {
     Queue,
     Provider,
     Workflow,
-    Tenant,
+    Team,
     Menu,
     Asset,
     Script,
@@ -516,7 +516,7 @@ db.changesets.createIndex(
   workspace_id: ObjectId("6650a1b2c3d4e5f607080801"),
   author_user_id: ObjectId("6650a1b2c3d4e5f607080101"),
   title: "Add payment provider config",
-  description: "Configures Stripe provider for EU tenants",
+  description: "Configures Stripe provider for EU teams",
   state: "in_review",
   base_sha: "abc123def456abc123def456abc123def456abc1",
   head_sha: "789def012345789def012345789def012345789d",
@@ -698,7 +698,7 @@ approvals to zero.
 
 Submit a review decision on a changeset.
 
-- **Auth:** `reviewer`, `config_manager`, or `app_admin`
+- **Auth:** `reviewer`, `config_manager`, or `admin`
 - **Body:** `ReviewRequest`
 - **Guard:** State must be `Submitted`, `InReview`, or `ChangesRequested`.
 - **Logic:**
@@ -718,7 +718,7 @@ Submit a review decision on a changeset.
 
 Move an approved changeset into the queue. Performed by config_manager+.
 
-- **Auth:** `config_manager` or `app_admin`
+- **Auth:** `config_manager` or `admin`
 - **Guard:** State must be `Approved`.
 - **Logic:**
   1. Transition `Approved -> Queued`.
@@ -928,7 +928,7 @@ structured change descriptions. Processing steps:
    - `queues/**/*.json` -> `Queue`
    - `providers/**/*.json` -> `Provider`
    - `workflows/**/*.json` -> `Workflow`
-   - `tenants/**/*.json` -> `Tenant`
+   - `teams/**/*.json` -> `Team`
    - `menus/**/*.json` -> `Menu`
    - `assets/**/*` -> `Asset`
    - `scripts/**/*` -> `Script`
@@ -1312,13 +1312,13 @@ comparison.
 | 30 | Approve flow | Submitted changeset | `POST /review` (approve) | State transitions through InReview, approval_count=1 |
 | 31 | Approve meets threshold | Changeset with required_approval_count=1 | `POST /review` (approve) | Auto-transitions to Approved |
 | 32 | Self-review blocked | Changeset authored by user A | `POST /review` as user A | 403 Forbidden |
-| 33 | User role cannot review | Changeset, caller has `user` role | `POST /review` | 403 Forbidden |
+| 33 | Member role cannot review | Changeset, caller has `member` role | `POST /review` | 403 Forbidden |
 | 34 | Request changes resets approvals | InReview changeset with approval_count=1 | `POST /review` (changes_requested) | approval_count=0, state=ChangesRequested |
 | 35 | Reject is terminal | Submitted changeset | `POST /review` (reject) | State=Rejected, no further transitions possible |
 | 36 | Queue approved changeset | Approved changeset | `POST /queue` as config_manager | State=Queued |
-| 37 | Queue by user role blocked | Approved changeset | `POST /queue` as user | 403 Forbidden |
+| 37 | Queue by member role blocked | Approved changeset | `POST /queue` as member | 403 Forbidden |
 | 38 | Move conflicted to draft | Conflicted changeset (author) | `POST /move-to-draft` | State=Draft, approval_count=0 |
-| 39 | Move to draft by non-author non-admin | Conflicted changeset, caller is different user role | `POST /move-to-draft` | 403 Forbidden |
+| 39 | Move to draft by non-author non-admin | Conflicted changeset, caller has different member role | `POST /move-to-draft` | 403 Forbidden |
 | 40 | Raw diff | Changeset with known changes | `GET /diff?mode=raw` | Returns unified diff and stats |
 | 41 | Semantic diff | Changeset with entity JSON changes | `GET /diff?mode=semantic` | Returns classified SemanticChanges |
 | 42 | Create top-level comment | Existing changeset | `POST /comments` | 201, comment stored |
@@ -1343,7 +1343,7 @@ comparison.
 
 5. **Approval threshold auto-transition:** When `approval_count >= required_approval_count` after an `Approve` review, the changeset automatically transitions to `Approved` without additional API calls.
 
-6. **Review role enforcement:** Only users with `reviewer`, `config_manager`, or `app_admin` role can submit reviews. Self-review is allowed when the author has one of these roles.
+6. **Review role enforcement:** Only users with `reviewer`, `config_manager`, or `admin` role can submit reviews. Self-review is allowed when the author has one of these roles.
 
 7. **Diff modes:** `GET /diff?mode=raw` returns a unified diff with per-file stats. `GET /diff?mode=semantic` returns classified `SemanticChange` entries with config type, operation, target, and description.
 

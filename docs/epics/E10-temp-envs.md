@@ -479,7 +479,7 @@ impl TempEnvRepo {
 POST /api/repos/:appId/temp-envs
 ```
 
-**Auth:** Any role (`user`, `reviewer`, `config_manager`, `app_admin`).
+**Auth:** Any role (`user`, `reviewer`, `config_manager`, `admin`).
 
 **Request body:**
 
@@ -578,7 +578,7 @@ POST /api/repos/:appId/temp-envs/:tempEnvId/extend
 ```
 
 **Auth:** Any role. The user must be the creator of the temp environment, or
-hold `config_manager`/`app_admin` role on the app.
+hold `config_manager`/`admin` role on the app.
 
 **Request body:**
 
@@ -620,7 +620,7 @@ hold `config_manager`/`app_admin` role on the app.
 POST /api/repos/:appId/temp-envs/:tempEnvId/undo-expire
 ```
 
-**Auth:** Same as extend (creator, `config_manager`, or `app_admin`).
+**Auth:** Same as extend (creator, `config_manager`, or `admin`).
 
 **Validation:**
 - Temp environment must be in `Expiring` state.
@@ -657,7 +657,7 @@ POST /api/repos/:appId/temp-envs/:tempEnvId/undo-expire
 DELETE /api/repos/:appId/temp-envs/:tempEnvId
 ```
 
-**Auth:** Creator, `config_manager`, or `app_admin`.
+**Auth:** Creator, `config_manager`, or `admin`.
 
 **Validation:**
 - Temp environment must be in `Active` or `Expiring` state. Already `Expired`
@@ -1598,4 +1598,4 @@ async fn touch_activity_extends_expiry() {
      `{app}-{kind}-{word}.<domain>`.
    - Each temp-env instance gets a unique generated URL (no workspace-stable
      host reuse).
-   - Special reusable base profiles are managed by `app_admin` only.
+   - Special reusable base profiles are managed by `admin` only.

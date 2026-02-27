@@ -232,7 +232,7 @@ compact. Queries filter on `app_id` + `state: "queued"` and sort by
 
 Move an approved changeset into the queue.
 
-**Auth:** changeset author (any role), config_manager, or app_admin.
+**Auth:** changeset author (any role), config_manager, or admin.
 
 **Guards:**
 - Changeset must be in `Approved` state.
@@ -272,7 +272,7 @@ filters `state == queued` and sorts by `queue_position ASC`.
   "data": [
     {
       "changeset_id": "abc123",
-      "title": "Add tenant configuration",
+      "title": "Add team configuration",
       "author_user_id": "user456",
       "author_email": "alice@example.com",
       "workspace_branch": "ws/alice/myapp",
@@ -292,7 +292,7 @@ filters `state == queued` and sorts by `queue_position ASC`.
 Reorder the entire queue for an app. The request must include every
 currently-queued changeset ID exactly once, in the desired new order.
 
-**Auth:** config_manager or app_admin.
+**Auth:** config_manager or admin.
 
 **Request body:**
 
@@ -313,7 +313,7 @@ currently-queued changeset ID exactly once, in the desired new order.
 ```
 
 **Error cases:**
-- `403 Forbidden` if caller lacks config_manager or app_admin role.
+- `403 Forbidden` if caller lacks config_manager or admin role.
 - `400 Validation` if the provided IDs do not match the current queued set
   exactly (missing IDs, extra IDs, or duplicates).
 - `409 Conflict` if the queue was modified concurrently (optimistic check).
@@ -327,7 +327,7 @@ author can address the issues.
 
 **Auth:**
 - Changeset author can move their own.
-- config_manager or app_admin can move any.
+- config_manager or admin can move any.
 
 **Guards:**
 - Changeset must be in `Conflicted` or `NeedsRevalidation` state.
@@ -368,7 +368,7 @@ author can address the issues.
 
 ### 6.2 Queue reorder
 
-1. Verify caller has config_manager or app_admin role.
+1. Verify caller has config_manager or admin role.
 2. Load all changesets for the app where `state == "queued"`, sorted by current
    `queue_position`.
 3. Validate that `ordered_changeset_ids` is a permutation of the current queued
@@ -423,7 +423,7 @@ Each `revalidate_queued_changeset` job executes the following steps:
 ### 6.5 Move-to-draft
 
 1. Verify changeset is in `Conflicted` or `NeedsRevalidation` state.
-2. Verify caller is the changeset author, config_manager, or app_admin.
+2. Verify caller is the changeset author, config_manager, or admin.
 3. Clear queue metadata: set `queue_position = None`, `queued_at = None`.
 4. Clear revalidation metadata: `last_revalidation_status = None`,
    `last_revalidation_job_id = None`.
@@ -747,7 +747,7 @@ message Repository {
 ### E07-05: Move-to-draft
 
 - [ ] Implement handler `POST /api/repos/:appId/changesets/:changesetId/move-to-draft`.
-- [ ] RBAC: author can move own; config_manager/app_admin can move any.
+- [ ] RBAC: author can move own; config_manager/admin can move any.
 - [ ] Clear queue metadata (`queue_position`, `queued_at`).
 - [ ] Clear revalidation metadata.
 - [ ] Transition state to `Draft`.
@@ -811,7 +811,7 @@ message Repository {
 - Author can move their own `NeedsRevalidation` changeset to `Draft`.
 - Author cannot move another user's conflicted changeset (returns `403`).
 - config_manager can move any user's conflicted changeset to `Draft`.
-- app_admin can move any user's needs_revalidation changeset to `Draft`.
+- admin can move any user's needs_revalidation changeset to `Draft`.
 - Move-to-draft clears `queue_position`, `queued_at`,
   `last_revalidation_status`, and `last_revalidation_job_id`.
 - Attempting move-to-draft on a `Queued` changeset returns `409`.

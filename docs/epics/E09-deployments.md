@@ -165,7 +165,7 @@ use conman_core::auth::Role;
 ///
 /// Validation rules:
 /// - Exactly 2 approvals from distinct users.
-/// - At least one approver must hold `reviewer`, `config_manager`, or `app_admin`.
+/// - At least one approver must hold `reviewer`, `config_manager`, or `admin`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeployApproval {
     /// The user granting approval.
@@ -203,11 +203,11 @@ impl DeployApproval {
 
         // At least one approver must hold a privileged role.
         let has_privileged = approvals.iter().any(|a| {
-            matches!(a.role, Role::Reviewer | Role::ConfigManager | Role::AppAdmin)
+            matches!(a.role, Role::Reviewer | Role::ConfigManager | Role::Admin)
         });
         if !has_privileged {
             return Err(ConmanError::Validation {
-                message: "at least one approver must be reviewer, config_manager, or app_admin"
+                message: "at least one approver must be reviewer, config_manager, or admin"
                     .into(),
             });
         }
@@ -475,7 +475,7 @@ Rollback via redeploy prior tag:
 POST /api/repos/:appId/environments/:envId/deploy
 ```
 
-**Auth:** `config_manager` or `app_admin` on the app.
+**Auth:** `config_manager` or `admin` on the app.
 
 **Request body:**
 
@@ -516,7 +516,7 @@ POST /api/repos/:appId/environments/:envId/deploy
 |--------|------|-----------|
 | 400 | `validation_error` | Release not in deployable state (not `published` or later) |
 | 400 | `validation_error` | Skip-stage approvals invalid (< 2, not distinct, no privileged) |
-| 403 | `forbidden` | Caller lacks `config_manager`/`app_admin` role |
+| 403 | `forbidden` | Caller lacks `config_manager`/`admin` role |
 | 404 | `not_found` | App, environment, or release not found |
 | 409 | `conflict` | Active deployment already exists on this environment (lock) |
 
@@ -526,7 +526,7 @@ POST /api/repos/:appId/environments/:envId/deploy
 POST /api/repos/:appId/environments/:envId/promote
 ```
 
-**Auth:** `config_manager` or `app_admin` on the app.
+**Auth:** `config_manager` or `admin` on the app.
 
 **Request body:**
 
@@ -563,7 +563,7 @@ POST /api/repos/:appId/environments/:envId/promote
 POST /api/repos/:appId/environments/:envId/rollback
 ```
 
-**Auth:** `config_manager` or `app_admin` on the app.
+**Auth:** `config_manager` or `admin` on the app.
 
 **Request body (RedeployPriorTag):**
 
@@ -664,9 +664,9 @@ Skip-stage is not a separate endpoint; it is a modifier on deploy/promote. When
 3. `DeployApproval::validate_approvals()` enforces:
    - At least 2 approvals.
    - All user IDs are distinct.
-   - At least one approver holds `reviewer`, `config_manager`, or `app_admin`.
+   - At least one approver holds `reviewer`, `config_manager`, or `admin`.
 4. The requesting user's own approval counts as one of the two (they must be
-   `config_manager` or `app_admin` to call deploy/promote).
+   `config_manager` or `admin` to call deploy/promote).
 
 ### 6.4 Concurrent Deploy
 
@@ -759,7 +759,7 @@ separate mutex.
 Normal sequential promotion (the release moves to the next environment in
 pipeline order) requires **no additional deploy-time approval** beyond the
 changeset and release approvals already obtained during the review and publish
-flow. Only `config_manager` or `app_admin` authorization is checked.
+flow. Only `config_manager` or `admin` authorization is checked.
 
 ## 7. Gitaly-rs Integration
 
@@ -1292,7 +1292,7 @@ fn valid_approvals_pass() {
         },
         DeployApproval {
             user_id: ObjectId::new(),
-            role: Role::User,
+            role: Role::Member,
             approved_at: Utc::now(),
         },
     ];
@@ -1304,7 +1304,7 @@ fn valid_approvals_pass() {
 fn fewer_than_two_approvals_fails() {
     let approvals = vec![DeployApproval {
         user_id: ObjectId::new(),
-        role: Role::AppAdmin,
+        role: Role::Admin,
         approved_at: Utc::now(),
     }];
 
@@ -1337,18 +1337,18 @@ fn no_privileged_approver_fails() {
     let approvals = vec![
         DeployApproval {
             user_id: ObjectId::new(),
-            role: Role::User,
+            role: Role::Member,
             approved_at: Utc::now(),
         },
         DeployApproval {
             user_id: ObjectId::new(),
-            role: Role::User,
+            role: Role::Member,
             approved_at: Utc::now(),
         },
     ];
 
     let err = DeployApproval::validate_approvals(&approvals).unwrap_err();
-    assert!(err.to_string().contains("reviewer, config_manager, or app_admin"));
+    assert!(err.to_string().contains("reviewer, config_manager, or admin"));
 }
 
 #[test]
@@ -1361,7 +1361,7 @@ fn reviewer_counts_as_privileged() {
         },
         DeployApproval {
             user_id: ObjectId::new(),
-            role: Role::User,
+            role: Role::Member,
             approved_at: Utc::now(),
         },
     ];
@@ -1618,7 +1618,7 @@ async fn deploy_emits_audit_event() {
 
 5. **Normal promotion needs no additional deploy-time approval.**
    - Sequential promotion (Dev -> QA -> UAT -> Prod) succeeds with only the
-     `config_manager`/`app_admin` authorization check. No approval records
+     `config_manager`/`admin` authorization check. No approval records
      are required.
 
 6. **Rollback mode A (revert and release) is available and audited.**

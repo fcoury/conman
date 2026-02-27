@@ -32,7 +32,7 @@ Legend:
 | E00 Platform Foundation | worker-platform | none | A | done | master | 100 |  |
 | E01 Git Adapter | worker-git | E00 | A | done | master | 100 |  |
 | E02 Auth & RBAC | worker-auth | E00 | A | done | master | 100 |  |
-| E03 Tenant/Repo Setup | worker-app | E01, E02 | A | done | master | 100 |  |
+| E03 Team/Repo Setup | worker-app | E01, E02 | A | done | master | 100 |  |
 | E04 Workspaces | worker-workspace | E01, E03 | B | done | master | 100 |  |
 | E05 Changesets | worker-changeset | E02, E04 | B | done | master | 100 |  |
 | E06 Async Jobs | worker-jobs | E00, E05 | B | done | master | 100 |  |
@@ -68,7 +68,7 @@ Do not merge when prerequisites are incomplete:
 - [x] Service boots with shared error/pagination/request-id conventions
 - [x] Git adapter boundary implemented (no direct gitaly calls in handlers)
 - [x] Auth + RBAC enforcement active
-- [x] Tenant/repo/surface + env/runtime-profile baseline APIs available
+- [x] Team/repo/surface + env/runtime-profile baseline APIs available
 - Result: `pass`
 - Date: `2026-02-26`
 - Notes: Full gitaly-rs RPC mappings now implemented in `conman-git::GitalyClient`.

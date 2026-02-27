@@ -561,7 +561,7 @@ pub async fn list_releases(
 POST /api/repos/:appId/releases
 ```
 
-**Role:** `config_manager` or `app_admin`.
+**Role:** `config_manager` or `admin`.
 
 **Request Body:**
 
@@ -649,7 +649,7 @@ with per-changeset detail:
 POST /api/repos/:appId/releases/:releaseId/changesets
 ```
 
-**Role:** `config_manager` or `app_admin`.
+**Role:** `config_manager` or `admin`.
 
 **Guard:** Release must be in `draft_release` state.
 
@@ -683,7 +683,7 @@ POST /api/repos/:appId/releases/:releaseId/changesets
 POST /api/repos/:appId/releases/:releaseId/reorder
 ```
 
-**Role:** `config_manager` or `app_admin`.
+**Role:** `config_manager` or `admin`.
 
 **Guard:** Release must be in `draft_release` state.
 
@@ -719,7 +719,7 @@ POST /api/repos/:appId/releases/:releaseId/reorder
 POST /api/repos/:appId/releases/:releaseId/assemble
 ```
 
-**Role:** `config_manager` or `app_admin`.
+**Role:** `config_manager` or `admin`.
 
 **Guard:** Release must be in `draft_release` state and have at least one
 changeset selected.
@@ -850,7 +850,7 @@ async fn execute_release_assemble(job: &Job, ctx: &WorkerContext) -> Result<(), 
 POST /api/repos/:appId/releases/:releaseId/publish
 ```
 
-**Role:** `config_manager` or `app_admin`.
+**Role:** `config_manager` or `admin`.
 
 **Guard:** Release must be in `validated` state.
 
@@ -919,7 +919,7 @@ pub async fn next_tag(
 - All selected changeset IDs must resolve to changesets in `queued` state.
 - A changeset cannot be included in more than one non-draft release
   simultaneously.
-- The creating user must have `config_manager` or `app_admin` role on the app.
+- The creating user must have `config_manager` or `admin` role on the app.
 
 ### 6.2 Composition Engine
 

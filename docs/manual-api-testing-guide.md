@@ -1,8 +1,8 @@
 # Manual API Testing Guide
 
-This guide walks through a full logical test sequence for the current Conman API,
-including first-user bootstrap, app setup, review/release flow, deployment flow,
-and temp environments.
+This guide walks through a full end-to-end API sequence for Conman, starting
+from a clean local run and covering signup, team/repository setup, apps,
+workspaces, changesets, release, deployment, and temp environments.
 
 ## 1. Prerequisites
 
@@ -10,13 +10,8 @@ and temp environments.
 - `jq`
 - `curl`
 - MongoDB reachable at `CONMAN_MONGO_URI`
-- Optional but recommended for full Git behavior: `gitaly-rs` running and target
-  repository path available in Gitaly
-
-Notes:
-- For full release/deploy validation behavior, keep the default gate commands
-  (`true`) from `.env.example`, or replace them with your real commands.
-- Default role hierarchy: `user < reviewer < config_manager < app_admin`.
+- Optional for full Git behavior: `gitaly-rs` running and repository path
+  available in Gitaly
 
 ## 2. Local setup and startup
 
@@ -31,58 +26,29 @@ Health checks:
 
 ```bash
 curl -sS http://127.0.0.1:3000/api/health | jq
-curl -sS http://127.0.0.1:3000/api/metrics | head -n 20
 curl -sS http://127.0.0.1:3000/api/openapi.json | jq '.openapi'
 open http://127.0.0.1:3000/api/docs
 ```
 
-## 3. Bootstrap the first login user (admin operator)
-
-There is no public signup endpoint in v1. Create/update a first user directly via
-Conman subcommand:
-
-```bash
-cargo run -- bootstrap-admin admin@example.com "Admin User" "AdminPassw0rd!!"
-```
-
-Optional DB override:
-
-```bash
-cargo run -- bootstrap-admin admin@example.com "Admin User" "AdminPassw0rd!!" \
-  --mongo-uri mongodb://localhost:27017 \
-  --mongo-db conman
-```
-
-## 4. Session variables and helpers
+## 3. Session variables and helper functions
 
 ```bash
 export BASE="http://127.0.0.1:3000"
 
-# Login as bootstrap user.
-ADMIN_LOGIN=$(curl -sS -X POST "$BASE/api/auth/login" \
-  -H 'content-type: application/json' \
-  -d '{"email":"admin@example.com","password":"AdminPassw0rd!!"}')
-export ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | jq -r '.data.token')
-export ADMIN_USER_ID=$(echo "$ADMIN_LOGIN" | jq -r '.data.user.id')
-
-echo "$ADMIN_TOKEN" | head -c 24; echo
-
-# Helper to call authenticated endpoints.
-api() {
+api_auth() {
   local method="$1"; shift
   local path="$1"; shift
   curl -sS -X "$method" "$BASE$path" \
-    -H "authorization: Bearer $ADMIN_TOKEN" \
+    -H "authorization: Bearer $TOKEN" \
     -H 'content-type: application/json' "$@"
 }
 
-# Helper to poll async jobs until terminal.
 wait_job() {
-  local app_id="$1"
+  local repo_id="$1"
   local job_id="$2"
   while true; do
     local state
-    state=$(api GET "/api/repos/$app_id/jobs/$job_id" | jq -r '.data.job.state')
+    state=$(api_auth GET "/api/repos/$repo_id/jobs/$job_id" | jq -r '.data.job.state')
     echo "job $job_id state=$state"
     case "$state" in
       succeeded|failed|canceled) break ;;
@@ -92,86 +58,117 @@ wait_job() {
 }
 ```
 
-## 5. Auth and self endpoints
+## 4. Signup and login
+
+Create the first user (open signup). This auto-creates the user's first team
+and first repository, and assigns `owner` role.
 
 ```bash
-# Logout endpoint (stateless response).
-api POST /api/auth/logout | jq
-
-# Forgot/reset flow (returns token in current implementation).
-RESET_TOKEN=$(curl -sS -X POST "$BASE/api/auth/forgot-password" \
+SIGNUP_JSON=$(curl -sS -X POST "$BASE/api/auth/signup" \
   -H 'content-type: application/json' \
-  -d '{"email":"admin@example.com"}' | jq -r '.data.reset_token')
+  -d '{"name":"Admin User","email":"admin@example.com","password":"AdminPassw0rd!!"}')
 
-curl -sS -X POST "$BASE/api/auth/reset-password" \
-  -H 'content-type: application/json' \
-  -d "{\"token\":\"$RESET_TOKEN\",\"new_password\":\"AdminPassw0rd!!\"}" | jq
-
-# Notification preferences.
-api GET /api/me/notification-preferences | jq
-api PATCH /api/me/notification-preferences -d '{"email_enabled":true}' | jq
+echo "$SIGNUP_JSON" | jq
+export TOKEN=$(echo "$SIGNUP_JSON" | jq -r '.data.token')
+export USER_ID=$(echo "$SIGNUP_JSON" | jq -r '.data.user.id')
+export TEAM_ID=$(echo "$SIGNUP_JSON" | jq -r '.data.team.id')
 ```
 
-## 6. Create tenant + repository and base settings
+Optional re-login:
 
 ```bash
-TENANT_JSON=$(api POST /api/tenants -d '{
-  "name": "Demo Tenant",
-  "slug": "demo-tenant"
-}')
-echo "$TENANT_JSON" | jq
-export TENANT_ID=$(echo "$TENANT_JSON" | jq -r '.data.id')
+LOGIN_JSON=$(curl -sS -X POST "$BASE/api/auth/login" \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin@example.com","password":"AdminPassw0rd!!"}')
+export TOKEN=$(echo "$LOGIN_JSON" | jq -r '.data.token')
+```
 
-REPO_JSON=$(api POST "/api/tenants/$TENANT_ID/repos" -d '{
-  "name": "Demo App",
-  "repo_path": "group/demo-app.git",
+## 5. Team + repository setup
+
+List teams and create another repository under the bootstrap team.
+
+```bash
+api_auth GET "/api/teams?page=1&limit=20" | jq
+api_auth GET "/api/teams/$TEAM_ID" | jq
+
+REPO_JSON=$(api_auth POST "/api/teams/$TEAM_ID/repos" -d '{
+  "name": "Demo Team Configuration",
+  "repo_path": "group/demo-team-config.git",
   "integration_branch": "main"
 }')
+
 echo "$REPO_JSON" | jq
-export APP_ID=$(echo "$REPO_JSON" | jq -r '.data.id')
+export REPO_ID=$(echo "$REPO_JSON" | jq -r '.data.id')
 
-api GET /api/tenants | jq
-api GET "/api/tenants/$TENANT_ID" | jq
-api GET /api/repos | jq
-api GET "/api/repos/$APP_ID" | jq
+# Refresh token so repo membership claims include the new repo.
+LOGIN_JSON=$(curl -sS -X POST "$BASE/api/auth/login" \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin@example.com","password":"AdminPassw0rd!!"}')
+export TOKEN=$(echo "$LOGIN_JSON" | jq -r '.data.token')
 
-# Compatibility alias still available.
-api GET /api/repos | jq
-api GET "/api/repos/$APP_ID" | jq
+api_auth GET "/api/repos?page=1&limit=20" | jq
+api_auth GET "/api/repos/$REPO_ID" | jq
+```
 
-api PATCH "/api/repos/$APP_ID/settings" -d '{
+## 6. Repository settings, members, and team invites
+
+```bash
+api_auth PATCH "/api/repos/$REPO_ID/settings" -d '{
   "baseline_mode": "canonical_env_release",
   "commit_mode_default": "submit_commit",
   "blocked_paths": [".git/**", ".gitignore", ".github/**"],
   "file_size_limit_bytes": 5242880,
   "profile_approval_policy": "stricter_two_approvals"
 }' | jq
+
+api_auth GET "/api/repos/$REPO_ID/members?page=1&limit=20" | jq
+
+INVITE_JSON=$(api_auth POST "/api/teams/$TEAM_ID/invites" -d '{
+  "email": "reviewer@example.com",
+  "role": "reviewer"
+}')
+
+echo "$INVITE_JSON" | jq
+export INVITE_TOKEN=$(echo "$INVITE_JSON" | jq -r '.data.token')
 ```
 
-## 7. Create apps
+Accept invite as second user:
 
 ```bash
-api POST "/api/repos/$APP_ID/apps" -d '{
+REVIEWER_ACCEPT=$(curl -sS -X POST "$BASE/api/auth/accept-invite" \
+  -H 'content-type: application/json' \
+  -d "{\"token\":\"$INVITE_TOKEN\",\"name\":\"Reviewer User\",\"password\":\"ReviewerPassw0rd!!\"}")
+
+export REVIEWER_TOKEN=$(echo "$REVIEWER_ACCEPT" | jq -r '.data.token')
+export REVIEWER_USER_ID=$(echo "$REVIEWER_ACCEPT" | jq -r '.data.user.id')
+
+# Optional explicit role assignment at repo scope.
+api_auth POST "/api/repos/$REPO_ID/members" -d "{\"user_id\":\"$REVIEWER_USER_ID\",\"role\":\"reviewer\"}" | jq
+api_auth GET "/api/repos/$REPO_ID/members?page=1&limit=20" | jq
+```
+
+## 7. Apps (surfaces)
+
+```bash
+api_auth POST "/api/repos/$REPO_ID/apps" -d '{
   "key": "portal",
   "title": "Patient Portal",
   "domains": ["portal.example.test"]
 }' | jq
 
-api POST "/api/repos/$APP_ID/apps" -d '{
+api_auth POST "/api/repos/$REPO_ID/apps" -d '{
   "key": "admin",
   "title": "Admin Console",
   "domains": ["admin.example.test"]
 }' | jq
 
-api GET "/api/repos/$APP_ID/apps" | jq
+api_auth GET "/api/repos/$REPO_ID/apps" | jq
 ```
 
 ## 8. Runtime profiles and environments
 
-Create two persistent runtime profiles:
-
 ```bash
-DEV_PROFILE_JSON=$(api POST "/api/repos/$APP_ID/runtime-profiles" -d '{
+DEV_PROFILE_JSON=$(api_auth POST "/api/repos/$REPO_ID/runtime-profiles" -d '{
   "name": "Development",
   "kind": "persistent_env",
   "base_url": "https://dev.example.test",
@@ -194,7 +191,7 @@ DEV_PROFILE_JSON=$(api POST "/api/repos/$APP_ID/runtime-profiles" -d '{
 }')
 export DEV_PROFILE_ID=$(echo "$DEV_PROFILE_JSON" | jq -r '.data.id')
 
-PROD_PROFILE_JSON=$(api POST "/api/repos/$APP_ID/runtime-profiles" -d '{
+PROD_PROFILE_JSON=$(api_auth POST "/api/repos/$REPO_ID/runtime-profiles" -d '{
   "name": "Production",
   "kind": "persistent_env",
   "base_url": "https://app.example.test",
@@ -216,18 +213,11 @@ PROD_PROFILE_JSON=$(api POST "/api/repos/$APP_ID/runtime-profiles" -d '{
 }')
 export PROD_PROFILE_ID=$(echo "$PROD_PROFILE_JSON" | jq -r '.data.id')
 
-api GET "/api/repos/$APP_ID/runtime-profiles" | jq
-api GET "/api/repos/$APP_ID/runtime-profiles/$DEV_PROFILE_ID" | jq
-api PATCH "/api/repos/$APP_ID/runtime-profiles/$DEV_PROFILE_ID" -d '{
-  "base_url": "https://dev2.example.test"
-}' | jq
-api POST "/api/repos/$APP_ID/runtime-profiles/$DEV_PROFILE_ID/secrets/API_KEY/reveal" | jq
-```
+api_auth GET "/api/repos/$REPO_ID/runtime-profiles?page=1&limit=20" | jq
+api_auth GET "/api/repos/$REPO_ID/runtime-profiles/$DEV_PROFILE_ID" | jq
+api_auth POST "/api/repos/$REPO_ID/runtime-profiles/$DEV_PROFILE_ID/secrets/API_KEY/reveal" | jq
 
-Replace environment set and mark canonical env:
-
-```bash
-ENV_JSON=$(api PATCH "/api/repos/$APP_ID/environments" -d "{
+ENV_JSON=$(api_auth PATCH "/api/repos/$REPO_ID/environments" -d "{
   \"environments\": [
     {\"name\":\"dev\",  \"position\":1, \"is_canonical\":false, \"runtime_profile_id\":\"$DEV_PROFILE_ID\"},
     {\"name\":\"qa\",   \"position\":2, \"is_canonical\":false, \"runtime_profile_id\":\"$DEV_PROFILE_ID\"},
@@ -235,262 +225,129 @@ ENV_JSON=$(api PATCH "/api/repos/$APP_ID/environments" -d "{
   ]
 }")
 
-echo "$ENV_JSON" | jq
 export DEV_ENV_ID=$(echo "$ENV_JSON" | jq -r '.data[] | select(.name=="dev") | .id')
 export QA_ENV_ID=$(echo "$ENV_JSON" | jq -r '.data[] | select(.name=="qa") | .id')
 export PROD_ENV_ID=$(echo "$ENV_JSON" | jq -r '.data[] | select(.name=="prod") | .id')
-
-api GET "/api/repos/$APP_ID/environments" | jq
 ```
 
-## 9. Members and invites (create reviewer user)
+## 9. Workspaces and files
 
 ```bash
-INVITE_JSON=$(api POST "/api/repos/$APP_ID/invites" -d '{
-  "email": "reviewer@example.com",
-  "role": "reviewer"
-}')
-
-echo "$INVITE_JSON" | jq
-export INVITE_TOKEN=$(echo "$INVITE_JSON" | jq -r '.data.token')
-
-# Accept invite as second user.
-REVIEWER_LOGIN=$(curl -sS -X POST "$BASE/api/auth/accept-invite" \
-  -H 'content-type: application/json' \
-  -d "{\"token\":\"$INVITE_TOKEN\",\"name\":\"Reviewer User\",\"password\":\"ReviewerPassw0rd!!\"}")
-export REVIEWER_TOKEN=$(echo "$REVIEWER_LOGIN" | jq -r '.data.token')
-export REVIEWER_USER_ID=$(echo "$REVIEWER_LOGIN" | jq -r '.data.user.id')
-
-# Optional explicit role assignment endpoint.
-api POST "/api/repos/$APP_ID/members" -d "{\"user_id\":\"$REVIEWER_USER_ID\",\"role\":\"reviewer\"}" | jq
-api GET "/api/repos/$APP_ID/members" | jq
-```
-
-## 10. Workspace and file operations
-
-```bash
-WS_JSON=$(api POST "/api/repos/$APP_ID/workspaces" -d '{"title":"Main Workspace"}')
+WS_JSON=$(api_auth POST "/api/repos/$REPO_ID/workspaces" -d '{"title":"Main Workspace"}')
 export WORKSPACE_ID=$(echo "$WS_JSON" | jq -r '.data.id')
 
-echo "$WS_JSON" | jq
-api GET "/api/repos/$APP_ID/workspaces" | jq
-api GET "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID" | jq
-api PATCH "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID" -d '{"title":"Main Workspace v2"}' | jq
-
-# Write file (content must be base64).
 FILE_B64=$(printf 'feature:\n  enabled: true\n' | base64)
-api PUT "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files" -d "{
+api_auth PUT "/api/repos/$REPO_ID/workspaces/$WORKSPACE_ID/files" -d "{
   \"path\": \"config/app.yaml\",
   \"content\": \"$FILE_B64\",
   \"message\": \"add config\"
 }" | jq
 
-api GET "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files?path=config/app.yaml" | jq
-api GET "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files?path=config" | jq
-
-api POST "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/checkpoints" -d '{"message":"checkpoint 1"}' | jq
-api POST "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/sync-integration" -d '{}' | jq
-api DELETE "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files" -d '{"path":"config/app.yaml"}' | jq
-api POST "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/reset" -d '{}' | jq
+api_auth GET "/api/repos/$REPO_ID/workspaces/$WORKSPACE_ID/files?path=config/app.yaml" | jq
+api_auth POST "/api/repos/$REPO_ID/workspaces/$WORKSPACE_ID/checkpoints" -d '{"message":"checkpoint 1"}' | jq
 ```
 
-## 11. Changesets: create -> submit -> review -> queue
-
-Create a fresh file change first:
+## 10. Changesets and review
 
 ```bash
-FILE_B64=$(printf 'feature:\n  enabled: false\n' | base64)
-api PUT "/api/repos/$APP_ID/workspaces/$WORKSPACE_ID/files" -d "{
-  \"path\": \"config/app.yaml\",
-  \"content\": \"$FILE_B64\",
-  \"message\": \"toggle feature\"
-}" | jq
-```
-
-Create and submit changeset:
-
-```bash
-CS_JSON=$(api POST "/api/repos/$APP_ID/changesets" -d "{
+CS_JSON=$(api_auth POST "/api/repos/$REPO_ID/changesets" -d "{
   \"workspace_id\": \"$WORKSPACE_ID\",
   \"title\": \"Toggle feature\",
   \"description\": \"Manual API test changeset\"
 }")
 export CHANGESET_ID=$(echo "$CS_JSON" | jq -r '.data.id')
 
-echo "$CS_JSON" | jq
-api GET "/api/repos/$APP_ID/changesets?page=1&limit=20" | jq
-api GET "/api/repos/$APP_ID/changesets/$CHANGESET_ID" | jq
-api PATCH "/api/repos/$APP_ID/changesets/$CHANGESET_ID" -d '{"description":"Updated description"}' | jq
-
-SUBMIT_JSON=$(api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/submit" -d "{
+SUBMIT_JSON=$(api_auth POST "/api/repos/$REPO_ID/changesets/$CHANGESET_ID/submit" -d "{
   \"profile_overrides\": [
     {\"key\":\"FEATURE_X\",\"value\":{\"type\":\"boolean\",\"value\":true},\"target_profile_id\":\"$DEV_PROFILE_ID\"}
   ]
 }")
-
-echo "$SUBMIT_JSON" | jq
 SUBMIT_JOB_ID=$(echo "$SUBMIT_JSON" | jq -r '.data.job.id')
-wait_job "$APP_ID" "$SUBMIT_JOB_ID"
-```
+wait_job "$REPO_ID" "$SUBMIT_JOB_ID"
 
-Review (as reviewer) and queue (as admin/config manager):
-
-```bash
-curl -sS -X POST "$BASE/api/repos/$APP_ID/changesets/$CHANGESET_ID/review" \
+curl -sS -X POST "$BASE/api/repos/$REPO_ID/changesets/$CHANGESET_ID/review" \
   -H "authorization: Bearer $REVIEWER_TOKEN" \
   -H 'content-type: application/json' \
   -d '{"action":"approve"}' | jq
 
-api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/queue" -d '{}' | jq
-
-# Diff + comments.
-api GET "/api/repos/$APP_ID/changesets/$CHANGESET_ID/diff?format=semantic" | jq
-api GET "/api/repos/$APP_ID/changesets/$CHANGESET_ID/diff?format=raw" | jq
-api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/comments" -d '{"body":"looks good"}' | jq
-api GET "/api/repos/$APP_ID/changesets/$CHANGESET_ID/comments" | jq
-
-# Optional draft transition from queued state.
-api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/move-to-draft" -d '{}' | jq
-# Re-submit path (after moving draft and making additional edit).
-api POST "/api/repos/$APP_ID/changesets/$CHANGESET_ID/resubmit" -d '{"profile_overrides":[]}' | jq
+api_auth POST "/api/repos/$REPO_ID/changesets/$CHANGESET_ID/queue" -d '{}' | jq
+api_auth GET "/api/repos/$REPO_ID/changesets/$CHANGESET_ID/diff?format=semantic" | jq
+api_auth POST "/api/repos/$REPO_ID/changesets/$CHANGESET_ID/comments" -d '{"body":"looks good"}' | jq
 ```
 
-## 12. Release flow (queue-first)
-
-Make sure the changeset is approved + queued before continuing.
+## 11. Releases
 
 ```bash
-REL_JSON=$(api POST "/api/repos/$APP_ID/releases" -d '{}')
+REL_JSON=$(api_auth POST "/api/repos/$REPO_ID/releases" -d '{}')
 export RELEASE_ID=$(echo "$REL_JSON" | jq -r '.data.id')
 
-echo "$REL_JSON" | jq
-api GET "/api/repos/$APP_ID/releases?page=1&limit=20" | jq
-api GET "/api/repos/$APP_ID/releases/$RELEASE_ID" | jq
-
-api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/changesets" -d "{
+api_auth POST "/api/repos/$REPO_ID/releases/$RELEASE_ID/changesets" -d "{
   \"changeset_ids\": [\"$CHANGESET_ID\"]
 }" | jq
 
-api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/reorder" -d "{
-  \"changeset_ids\": [\"$CHANGESET_ID\"]
-}" | jq
-
-ASM_JSON=$(api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/assemble" -d '{}')
+ASM_JSON=$(api_auth POST "/api/repos/$REPO_ID/releases/$RELEASE_ID/assemble" -d '{}')
 ASM_JOB_ID=$(echo "$ASM_JSON" | jq -r '.data.job.id')
-wait_job "$APP_ID" "$ASM_JOB_ID"
+wait_job "$REPO_ID" "$ASM_JOB_ID"
 
-# Publish can return 409 first time if merge gate job gets enqueued.
-PUBLISH_STATUS=$(api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/publish" -d '{}' | tee /tmp/publish.json | jq -r '.data.release.id // empty')
-if [ -z "$PUBLISH_STATUS" ]; then
-  echo "publish returned non-success; poll jobs and retry"
-  api GET "/api/repos/$APP_ID/jobs?page=1&limit=50" | jq
-  # Retry publish until success:
-  api POST "/api/repos/$APP_ID/releases/$RELEASE_ID/publish" -d '{}' | jq
-else
-  cat /tmp/publish.json | jq
-fi
+api_auth POST "/api/repos/$REPO_ID/releases/$RELEASE_ID/publish" -d '{}' | jq
 ```
 
-## 13. Deploy, promote, rollback
-
-Deploy uses gate jobs (drift check and msuite deploy). First deploy calls may return
-`409` with gate-enqueued messages; retry after gate job success.
+## 12. Deployments
 
 ```bash
-# Attempt deploy to dev.
-api POST "/api/repos/$APP_ID/environments/$DEV_ENV_ID/deploy" -d "{
+api_auth POST "/api/repos/$REPO_ID/environments/$DEV_ENV_ID/deploy" -d "{
   \"release_id\": \"$RELEASE_ID\",
   \"is_skip_stage\": false,
   \"is_concurrent_batch\": false,
   \"approvals\": []
 }" | jq
 
-# Inspect/poll jobs, then retry deploy until you get data.deployment + data.job.
-api GET "/api/repos/$APP_ID/jobs?page=1&limit=50" | jq
-
-# Promote to QA.
-api POST "/api/repos/$APP_ID/environments/$QA_ENV_ID/promote" -d "{
+api_auth POST "/api/repos/$REPO_ID/environments/$QA_ENV_ID/promote" -d "{
   \"release_id\": \"$RELEASE_ID\",
   \"is_skip_stage\": false,
   \"is_concurrent_batch\": false,
   \"approvals\": []
 }" | jq
 
-# Exceptional concurrent/skip-stage deploy example (requires two distinct approvers,
-# with at least one config_manager/app_admin).
-api POST "/api/repos/$APP_ID/environments/$PROD_ENV_ID/deploy" -d "{
-  \"release_id\": \"$RELEASE_ID\",
-  \"is_skip_stage\": true,
-  \"is_concurrent_batch\": false,
-  \"approvals\": [\"$REVIEWER_USER_ID\", \"$ADMIN_USER_ID\"]
-}" | jq
-
-# Rollback (mode: revert_and_release or redeploy_prior_tag).
-api POST "/api/repos/$APP_ID/environments/$PROD_ENV_ID/rollback" -d "{
+api_auth POST "/api/repos/$REPO_ID/environments/$PROD_ENV_ID/rollback" -d "{
   \"release_id\": \"$RELEASE_ID\",
   \"mode\": \"revert_and_release\",
-  \"approvals\": [\"$REVIEWER_USER_ID\", \"$ADMIN_USER_ID\"]
+  \"approvals\": [\"$REVIEWER_USER_ID\", \"$USER_ID\"]
 }" | jq
-
-api GET "/api/repos/$APP_ID/deployments?page=1&limit=50" | jq
 ```
 
-## 14. Temp environments
+## 13. Temp environments
 
 ```bash
-TEMP_JSON=$(api POST "/api/repos/$APP_ID/temp-envs" -d "{
+TEMP_JSON=$(api_auth POST "/api/repos/$REPO_ID/temp-envs" -d "{
   \"kind\": \"workspace\",
   \"source_id\": \"$WORKSPACE_ID\",
   \"base_profile_id\": \"$DEV_PROFILE_ID\"
 }")
 
-echo "$TEMP_JSON" | jq
 export TEMP_ENV_ID=$(echo "$TEMP_JSON" | jq -r '.data.temp_env.id')
 export TEMP_JOB_ID=$(echo "$TEMP_JSON" | jq -r '.data.job.id')
-wait_job "$APP_ID" "$TEMP_JOB_ID"
+wait_job "$REPO_ID" "$TEMP_JOB_ID"
 
-api GET "/api/repos/$APP_ID/temp-envs?page=1&limit=20" | jq
-api POST "/api/repos/$APP_ID/temp-envs/$TEMP_ENV_ID/extend" -d '{"seconds":7200}' | jq
-api DELETE "/api/repos/$APP_ID/temp-envs/$TEMP_ENV_ID" -d '{}' | jq
-api POST "/api/repos/$APP_ID/temp-envs/$TEMP_ENV_ID/undo-expire" -d '{}' | jq
+api_auth POST "/api/repos/$REPO_ID/temp-envs/$TEMP_ENV_ID/extend" -d '{"seconds":7200}' | jq
+api_auth DELETE "/api/repos/$REPO_ID/temp-envs/$TEMP_ENV_ID" -d '{}' | jq
+api_auth POST "/api/repos/$REPO_ID/temp-envs/$TEMP_ENV_ID/undo-expire" -d '{}' | jq
 ```
 
-## 15. Jobs endpoint usage for all async flows
+## 14. Endpoint coverage checklist
 
-```bash
-api GET "/api/repos/$APP_ID/jobs?page=1&limit=100" | jq
+This sequence covers:
 
-# Pick one job id and inspect logs.
-JOB_ID=$(api GET "/api/repos/$APP_ID/jobs?page=1&limit=1" | jq -r '.data[0].id')
-api GET "/api/repos/$APP_ID/jobs/$JOB_ID" | jq
-```
-
-## 16. Endpoint coverage checklist
-
-This sequence exercises every currently wired route in `conman-api/src/router.rs`:
-
-- Platform: `/api/health`, `/api/metrics`, `/api/openapi.json`, `/api/docs`
-- Auth: login/logout/forgot-password/reset-password/accept-invite
-- Tenants + repos: tenant list/create/get + repo create/list/get + surface create/list
-- Apps compatibility: list/create/get/settings/members/invites
+- Platform: `/api/health`, `/api/openapi.json`, `/api/docs`
+- Auth: signup/login/logout/forgot-password/reset-password/accept-invite
+- Teams: list/create/get/invite and repository creation under team
+- Repositories: list/get/settings/members
+- Apps (surfaces): list/create/update
 - Workspaces: list/create/get/update/reset/sync/files/checkpoints
 - Changesets: list/create/get/update/submit/resubmit/review/queue/move-to-draft/diff/comments
 - Releases: list/create/get/changesets/reorder/assemble/publish
-- Environments + runtime profiles: list/replace + profile list/create/get/update/reveal-secret (`surface_endpoints` included)
+- Environments + runtime profiles
 - Deployments: deploy/promote/rollback/list
 - Temp envs: list/create/extend/undo-expire/delete
 - Me: notification preferences get/update
 - Jobs: list/get
-
-## 17. Common failure modes
-
-- `403 missing bearer token`:
-  token missing or expired.
-- `403 role/capability required`:
-  wrong role for endpoint (`app_admin` vs `config_manager` vs `reviewer`).
-- `409 gate not satisfied`:
-  async gate job was enqueued; poll jobs and retry action.
-- `400 content must be base64` for workspace writes:
-  file payload content must be base64.
-- `409 changeset must be approved before queueing`:
-  review with `approve` first.

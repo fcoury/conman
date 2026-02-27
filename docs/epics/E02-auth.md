@@ -48,10 +48,10 @@ impl Role {
 impl std::fmt::Display for Role {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Role::User => write!(f, "user"),
+            Role::Member => write!(f, "user"),
             Role::Reviewer => write!(f, "reviewer"),
             Role::ConfigManager => write!(f, "config_manager"),
-            Role::AppAdmin => write!(f, "app_admin"),
+            Role::Admin => write!(f, "admin"),
         }
     }
 }
@@ -100,7 +100,7 @@ impl Capability {
             | Capability::EditOwnChangeset
             | Capability::SubmitChangeset
             | Capability::CommentInReview
-            | Capability::MoveToDraftOwn => Role::User,
+            | Capability::MoveToDraftOwn => Role::Member,
 
             Capability::ReviewChangeset
             | Capability::ApproveSkipStage => Role::Reviewer,
@@ -111,7 +111,7 @@ impl Capability {
             | Capability::DeployRelease => Role::ConfigManager,
 
             Capability::InviteUsers
-            | Capability::ManageApp => Role::AppAdmin,
+            | Capability::ManageApp => Role::Admin,
         }
     }
 }
@@ -441,7 +441,7 @@ Example document:
 | `_id` | `ObjectId` | Primary key |
 | `user_id` | `ObjectId` | References `users._id` |
 | `app_id` | `ObjectId` | References `apps._id` |
-| `role` | `String` | One of: `user`, `reviewer`, `config_manager`, `app_admin` |
+| `role` | `String` | One of: `user`, `reviewer`, `config_manager`, `admin` |
 | `created_at` | `DateTime` | Membership creation timestamp |
 
 Indexes:
@@ -765,7 +765,7 @@ Response `200`:
       "user_id": "665a1b2c3d4e5f6a7b8c9d0e",
       "email": "alice@example.com",
       "name": "Alice Chen",
-      "role": "app_admin",
+      "role": "admin",
       "joined_at": "2025-06-01T10:05:00Z"
     }
   ],
@@ -780,14 +780,14 @@ Errors:
 | 404 | `not_found` | App does not exist |
 | 403 | `forbidden` | User is not a member of this app |
 
-### `POST /api/repos/:appId/invites`
+### `POST /api/teams/:teamId/invites`
 
 Create an invite for a new user. Only app admins can invite.
 
 | | |
 |---|---|
 | **Auth** | Bearer JWT |
-| **RBAC** | `InviteUsers` (`app_admin` only) |
+| **RBAC** | `InviteUsers` (`admin` only) |
 
 Request:
 
@@ -817,19 +817,19 @@ Errors:
 
 | Status | Code | When |
 |--------|------|------|
-| 403 | `forbidden` | Caller is not app_admin |
+| 403 | `forbidden` | Caller is not admin |
 | 409 | `conflict` | Pending invite already exists for this email+app |
 | 409 | `conflict` | User is already a member of this app |
 | 404 | `not_found` | App does not exist |
 
-### `POST /api/repos/:appId/invites/:inviteId/resend`
+### `POST /api/teams/:teamId/invites/:inviteId/resend`
 
 Resend the invite email. Resets `expires_at` to 7 days from now.
 
 | | |
 |---|---|
 | **Auth** | Bearer JWT |
-| **RBAC** | `InviteUsers` (`app_admin` only) |
+| **RBAC** | `InviteUsers` (`admin` only) |
 
 Request: empty body.
 
@@ -852,18 +852,18 @@ Errors:
 
 | Status | Code | When |
 |--------|------|------|
-| 403 | `forbidden` | Caller is not app_admin |
+| 403 | `forbidden` | Caller is not admin |
 | 404 | `not_found` | Invite does not exist |
 | 400 | `invite_invalid` | Invite already accepted |
 
-### `DELETE /api/repos/:appId/invites/:inviteId`
+### `DELETE /api/teams/:teamId/invites/:inviteId`
 
 Revoke a pending invite.
 
 | | |
 |---|---|
 | **Auth** | Bearer JWT |
-| **RBAC** | `InviteUsers` (`app_admin` only) |
+| **RBAC** | `InviteUsers` (`admin` only) |
 
 Request: empty body.
 
@@ -879,7 +879,7 @@ Errors:
 
 | Status | Code | When |
 |--------|------|------|
-| 403 | `forbidden` | Caller is not app_admin |
+| 403 | `forbidden` | Caller is not admin |
 | 404 | `not_found` | Invite does not exist |
 | 400 | `invite_invalid` | Invite already accepted (cannot revoke) |
 
@@ -1022,9 +1022,9 @@ pub fn validate_token(token: &str, config: &JwtConfig) -> Result<Claims, ConmanE
 ### Invite flow
 
 ```
-1. app_admin calls POST /api/repos/:appId/invites { email, role }
+1. admin calls POST /api/teams/:teamId/invites { email, role }
 2. Server validates:
-   - Caller has InviteUsers capability (app_admin role)
+   - Caller has InviteUsers capability (admin role)
    - No pending invite exists for this email+app
    - Email is not already a member of this app
 3. Server generates a 32-byte random token (base64url-encoded)
@@ -1073,7 +1073,7 @@ Reset flow:
 
 Role inheritance is enforced by `PartialOrd` on the `Role` enum. The
 discriminant ordering (`User=0 < Reviewer=1 < ConfigManager=2 < AppAdmin=3`)
-means `app_admin.satisfies(config_manager)` is true, implementing the
+means `admin.satisfies(config_manager)` is true, implementing the
 inheritance rule from the scope doc.
 
 ```
@@ -1195,9 +1195,9 @@ tested independently.
 - [ ] **E02-S17**: Implement `POST /api/auth/reset-password` handler. Integration test: valid token updates password, expired token returns 410, used token returns 400.
 - [ ] **E02-S18**: Implement `POST /api/auth/accept-invite` handler. Integration test: valid invite creates user + membership + returns JWT, expired invite returns 410, already-accepted returns 400.
 - [ ] **E02-S19**: Implement `GET /api/repos/:appId/members` handler with pagination. Integration test: returns members with roles, respects pagination, non-member returns 403.
-- [ ] **E02-S20**: Implement `POST /api/repos/:appId/invites` handler. Integration test: app_admin can invite, non-admin returns 403, duplicate invite returns 409.
-- [ ] **E02-S21**: Implement `POST /api/repos/:appId/invites/:inviteId/resend` handler. Integration test: resets expiry, already-accepted returns 400.
-- [ ] **E02-S22**: Implement `DELETE /api/repos/:appId/invites/:inviteId` handler. Integration test: deletes pending invite, already-accepted returns 400.
+- [ ] **E02-S20**: Implement `POST /api/teams/:teamId/invites` handler. Integration test: admin can invite, non-admin returns 403, duplicate invite returns 409.
+- [ ] **E02-S21**: Implement `POST /api/teams/:teamId/invites/:inviteId/resend` handler. Integration test: resets expiry, already-accepted returns 400.
+- [ ] **E02-S22**: Implement `DELETE /api/teams/:teamId/invites/:inviteId` handler. Integration test: deletes pending invite, already-accepted returns 400.
 - [ ] **E02-S23**: Implement `GET /api/me/notification-preferences` handler. Integration test: returns defaults for new user, returns saved preferences.
 - [ ] **E02-S24**: Implement `PATCH /api/me/notification-preferences` handler. Integration test: updates toggle, subsequent GET reflects change.
 - [ ] **E02-S25**: Add audit event emission to all mutation handlers (invite_created, invite_accepted, invite_revoked, invite_resent, password_reset_requested, password_changed, membership_created, notification_preferences_updated). Verify audit documents in integration tests.
@@ -1319,8 +1319,8 @@ tested independently.
   - `user`: read, edit own workspace/changeset, submit, comment, move own to draft.
   - `reviewer`: all of `user` plus approve/request changes/reject, skip-stage approval.
   - `config_manager`: all of `reviewer` plus assemble/publish/deploy release, move any to draft.
-  - `app_admin`: all of `config_manager` plus invite users, manage app settings.
-- [ ] Role inheritance works: `app_admin` satisfies any `config_manager` check, `config_manager` satisfies any `reviewer` check, etc.
+  - `admin`: all of `config_manager` plus invite users, manage app settings.
+- [ ] Role inheritance works: `admin` satisfies any `config_manager` check, `config_manager` satisfies any `reviewer` check, etc.
 - [ ] All mutation endpoints emit audit events with actor, timestamp, before/after state, and request context.
 - [ ] All 55 test cases from section 9 pass.
 - [ ] TTL index on `password_reset_tokens.expires_at` automatically cleans up expired tokens.

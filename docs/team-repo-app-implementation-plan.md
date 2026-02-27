@@ -1,10 +1,10 @@
-# Tenant/Repo/App Implementation Plan
+# Team/Repo/App Implementation Plan
 
 ## Goal
 
 Implement the new domain direction:
 
-- `Tenant -> Config Repository -> App`
+- `Team -> Config Repository -> App`
 - Keep Git lifecycle repo-scoped (`workspace -> changeset -> release -> deploy`)
 - Add multi-surface support for URLs/runtime profile context
 
@@ -13,9 +13,9 @@ This plan is optimized for current reality: pre-production and one active user.
 ## What changes
 
 1. Current `App` becomes a repository concept in practice.
-2. Add first-class `Tenant`.
+2. Add first-class `Team`.
 3. Add first-class `App` under each repository.
-4. Keep `/api/repos` and `/api/tenants` as the canonical API surfaces.
+4. Keep `/api/repos` and `/api/teams` as the canonical API surfaces.
 5. Runtime profiles gain surface endpoint mapping.
 
 ## What stays the same
@@ -31,46 +31,41 @@ This plan is optimized for current reality: pre-production and one active user.
 
 Crates/files:
 
-- `conman-core`: add `tenant.rs`, `app_surface.rs`; keep `app.rs` as repo model.
-- `conman-db`: add `tenant_repo.rs`, `app_surface_repo.rs`.
+- `conman-core`: add `team.rs`, `app_surface.rs`; keep `app.rs` as repo model.
+- `conman-db`: add `team_repo.rs`, `app_surface_repo.rs`.
 - `conman-db/src/lib.rs`: export new repos and include index bootstrap.
 
 Tasks:
 
 1. Add domain structs:
-   - `Tenant { id, name, slug, created_at, updated_at }`
+   - `Team { id, name, slug, created_at, updated_at }`
    - `AppSurface { id, repo_id, key, title, domains, branding?, roles?, created_at, updated_at }`
-2. Extend existing app/repo model with `tenant_id`.
+2. Extend existing app/repo model with `team_id`.
 3. Add Mongo collections/indexes:
-   - `tenants.slug` unique
+   - `teams.slug` unique
    - `app_surfaces (repo_id, key)` unique
-   - `apps.tenant_id` non-unique index
-4. One-time local backfill:
-   - create a default tenant
-   - assign all existing repos to it
-
+   - `apps.team_id` non-unique index
 Done when:
 
 - service boots with new collections/indexes
-- existing app/repo flows still work
 
-## Step 2: API surface (tenant + repo + app)
+## Step 2: API surface (team + repo + app)
 
 Crates/files:
 
-- `conman-api/src/handlers/tenants.rs` (new)
-- `conman-api/src/handlers/repos.rs` (new alias/clear naming over current app handlers)
+- `conman-api/src/handlers/teams.rs` (new)
+- `conman-api/src/handlers/apps.rs` (repository handlers)
 - `conman-api/src/handlers/app_surfaces.rs` (new)
 - router wiring in `conman-api`
 
 Tasks:
 
-1. Add tenant endpoints:
-   - `POST /api/tenants`
-   - `GET /api/tenants`
-   - `GET /api/tenants/:tenantId`
+1. Add team endpoints:
+   - `POST /api/teams`
+   - `GET /api/teams`
+   - `GET /api/teams/:teamId`
 2. Add repo endpoints:
-   - `POST /api/tenants/:tenantId/repos`
+   - `POST /api/teams/:teamId/repos`
    - `GET /api/repos`
    - `GET /api/repos/:repoId`
 3. Add app endpoints:
@@ -80,8 +75,7 @@ Tasks:
 
 Done when:
 
-- tenant/repo/surface can be created and listed end-to-end
-- `/api/repos` existing calls still pass manual smoke tests
+- team/repo/surface can be created and listed end-to-end
 
 ## Step 3: Runtime profile multi-surface support
 
@@ -97,8 +91,7 @@ Tasks:
    - shape: `HashMap<String, String>` (`surface_key -> base_url`)
 2. Validate keys:
    - must match existing repo surface keys
-3. Keep existing single-url fields as compatibility path (if present).
-4. Update temp env derivation logic so endpoint overrides can be per-surface.
+3. Update temp env derivation logic so endpoint overrides can be per-surface.
 
 Done when:
 
@@ -130,12 +123,12 @@ Done when:
 Keep it simple for now:
 
 - Membership remains repo-scoped (current behavior).
-- `app_admin` remains the admin capability role.
-- Tenant-level admin model can be deferred.
+- `admin` remains the admin capability role.
+- Team-level admin model can be deferred.
 
 Tasks:
 
-1. Ensure new tenant/repo/surface endpoints enforce current RBAC correctly.
+1. Ensure new team/repo/surface endpoints enforce current RBAC correctly.
 2. Ensure invite/member flows still work with repo IDs unchanged.
 
 Done when:
@@ -147,17 +140,17 @@ Done when:
 Tasks:
 
 1. Add/adjust unit and integration tests:
-   - tenant/surface repos
+   - team/surface repos
    - new handlers
    - runtime profile endpoint map validation
 2. Update manual test guide with new setup sequence:
-   - create tenant -> create repo -> create surfaces
+   - create team -> create repo -> create surfaces
 3. Keep OpenAPI docs aligned with the new endpoints.
 
 Done when:
 
 - `cargo test --workspace` passes
-- manual API sequence works cleanly with tenant/repo/surface model
+- manual API sequence works cleanly with team/repo/surface model
 
 ## Practical execution checklist
 
@@ -170,8 +163,6 @@ Done when:
 
 - Existing code already treats `App` like a repo (`repo_path`,
   `integration_branch`), so this change is mostly additive + naming clarity.
-- Because this is pre-production and single-user, we can keep the backfill
-  lightweight and local without additional orchestration.
 
 ## Automated acceptance criteria
 
@@ -179,17 +170,16 @@ When implementation is complete, these checks must pass.
 
 | ID | Criteria | Automated check |
 |---|---|---|
-| TRS-AC-01 | Tenant can be created and queried. | `run_tenant_repo_surface_acceptance.sh` |
-| TRS-AC-02 | Repository can be created under a tenant and queried via `/api/repos/:id`. | `run_tenant_repo_surface_acceptance.sh` |
-| TRS-AC-03 | `/api/repos/:id` compatibility still works for repo records. | `run_tenant_repo_surface_acceptance.sh` |
-| TRS-AC-04 | Two apps can be created and listed for one repo. | `run_tenant_repo_surface_acceptance.sh` |
-| TRS-AC-05 | Runtime profile stores and returns `surface_endpoints`. | `run_tenant_repo_surface_acceptance.sh` |
-| TRS-AC-06 | Environment configuration can reference runtime profiles after model change. | `run_tenant_repo_surface_acceptance.sh` |
-| TRS-AC-07 | Existing lifecycle smoke remains functional after model change. | `tests/e2e/run_full_staged_smoke.sh` |
+| TRS-AC-01 | Team can be created and queried. | `run_team_repo_surface_acceptance.sh` |
+| TRS-AC-02 | Repository can be created under a team and queried via `/api/repos/:id`. | `run_team_repo_surface_acceptance.sh` |
+| TRS-AC-03 | Two apps can be created and listed for one repo. | `run_team_repo_surface_acceptance.sh` |
+| TRS-AC-04 | Runtime profile stores and returns `surface_endpoints`. | `run_team_repo_surface_acceptance.sh` |
+| TRS-AC-05 | Environment configuration can reference runtime profiles after model change. | `run_team_repo_surface_acceptance.sh` |
+| TRS-AC-06 | Existing lifecycle smoke remains functional after model change. | `tests/e2e/run_full_staged_smoke.sh` |
 
 ### Acceptance command set
 
-1. `CONMAN_BASE_URL=... CONMAN_LOGIN_EMAIL=... CONMAN_LOGIN_PASSWORD=... CONMAN_ACCEPTANCE_REPO_PATH=... ./tests/ops/run_tenant_repo_surface_acceptance.sh --strict`
+1. `CONMAN_BASE_URL=... CONMAN_LOGIN_EMAIL=... CONMAN_LOGIN_PASSWORD=... CONMAN_ACCEPTANCE_REPO_PATH=... ./tests/ops/run_team_repo_surface_acceptance.sh --strict`
 2. `./tests/e2e/run_full_staged_smoke.sh`
 
 The first command validates the new model contracts. The second command guards

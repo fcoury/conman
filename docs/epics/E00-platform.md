@@ -619,7 +619,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/repos/:appId", get(not_implemented))
         .route("/api/repos/:appId/settings", axum::routing::patch(not_implemented))
         .route("/api/repos/:appId/members", get(not_implemented))
-        .route("/api/repos/:appId/invites", axum::routing::post(not_implemented))
+        .route("/api/teams/:teamId/invites", axum::routing::post(not_implemented))
 
         // Workspaces stubs (E04)
         .route("/api/repos/:appId/workspaces", get(not_implemented).post(not_implemented))
@@ -1268,7 +1268,7 @@ async fn stub_route_returns_501_envelope() {
    - `GET /api/health` returns `503 {"status":"degraded","mongo":"disconnected"}`
      when MongoDB is unreachable.
    - `GET /api/repos` returns `501 {"error":{"code":"not_implemented",...}}`.
-   - `POST /api/repos` returns `501 {"error":{"code":"not_implemented",...}}`.
+   - `POST /api/teams/:teamId/repos` returns `501 {"error":{"code":"not_implemented",...}}`.
    - `GET /api/nonexistent` returns `404 {"error":{"code":"not_found",...}}`.
    - All responses include `X-Request-Id` header.
 

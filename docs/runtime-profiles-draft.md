@@ -22,7 +22,7 @@ environments.
 - Temp profiles are derived from a base persistent environment profile.
 - Temp environment URLs are auto-generated and should be readable/shareable.
 - Environment profile changes for canonical user-facing env require approval.
-- `app_admin` can perform direct emergency persistent-profile edits (fully
+- `admin` can perform direct emergency persistent-profile edits (fully
   audited).
 - Profile overrides can travel with a changeset/release.
 - Changeset submit auto-includes profile overrides and returns a submit summary.
@@ -30,7 +30,7 @@ environments.
   configurable gates and command.
 - Deployment is blocked on runtime profile drift until revalidation passes.
 - Database engine scope for v1 is MongoDB only.
-- Special base databases/profiles are managed by `app_admin` only.
+- Special base databases/profiles are managed by `admin` only.
 - If two queued changesets override the same env var key, the later one becomes
   `conflicted`.
 - If both queued changesets set the same env var key to the same typed value,
@@ -39,7 +39,7 @@ environments.
   `stricter_two_approvals` (default).
 - Drift includes env vars, secrets, URL, DB settings, and migration set changes.
 - Secret key rotation is manual in v1.
-- Secrets can be revealed in plaintext by `app_admin` only; other roles see
+- Secrets can be revealed in plaintext by `admin` only; other roles see
   masked previews.
 - Secret reveal does not require re-auth/audit reason in v1.
 - MongoDB clone strategy defaults to snapshot clone, fallback to dump/restore.
@@ -125,7 +125,7 @@ Rationale:
 8. Track applied migration metadata in Conman for drift and gating decisions.
 9. Support app-admin direct profile edits with audit and drift-triggered
    revalidation requirements.
-10. Support secret masking/reveal policy (`app_admin` plaintext only).
+10. Support secret masking/reveal policy (`admin` plaintext only).
 
 ## 6) Non-Goals (Initial Draft)
 
@@ -153,7 +153,7 @@ Rationale:
    - release publish: environment profiles only.
    - deploy: target environment profile only.
 6. Secret visibility:
-   - `app_admin` can reveal plaintext.
+   - `admin` can reveal plaintext.
    - Other roles see masked values.
    - Masking policy:
      - length <= 8: show last 4 characters only.

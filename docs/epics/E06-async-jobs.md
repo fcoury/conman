@@ -520,7 +520,7 @@ fn default_limit() -> u64 { 20 }
 
 Retrieve a single job by ID, including its current state, result, and error.
 
-**Auth:** Any app member (user, reviewer, config_manager, app_admin).
+**Auth:** Any app member (user, reviewer, config_manager, admin).
 
 **Path params:**
 

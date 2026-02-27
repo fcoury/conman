@@ -1,17 +1,17 @@
-# Tenant, Repo, and App Model
+# Team, Repo, and App Model
 
 ## 1) Why this change
 
 Conman currently models one "App" as one Git repository.
 
 That assumption breaks for real config repos like `hepquant-config`, where one
-tenant has multiple user-facing apps in the same repo, each with its
+team has multiple user-facing apps in the same repo, each with its
 own URL/domain and access model.
 
 Examples observed in current config repos:
 
-- Tenant is top-level (`config/tenant.yml`).
-- Multiple apps are nested under tenant `app`.
+- Team is top-level (`config/team.yml`).
+- Multiple apps are nested under team `app`.
 - Config files target surfaces using `allowedApps`.
 - Environment settings include multiple base URLs for different surfaces.
 
@@ -19,13 +19,13 @@ Examples observed in current config repos:
 
 Use three layers:
 
-- **Tenant**: customer/account boundary.
+- **Team**: customer/account boundary.
 - **Config Repository**: Git boundary (workspace, changeset, release, tag).
 - **App**: user-facing app within a repo (domain, branding, roles).
 
 Cardinality:
 
-- Tenant `1..N` Config Repositories
+- Team `1..N` Config Repositories
 - Config Repository `1..N` Apps
 - App belongs to exactly one Config Repository
 
@@ -69,13 +69,13 @@ Current Conman "App" is effectively a repo object (`repo_path`,
 `integration_branch`). To reduce confusion:
 
 - Domain rename in docs/spec: **App -> Config Repository**.
-- Introduce **Tenant** and **App** resources.
+- Introduce **Team** and **App** resources.
 
-Suggested API shape (incremental):
+Canonical API shape:
 
-- `POST /api/tenants`
-- `GET /api/tenants/:tenantId`
-- `POST /api/tenants/:tenantId/repos`
+- `POST /api/teams`
+- `GET /api/teams/:teamId`
+- `POST /api/teams/:teamId/repos`
 - `GET /api/repos/:repoId`
 - `POST /api/repos/:repoId/apps`
 - `GET /api/repos/:repoId/apps`
@@ -87,13 +87,13 @@ API strategy for v1 implementation:
 
 ## 6) Data model changes (minimum)
 
-Add `tenants` collection:
+Add `teams` collection:
 
 - `id`, `name`, `slug`, `created_at`, `updated_at`
 
 Update app/repo document (currently `apps`):
 
-- add `tenant_id`
+- add `team_id`
 - keep `repo_path`, `integration_branch`, baseline settings
 
 Add `app_surfaces` collection:
@@ -124,26 +124,20 @@ Add visibility metadata:
 
 ## 8) Implementation phases
 
-Phase 1 (non-breaking):
+Phase 1:
 
-- add `tenant_id` to existing app/repo docs
-- backfill one default tenant for existing records
-- add `app_surfaces`
-- keep all current `/api/repos` behavior
+- add `team_id` to repository docs
+- add `team_memberships` and `app_surfaces`
+- expose team and surface APIs
 
 Phase 2:
 
-- expose tenant and surface APIs
 - add surface-aware runtime profile endpoints
 - add impacted-surface summaries to changeset/release APIs
 
-Phase 3:
-
-- promote `/api/repos` naming, keep `/api/repos` alias for compatibility window
-
 ## 9) Decisions captured
 
-- Add top-level **Tenant** concept.
+- Add top-level **Team** concept.
 - Keep one repo as the Git/release unit.
 - Support multiple user-facing apps inside one repo.
 - Do **not** split releases/workspaces by surface in v1.
@@ -151,4 +145,4 @@ Phase 3:
   branches).
 
 Implementation plan:
-[`docs/tenant-repo-app-implementation-plan.md`](./tenant-repo-app-implementation-plan.md)
+[`docs/team-repo-app-implementation-plan.md`](./team-repo-app-implementation-plan.md)

@@ -9,7 +9,7 @@ Execution order (topological):
 1. E00 Platform foundation
 2. E01 Git adapter (`gitaly-rs`) + repository abstraction
 3. E02 Auth, invites, memberships, RBAC
-4. E03 Tenant/repo setup + settings + environments metadata
+4. E03 Team/repo setup + settings + environments metadata
 5. E04 Workspace lifecycle + file operations + guardrails
 6. E05 Changeset lifecycle + review + comments + revisions
 7. E06 Async jobs + `msuite` execution pipeline
@@ -76,10 +76,10 @@ Goal: Secure access and per-repository role model.
 Issues:
 
 1. E02-01: Local email/password auth with password hashing and sessions/JWT.
-2. E02-02: Invite-only onboarding (`app_admin`), 7-day token expiry.
+2. E02-02: Invite-only onboarding (`admin`), 7-day token expiry.
 3. E02-03: Forgot/reset password via email token.
 4. E02-04: App membership model with roles: `user`, `reviewer`,
-   `config_manager`, `app_admin`.
+   `config_manager`, `admin`.
 5. E02-05: Authorization middleware + policy checks per endpoint.
 
 Acceptance:
@@ -89,14 +89,14 @@ Acceptance:
 
 Depends on: E00.
 
-## E03 Tenant/Repo Setup, Settings, Environment Metadata
+## E03 Team/Repo Setup, Settings, Environment Metadata
 
-Goal: Manage tenant/repo setup, repository-level configuration, and baseline behavior.
+Goal: Manage team/repo setup, repository-level configuration, and baseline behavior.
 
 Issues:
 
-1. E03-01: `tenants` create/list/get APIs.
-2. E03-02: Repository creation under tenant + `repos` list/get APIs.
+1. E03-01: `teams` create/list/get APIs.
+2. E03-02: Repository creation under team + `repos` list/get APIs.
 3. E03-03: App CRUD/list APIs per repository.
 4. E03-04: Settings API for baseline mode, canonical env, commit mode default,
    blocked paths, file size limit.
@@ -104,7 +104,7 @@ Issues:
 6. E03-06: Membership listing and role assignment APIs.
 7. E03-07: Runtime profile CRUD/revisions, environment linkage, canonical
    approval policy config.
-8. E03-08: Runtime profile secret visibility rules (`app_admin` reveal endpoint,
+8. E03-08: Runtime profile secret visibility rules (`admin` reveal endpoint,
    masked previews for other roles) and typed env var schema validation.
 9. E03-09: Runtime profile `surface_endpoints` persistence and validation
    against app keys.
@@ -112,7 +112,7 @@ Issues:
 
 Acceptance:
 
-- App admin can create tenants, repositories, and apps before
+- App admin can create teams, repositories, and apps before
   workspace/changeset flow.
 - Repository admin can configure baseline mode (`integration_head` or
   `canonical_env_release`).
@@ -384,6 +384,6 @@ Fast-follow but not blocking first release assembly:
 
 Definition of done for Sprint 1:
 
-- Authenticated user can create tenant + repository, get default workspace,
+- Authenticated user can create team + repository, get default workspace,
   edit files with guardrails, create changeset, and submit it with persisted
   revision + `head_sha`.

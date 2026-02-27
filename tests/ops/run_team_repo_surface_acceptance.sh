@@ -11,7 +11,7 @@ OPS_RESULTS_DIR="$ROOT/tests/ops/results"
 mkdir -p "$OPS_RESULTS_DIR"
 
 STAMP="$(date -u +%Y%m%d%H%M%S)"
-SUMMARY_FILE="$OPS_RESULTS_DIR/${STAMP}-tenant-repo-surface-acceptance-summary.md"
+SUMMARY_FILE="$OPS_RESULTS_DIR/${STAMP}-team-repo-surface-acceptance-summary.md"
 
 BASE_URL="${CONMAN_BASE_URL:-http://127.0.0.1:3000}"
 TOKEN="${CONMAN_TOKEN:-}"
@@ -128,7 +128,7 @@ fi
 
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   {
-    echo "# Tenant/Repo/App Acceptance"
+    echo "# Team/Repo/App Acceptance"
     echo
     echo "- Generated at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
     echo "- Base URL: \`$BASE_URL\`"
@@ -156,29 +156,29 @@ if expect_status_any "Health endpoint" "200,503" GET "/api/health"; then
   rm -f "$file"
 fi
 
-TENANT_SLUG="tenant-acceptance-${STAMP}"
-TENANT_NAME="Tenant Acceptance ${STAMP}"
-TENANT_PAYLOAD="$(jq -cn --arg n "$TENANT_NAME" --arg s "$TENANT_SLUG" '{name:$n,slug:$s}')"
+TEAM_SLUG="team-acceptance-${STAMP}"
+TEAM_NAME="Team Acceptance ${STAMP}"
+TEAM_PAYLOAD="$(jq -cn --arg n "$TEAM_NAME" --arg s "$TEAM_SLUG" '{name:$n,slug:$s}')"
 
-if expect_status_any "Create tenant" "200,201" POST "/api/tenants" "$TENANT_PAYLOAD"; then
+if expect_status_any "Create team" "200,201" POST "/api/teams" "$TEAM_PAYLOAD"; then
   file="$LAST_RESPONSE_FILE"
-  TENANT_ID="$(jq -r '.data.id // empty' "$file")"
-  if [[ -n "$TENANT_ID" ]]; then
-    record_pass "TRS-AC-01 tenant create" "Created tenant \`$TENANT_ID\`."
+  TEAM_ID="$(jq -r '.data.id // empty' "$file")"
+  if [[ -n "$TEAM_ID" ]]; then
+    record_pass "TRS-AC-01 team create" "Created team \`$TEAM_ID\`."
   else
-    record_fail "TRS-AC-01 tenant create" "Response missing \`data.id\`."
+    record_fail "TRS-AC-01 team create" "Response missing \`data.id\`."
   fi
   rm -f "$file"
 fi
 
-if [[ -n "${TENANT_ID:-}" ]]; then
-  if expect_status_any "Get tenant" "200" GET "/api/tenants/${TENANT_ID}"; then
+if [[ -n "${TEAM_ID:-}" ]]; then
+  if expect_status_any "Get team" "200" GET "/api/teams/${TEAM_ID}"; then
     file="$LAST_RESPONSE_FILE"
     GOT_ID="$(jq -r '.data.id // empty' "$file")"
-    if [[ "$GOT_ID" == "$TENANT_ID" ]]; then
-      record_pass "TRS-AC-01 tenant read" "Tenant lookup returns matching id."
+    if [[ "$GOT_ID" == "$TEAM_ID" ]]; then
+      record_pass "TRS-AC-01 team read" "Team lookup returns matching id."
     else
-      record_fail "TRS-AC-01 tenant read" "Tenant lookup id mismatch."
+      record_fail "TRS-AC-01 team read" "Team lookup id mismatch."
     fi
     rm -f "$file"
   fi
@@ -191,8 +191,8 @@ REPO_PAYLOAD="$(jq -cn \
   --arg b "$INTEGRATION_BRANCH" \
   '{name:$n,repo_path:$p,integration_branch:$b}')"
 
-if [[ -n "${TENANT_ID:-}" ]]; then
-  if expect_status_any "Create repo under tenant" "200,201" POST "/api/tenants/${TENANT_ID}/repos" "$REPO_PAYLOAD"; then
+if [[ -n "${TEAM_ID:-}" ]]; then
+  if expect_status_any "Create repo under team" "200,201" POST "/api/teams/${TEAM_ID}/repos" "$REPO_PAYLOAD"; then
     file="$LAST_RESPONSE_FILE"
     REPO_ID="$(jq -r '.data.id // empty' "$file")"
     if [[ -n "$REPO_ID" ]]; then
@@ -241,18 +241,18 @@ if [[ -n "${REPO_ID:-}" ]]; then
   fi
 
   if [[ -n "${SURFACE_1_ID:-}" && -n "${SURFACE_2_ID:-}" ]]; then
-    record_pass "TRS-AC-04 app create" "Created two apps for repo."
+    record_pass "TRS-AC-03 app create" "Created two apps for repo."
   else
-    record_fail "TRS-AC-04 app create" "Failed to create both required apps."
+    record_fail "TRS-AC-03 app create" "Failed to create both required apps."
   fi
 
   if expect_status_any "List apps" "200" GET "/api/repos/${REPO_ID}/apps"; then
     file="$LAST_RESPONSE_FILE"
     KEYS="$(jq -r '.data[]?.key' "$file" | sort | tr '\n' ' ')"
     if [[ "$KEYS" == *"lims"* && "$KEYS" == *"portal"* ]]; then
-      record_pass "TRS-AC-04 app list" "App list contains \`lims\` and \`portal\`."
+      record_pass "TRS-AC-03 app list" "App list contains \`lims\` and \`portal\`."
     else
-      record_fail "TRS-AC-04 app list" "App list missing expected keys."
+      record_fail "TRS-AC-03 app list" "App list missing expected keys."
     fi
     rm -f "$file"
   fi
@@ -280,9 +280,9 @@ if [[ -n "${REPO_ID:-}" ]]; then
     file="$LAST_RESPONSE_FILE"
     PROFILE_ID="$(jq -r '.data.id // empty' "$file")"
     if [[ -n "$PROFILE_ID" ]]; then
-      record_pass "TRS-AC-05 runtime profile create" "Created runtime profile \`$PROFILE_ID\`."
+      record_pass "TRS-AC-04 runtime profile create" "Created runtime profile \`$PROFILE_ID\`."
     else
-      record_fail "TRS-AC-05 runtime profile create" "Runtime profile response missing id."
+      record_fail "TRS-AC-04 runtime profile create" "Runtime profile response missing id."
     fi
     rm -f "$file"
   fi
@@ -293,9 +293,9 @@ if [[ -n "${REPO_ID:-}" ]]; then
       LIMS_EP="$(jq -r '.data.surface_endpoints.lims // empty' "$file")"
       PORTAL_EP="$(jq -r '.data.surface_endpoints.portal // empty' "$file")"
       if [[ -n "$LIMS_EP" && -n "$PORTAL_EP" ]]; then
-        record_pass "TRS-AC-05 runtime profile read" "Runtime profile returns persisted \`surface_endpoints\`."
+        record_pass "TRS-AC-04 runtime profile read" "Runtime profile returns persisted \`surface_endpoints\`."
       else
-        record_fail "TRS-AC-05 runtime profile read" "Missing \`surface_endpoints\` in runtime profile response."
+        record_fail "TRS-AC-04 runtime profile read" "Missing \`surface_endpoints\` in runtime profile response."
       fi
       rm -f "$file"
     fi
@@ -310,9 +310,9 @@ if [[ -n "${REPO_ID:-}" ]]; then
       file="$LAST_RESPONSE_FILE"
       CNT="$(jq -r '.data | length' "$file")"
       if [[ "${CNT:-0}" -ge 2 ]]; then
-        record_pass "TRS-AC-06 env profile linkage" "Environment set references runtime profile."
+        record_pass "TRS-AC-05 env profile linkage" "Environment set references runtime profile."
       else
-        record_fail "TRS-AC-06 env profile linkage" "Environment patch did not return expected entries."
+        record_fail "TRS-AC-05 env profile linkage" "Environment patch did not return expected entries."
       fi
       rm -f "$file"
     fi
@@ -321,14 +321,14 @@ fi
 
 if [[ "$FAIL_COUNT" -eq 0 ]]; then
   if [[ "${CONMAN_ACCEPTANCE_REQUIRE_E2E:-0}" == "1" ]]; then
-    record_warn "TRS-AC-07 lifecycle regression guard" "Run \`tests/e2e/run_full_staged_smoke.sh\` separately to validate full legacy lifecycle flow."
+    record_warn "TRS-AC-06 lifecycle regression guard" "Run \`tests/e2e/run_full_staged_smoke.sh\` separately to validate full lifecycle flow."
   else
-    record_pass "TRS-AC-07 lifecycle regression guard" "Run \`tests/e2e/run_full_staged_smoke.sh\` in CI/nightly for full regression coverage."
+    record_pass "TRS-AC-06 lifecycle regression guard" "Run \`tests/e2e/run_full_staged_smoke.sh\` in CI/nightly for full regression coverage."
   fi
 fi
 
 {
-  echo "# Tenant/Repo/App Acceptance"
+  echo "# Team/Repo/App Acceptance"
   echo
   echo "- Generated at: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
   echo "- Base URL: \`$BASE_URL\`"

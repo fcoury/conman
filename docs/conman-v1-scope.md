@@ -7,15 +7,15 @@ DxFlow-style config repositories.
 
 Conman v1 model:
 
-- `Tenant` -> `Repository` -> `App`
+- `Team` -> `Repository` -> `App`
 - Repository workflow: `Workspace` -> `Changeset` -> `Release`
 - Git is source of truth for files and history
-- MongoDB stores tenant/repository metadata, workflow state, and audit trails
+- MongoDB stores team/repository metadata, workflow state, and audit trails
 - `gitaly-rs` is the Git backend interface
 
 ## 2) Domain Terminology
 
-- **Tenant**: Top-level customer/account boundary. Owns repositories.
+- **Team**: Top-level customer/account boundary. Owns repositories.
 - **Repository**: A managed config repository (stored in `apps` collection in
   v1).
 - **App**: A user-facing app within a repository (domain/branding/role hints).
@@ -55,7 +55,7 @@ Conman v1 model:
   - deploy: target environment profile only
 - **Migration execution metadata**: Conman-tracked records of migration runs
   used by drift checks and deployment gating.
-- **Emergency profile edit**: Direct `app_admin` runtime-profile update outside
+- **Emergency profile edit**: Direct `admin` runtime-profile update outside
   normal changeset flow; fully audited and still subject to drift blocking.
 
 ## 3) Core V1 Decisions
@@ -108,7 +108,7 @@ Conman v1 model:
 - Skip-stage flow and concurrent multi-environment deployment are exceptional
   flows requiring two approvals:
   - approvals must be from distinct users
-  - at least one approver must be `reviewer`, `config_manager`, or `app_admin`
+  - at least one approver must be `reviewer`, `config_manager`, or `admin`
 - Normal promotion requires no additional deploy-time approval beyond
   changeset/release approvals.
 - Deployments may run concurrently across environments, with lock scope of one
@@ -159,10 +159,14 @@ Conman v1 model:
 ### 3.10 Auth, membership, and notifications
 
 - Auth v1: local email/password.
-- Provisioning: invite-only by app admins.
+- Signup: open to anyone via `POST /api/auth/signup`.
+- Signup bootstrap: automatically creates first team and first repository, and
+  assigns creator role `owner`.
+- Team invites are created at team scope by `admin`/`owner`.
 - Invite expiration: 7 days.
 - Password policy: minimum length + reset via email token.
-- User can belong to multiple repositories with different roles per repository.
+- User can belong to multiple teams and repositories, with roles scoped per
+  repository.
 - Email notifications are per-user single toggle in v1.
 
 ### 3.11 API conventions
@@ -193,13 +197,13 @@ Conman v1 model:
 - Canonical user-facing environment profile changes require configurable policy:
   `same_as_changeset` or `stricter_two_approvals` (default).
 - Deployment is blocked on runtime profile drift until revalidation passes.
-- `app_admin` may apply direct emergency edits to persistent runtime profiles;
+- `admin` may apply direct emergency edits to persistent runtime profiles;
   these edits are fully audited and still trigger drift/revalidation gating.
 - v1 DB engine scope is MongoDB only.
 - Temp DB provisioning defaults to snapshot clone with dump/restore fallback.
 - Secrets are encrypted at rest in Conman (no external secret manager required
   for v1).
-- Secret plaintext reveal is `app_admin`-only in v1; other roles get masked
+- Secret plaintext reveal is `admin`-only in v1; other roles get masked
   preview only.
 - Secret reveal does not require forced re-auth or reason entry in v1.
 - Secret masking policy:
@@ -219,36 +223,38 @@ Conman v1 model:
 
 Roles:
 
-- `user`
+- `member`
 - `reviewer`
 - `config_manager`
-- `app_admin`
+- `admin`
+- `owner`
 
 Notes:
 
-- `app_admin` inherits `config_manager` capabilities.
-- `reviewer`, `config_manager`, and `app_admin` can approve changesets.
-- Config manager is responsible for release assembly and governance.
+- `owner` inherits `admin` capabilities.
+- `admin` inherits `config_manager` capabilities.
+- `reviewer`, `config_manager`, `admin`, and `owner` can approve changesets.
+- `config_manager` is responsible for release assembly and governance.
 
 ### 4.1 Permission matrix (v1)
 
-| Capability | user | reviewer | config_manager | app_admin |
-|---|---:|---:|---:|---:|
-| Read app/repo metadata | Y | Y | Y | Y |
-| Create/edit own workspace | Y | Y | Y | Y |
-| Create/modify own changeset | Y | Y | Y | Y |
-| Submit changeset | Y | Y | Y | Y |
-| Comment in review | Y | Y | Y | Y |
-| Approve/request changes/reject | N | Y | Y | Y |
-| Move `conflicted`/`needs_revalidation` to draft | Own | Own | Any | Any |
-| Assemble release from queue | N | N | Y | Y |
-| Publish release | N | N | Y | Y |
-| Deploy/promote release | N | N | Y | Y |
-| Skip stage / concurrent deploy approval | N | Y | Y | Y |
-| Invite users | N | N | N | Y |
-| Manage app settings/roles/envs | N | N | N | Y |
-| Manage persistent runtime profiles directly | N | N | N | Y |
-| Reveal secret plaintext | N | N | N | Y |
+| Capability | member | reviewer | config_manager | admin | owner |
+|---|---:|---:|---:|---:|---:|
+| Read app/repo metadata | Y | Y | Y | Y | Y |
+| Create/edit own workspace | Y | Y | Y | Y | Y |
+| Create/modify own changeset | Y | Y | Y | Y | Y |
+| Submit changeset | Y | Y | Y | Y | Y |
+| Comment in review | Y | Y | Y | Y | Y |
+| Approve/request changes/reject | N | Y | Y | Y | Y |
+| Move `conflicted`/`needs_revalidation` to draft | Own | Own | Any | Any | Any |
+| Assemble release from queue | N | N | Y | Y | Y |
+| Publish release | N | N | Y | Y | Y |
+| Deploy/promote release | N | N | Y | Y | Y |
+| Skip stage / concurrent deploy approval | N | Y | Y | Y | Y |
+| Invite users | N | N | N | Y | Y |
+| Manage app settings/roles/envs | N | N | N | Y | Y |
+| Manage persistent runtime profiles directly | N | N | N | Y | Y |
+| Reveal secret plaintext | N | N | N | Y | Y |
 
 `Own` means for items authored by that user.
 
@@ -336,7 +342,7 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 ### 7.1 Collections
 
-- `tenants`
+- `teams`
 - `apps`
 - `app_surfaces`
 - `app_memberships`
@@ -362,14 +368,14 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 ### 7.2 Important fields
 
-`tenants`
+`teams`
 
 - `id`, `name`, `slug`
 - `created_at`, `updated_at`
 
 `apps`
 
-- `id`, `tenant_id`, `name`, `repo_path`
+- `id`, `team_id`, `name`, `repo_path`
 - `integration_branch` (default `main`)
 - `baseline_mode` (`integration_head` | `canonical_env_release`)
 - `canonical_env_id`
@@ -469,30 +475,23 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 Base path: `/api`
 
-## 8.1 Tenants and repositories
+## 8.1 Teams and repositories
 
-- `GET /api/tenants?page=&limit=`
-- `POST /api/tenants`
-- `GET /api/tenants/:tenantId`
-- `POST /api/tenants/:tenantId/repos`
+- `GET /api/teams?page=&limit=`
+- `POST /api/teams`
+- `GET /api/teams/:teamId`
+- `POST /api/teams/:teamId/repos`
+- `POST /api/teams/:teamId/invites`
 - `GET /api/repos?page=&limit=`
 - `GET /api/repos/:appId`
+- `PATCH /api/repos/:appId/settings`
+- `GET /api/repos/:appId/members?page=&limit=`
+- `POST /api/repos/:appId/members`
 - `GET /api/repos/:appId/apps`
 - `POST /api/repos/:appId/apps`
 - `PATCH /api/repos/:appId/apps/:surfaceId`
 
-## 8.2 Repository management endpoints
-
-- `GET /api/repos?page=&limit=`
-- `POST /api/repos`
-- `GET /api/repos/:appId`
-- `PATCH /api/repos/:appId/settings`
-- `GET /api/repos/:appId/members?page=&limit=`
-- `POST /api/repos/:appId/invites`
-- `POST /api/repos/:appId/invites/:inviteId/resend`
-- `DELETE /api/repos/:appId/invites/:inviteId`
-
-## 8.3 Workspaces
+## 8.2 Workspaces
 
 - `GET /api/repos/:appId/workspaces?page=&limit=`
 - `POST /api/repos/:appId/workspaces`
@@ -501,14 +500,14 @@ Base path: `/api`
 - `POST /api/repos/:appId/workspaces/:workspaceId/reset`
 - `POST /api/repos/:appId/workspaces/:workspaceId/sync-integration`
 
-## 8.4 Workspace files
+## 8.3 Workspace files
 
 - `GET /api/repos/:appId/workspaces/:workspaceId/files?path=`
 - `PUT /api/repos/:appId/workspaces/:workspaceId/files` (body: `path`, `content`)
 - `DELETE /api/repos/:appId/workspaces/:workspaceId/files` (body: `path`)
 - `POST /api/repos/:appId/workspaces/:workspaceId/checkpoints`
 
-## 8.5 Changesets
+## 8.4 Changesets
 
 - `GET /api/repos/:appId/changesets?page=&limit=&state=`
 - `POST /api/repos/:appId/changesets` (from workspace)
@@ -524,7 +523,7 @@ Base path: `/api`
 
 `POST .../submit` responses include an `included_profile_overrides` summary.
 
-## 8.6 Diffs, comments, and AI
+## 8.5 Diffs, comments, and AI
 
 - `GET /api/repos/:appId/changesets/:changesetId/diff?mode=raw|semantic`
 - `GET /api/repos/:appId/changesets/:changesetId/comments?page=&limit=`
@@ -543,7 +542,7 @@ type SemanticConfigType =
   | 'queue'
   | 'provider'
   | 'workflow'
-  | 'tenant'
+  | 'team'
   | 'menu'
   | 'asset'
   | 'script';
@@ -573,7 +572,7 @@ interface SemanticDiffResponse {
 }
 ```
 
-## 8.7 Releases
+## 8.6 Releases
 
 - `GET /api/repos/:appId/releases?page=&limit=&state=`
 - `POST /api/repos/:appId/releases` (create draft release)
@@ -583,7 +582,7 @@ interface SemanticDiffResponse {
 - `POST /api/repos/:appId/releases/:releaseId/publish`
 - `GET /api/repos/:appId/releases/:releaseId`
 
-## 8.8 Environments and deployments
+## 8.7 Environments and deployments
 
 - `GET /api/repos/:appId/environments`
 - `PATCH /api/repos/:appId/environments`
@@ -593,7 +592,7 @@ interface SemanticDiffResponse {
 - `POST /api/repos/:appId/environments/:envId/create-drift-fix-changeset`
 - `GET /api/repos/:appId/deployments?page=&limit=`
 
-## 8.9 Runtime profiles
+## 8.8 Runtime profiles
 
 - `GET /api/repos/:appId/runtime-profiles?page=&limit=`
 - `POST /api/repos/:appId/runtime-profiles`
@@ -603,14 +602,14 @@ interface SemanticDiffResponse {
 - `POST /api/repos/:appId/runtime-profiles/:profileId/revert`
 - `POST /api/repos/:appId/runtime-profiles/:profileId/rotate-key` (manual)
 - `POST /api/repos/:appId/runtime-profiles/:profileId/secrets/:key/reveal`
-  (`app_admin` only; audited)
+  (`admin` only; audited)
 - `surface_endpoints` keys must reference existing
   `/api/repos/:appId/apps` keys
 
 `PATCH .../runtime-profiles/:profileId` allows direct emergency edits by
-`app_admin`; resulting drift still blocks deployment until revalidation.
+`admin`; resulting drift still blocks deployment until revalidation.
 
-## 8.10 Temp environments and jobs
+## 8.9 Temp environments and jobs
 
 - `POST /api/repos/:appId/temp-envs` (workspace or changeset)
 - `GET /api/repos/:appId/temp-envs?page=&limit=`
@@ -620,10 +619,11 @@ interface SemanticDiffResponse {
 - `GET /api/repos/:appId/jobs/:jobId`
 - `GET /api/repos/:appId/jobs?page=&limit=&type=&state=`
 
-## 8.11 Notifications and auth
+## 8.10 Notifications and auth
 
 - `GET /api/me/notification-preferences`
 - `PATCH /api/me/notification-preferences`
+- `POST /api/auth/signup`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `POST /api/auth/forgot-password`
@@ -697,7 +697,7 @@ Retention: keep forever in v1.
 
 ## 12) UI Component Scope (v1)
 
-- Dashboard: tenant/repository cards and role-aware quick actions.
+- Dashboard: team/repository cards and role-aware quick actions.
 - App shell: sidebar, breadcrumbs, app switcher.
 - Workspace page:
   - repo tree with markers
@@ -743,7 +743,7 @@ Retention: keep forever in v1.
 
 ### Phase A: Foundations
 
-- Auth/invites, tenant/repository setup, memberships, RBAC.
+- Auth/invites, team/repository setup, memberships, RBAC.
 - Workspace CRUD and file editing with guardrails.
 - Changeset creation/submit/review and approval reset behavior.
 - Async `msuite` at submit.
