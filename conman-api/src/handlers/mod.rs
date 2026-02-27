@@ -6,6 +6,6 @@ pub mod jobs;
 pub mod me;
 pub mod metrics;
 pub mod releases;
+pub mod teams;
 pub mod temp_envs;
-pub mod tenants;
 pub mod workspaces;

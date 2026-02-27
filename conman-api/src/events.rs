@@ -56,7 +56,7 @@ pub async fn emit_notification(
         .find_by_id(user_id)
         .await?
         .ok_or_else(|| ConmanError::NotFound {
-            entity: "user",
+            entity: "member",
             id: user_id.to_string(),
         })?;
     conman_db::NotificationEventRepo::new(state.db.clone())

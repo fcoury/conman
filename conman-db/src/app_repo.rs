@@ -14,7 +14,7 @@ struct AppDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
     #[serde(default)]
-    tenant_id: Option<ObjectId>,
+    team_id: Option<ObjectId>,
     name: String,
     repo_path: String,
     integration_branch: String,
@@ -30,7 +30,7 @@ impl From<AppDoc> for App {
     fn from(value: AppDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            tenant_id: value.tenant_id.map(|v| v.to_hex()),
+            team_id: value.team_id.map(|v| v.to_hex()),
             name: value.name,
             repo_path: value.repo_path,
             integration_branch: value.integration_branch,
@@ -67,7 +67,7 @@ impl AppRepo {
         let now = Utc::now();
         let doc = AppDoc {
             id: ObjectId::new(),
-            tenant_id: None,
+            team_id: None,
             name: name.to_string(),
             repo_path: repo_path.to_string(),
             integration_branch: integration_branch.to_string(),
@@ -87,9 +87,9 @@ impl AppRepo {
         Ok(doc.into())
     }
 
-    pub async fn insert_for_tenant(
+    pub async fn insert_for_team(
         &self,
-        tenant_id: &str,
+        team_id: &str,
         name: &str,
         repo_path: &str,
         integration_branch: &str,
@@ -98,13 +98,13 @@ impl AppRepo {
         let created_by = ObjectId::parse_str(created_by).map_err(|e| ConmanError::Validation {
             message: format!("invalid created_by: {e}"),
         })?;
-        let tenant_id = ObjectId::parse_str(tenant_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid tenant_id: {e}"),
+        let team_id = ObjectId::parse_str(team_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid team_id: {e}"),
         })?;
         let now = Utc::now();
         let doc = AppDoc {
             id: ObjectId::new(),
-            tenant_id: Some(tenant_id),
+            team_id: Some(team_id),
             name: name.to_string(),
             repo_path: repo_path.to_string(),
             integration_branch: integration_branch.to_string(),
@@ -188,6 +188,34 @@ impl AppRepo {
         Ok((apps, total))
     }
 
+    pub async fn list_by_team_id(&self, team_id: &str) -> Result<Vec<App>, ConmanError> {
+        let team_id = ObjectId::parse_str(team_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid team_id: {e}"),
+        })?;
+
+        let mut cursor = self
+            .collection
+            .find(doc! {"team_id": team_id})
+            .sort(doc! {"updated_at": -1})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to list apps by team: {e}"),
+            })?;
+
+        let mut apps = Vec::new();
+        while cursor.advance().await.map_err(|e| ConmanError::Internal {
+            message: format!("failed iterating apps cursor: {e}"),
+        })? {
+            let app: AppDoc = cursor
+                .deserialize_current()
+                .map_err(|e| ConmanError::Internal {
+                    message: format!("failed to deserialize app: {e}"),
+                })?;
+            apps.push(app.into());
+        }
+        Ok(apps)
+    }
+
     pub async fn update_settings(
         &self,
         app_id: &str,
@@ -239,17 +267,17 @@ impl EnsureIndexes for AppRepo {
                     .build(),
             )
             .build();
-        let tenant_idx = IndexModel::builder()
-            .keys(doc! {"tenant_id": 1})
+        let team_idx = IndexModel::builder()
+            .keys(doc! {"team_id": 1})
             .options(
                 IndexOptions::builder()
-                    .name("apps_tenant_id_idx".to_string())
+                    .name("apps_team_id_idx".to_string())
                     .build(),
             )
             .build();
 
         self.collection
-            .create_indexes(vec![name_idx, repo_idx, tenant_idx])
+            .create_indexes(vec![name_idx, repo_idx, team_idx])
             .await
             .map_err(|e| ConmanError::Internal {
                 message: format!("failed to ensure app indexes: {e}"),

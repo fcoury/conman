@@ -81,7 +81,7 @@ fn parse_review_action(input: &str) -> Result<ReviewAction, ApiConmanError> {
 }
 
 fn is_reviewer(role: Role) -> bool {
-    matches!(role, Role::Reviewer | Role::ConfigManager | Role::AppAdmin)
+    role.satisfies(Role::Reviewer)
 }
 
 fn overrides_conflict(a: &ChangesetProfileOverride, b: &ChangesetProfileOverride) -> bool {
@@ -108,7 +108,7 @@ pub async fn list_changesets(
     Path(app_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<ApiResponse<Vec<Changeset>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let pagination = pagination.validate()?;
     let (rows, total) = conman_db::ChangesetRepo::new(state.db.clone())
         .list_by_app(&app_id, pagination.skip(), pagination.limit)
@@ -127,7 +127,7 @@ pub async fn create_changeset(
     Path(app_id): Path<String>,
     Json(req): Json<CreateChangesetRequest>,
 ) -> Result<Json<ApiResponse<Changeset>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     if req.title.trim().is_empty() {
         return Err(ConmanError::Validation {
             message: "title is required".to_string(),
@@ -182,7 +182,7 @@ pub async fn get_changeset(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, changeset_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<ChangesetDetailResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let changeset = find_changeset_or_404(&state, &changeset_id).await?;
     if changeset.app_id != app_id {
         return Err(ConmanError::Forbidden {
@@ -205,7 +205,7 @@ pub async fn update_changeset(
     Path((app_id, changeset_id)): Path<(String, String)>,
     Json(req): Json<UpdateChangesetRequest>,
 ) -> Result<Json<ApiResponse<Changeset>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let changeset = find_changeset_or_404(&state, &changeset_id).await?;
     if changeset.app_id != app_id {
         return Err(ConmanError::Forbidden {
@@ -246,7 +246,7 @@ pub async fn submit_changeset(
     Path((app_id, changeset_id)): Path<(String, String)>,
     Json(req): Json<SubmitRequest>,
 ) -> Result<Json<ApiResponse<SubmitResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let changeset = find_changeset_or_404(&state, &changeset_id).await?;
     if changeset.app_id != app_id || changeset.author_user_id != auth.user_id {
         return Err(ConmanError::Forbidden {
@@ -333,7 +333,7 @@ pub async fn resubmit_changeset(
     Path((app_id, changeset_id)): Path<(String, String)>,
     Json(req): Json<SubmitRequest>,
 ) -> Result<Json<ApiResponse<SubmitResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let changeset = find_changeset_or_404(&state, &changeset_id).await?;
     if changeset.app_id != app_id || changeset.author_user_id != auth.user_id {
         return Err(ConmanError::Forbidden {
@@ -548,14 +548,14 @@ pub async fn move_changeset_to_draft(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, changeset_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<Changeset>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let changeset = find_changeset_or_404(&state, &changeset_id).await?;
     let role = auth
         .role_for(&app_id)
         .ok_or_else(|| ConmanError::Forbidden {
             message: "missing app role".to_string(),
         })?;
-    let privileged = matches!(role, Role::ConfigManager | Role::AppAdmin);
+    let privileged = role.satisfies(Role::ConfigManager);
     if !privileged && changeset.author_user_id != auth.user_id {
         return Err(ConmanError::Forbidden {
             message: "only author or config manager/app admin can move to draft".to_string(),
@@ -589,7 +589,7 @@ pub async fn get_changeset_diff(
     Path((app_id, changeset_id)): Path<(String, String)>,
     Query(query): Query<DiffQuery>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let app = conman_db::AppRepo::new(state.db.clone())
         .find_by_id(&app_id)
         .await?
@@ -642,7 +642,7 @@ pub async fn list_changeset_comments(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, changeset_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<Vec<conman_core::ChangesetComment>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let rows = conman_db::ChangesetCommentRepo::new(state.db.clone())
         .list_by_changeset(&changeset_id)
         .await?;
@@ -655,7 +655,7 @@ pub async fn create_changeset_comment(
     Path((app_id, changeset_id)): Path<(String, String)>,
     Json(req): Json<CreateCommentRequest>,
 ) -> Result<Json<ApiResponse<conman_core::ChangesetComment>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     if req.body.trim().is_empty() {
         return Err(ConmanError::Validation {
             message: "comment body is required".to_string(),

@@ -25,13 +25,22 @@ pub struct AppMembership {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Invite {
     pub id: String,
-    pub app_id: String,
+    pub team_id: String,
     pub email: String,
     pub role: Role,
     pub token: String,
     pub invited_by: String,
     pub expires_at: DateTime<Utc>,
     pub accepted_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TeamMembership {
+    pub id: String,
+    pub user_id: String,
+    pub team_id: String,
+    pub role: Role,
     pub created_at: DateTime<Utc>,
 }
 

@@ -91,7 +91,7 @@ impl Default for AppSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct App {
     pub id: String,
-    pub tenant_id: Option<String>,
+    pub team_id: Option<String>,
     pub name: String,
     pub repo_path: String,
     pub integration_branch: String,

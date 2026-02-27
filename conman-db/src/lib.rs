@@ -18,8 +18,9 @@ pub mod notification_pref_repo;
 pub mod password_reset_repo;
 pub mod release_repo;
 pub mod runtime_profile_repo;
+pub mod team_membership_repo;
+pub mod team_repo;
 pub mod temp_env_repo;
-pub mod tenant_repo;
 pub mod user_repo;
 pub mod workspace_repo;
 
@@ -41,8 +42,9 @@ pub use notification_pref_repo::NotificationPreferenceRepo;
 pub use password_reset_repo::PasswordResetRepo;
 pub use release_repo::ReleaseRepo;
 pub use runtime_profile_repo::{RuntimeProfileInput, RuntimeProfileRepo, RuntimeProfileUpdate};
+pub use team_membership_repo::TeamMembershipRepo;
+pub use team_repo::TeamRepo;
 pub use temp_env_repo::{CreateTempEnvInput, TempEnvRepo};
-pub use tenant_repo::TenantRepo;
 pub use user_repo::UserRepo;
 pub use workspace_repo::{CreateWorkspaceInput, WorkspaceRepo};
 

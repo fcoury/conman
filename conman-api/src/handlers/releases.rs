@@ -57,7 +57,7 @@ pub async fn list_releases(
     Path(app_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<ApiResponse<Vec<ReleaseBatch>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let pagination = pagination.validate()?;
     let (rows, total) = conman_db::ReleaseRepo::new(state.db.clone())
         .list_by_app(&app_id, pagination.skip(), pagination.limit)
@@ -102,7 +102,7 @@ pub async fn get_release(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, release_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<ReleaseBatch>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let release = conman_db::ReleaseRepo::new(state.db.clone())
         .find_by_id(&release_id)
         .await?

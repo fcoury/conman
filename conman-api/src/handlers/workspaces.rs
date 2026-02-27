@@ -271,7 +271,7 @@ pub async fn list_workspaces(
     Extension(auth): Extension<AuthUser>,
     Path(app_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<Workspace>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let app = find_app(&state, &app_id).await?;
     let repo = conman_db::WorkspaceRepo::new(state.db.clone());
     let mut workspaces = repo.list_by_app_owner(&app_id, &auth.user_id).await?;
@@ -289,7 +289,7 @@ pub async fn create_workspace(
     Path(app_id): Path<String>,
     Json(req): Json<CreateWorkspaceRequest>,
 ) -> Result<Json<ApiResponse<Workspace>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let app = find_app(&state, &app_id).await?;
 
     let provided_branch = req.branch_name;
@@ -362,7 +362,7 @@ pub async fn get_workspace(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, workspace_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<Workspace>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
     if workspace.app_id != app_id {
         return Err(ConmanError::Forbidden {
@@ -379,7 +379,7 @@ pub async fn update_workspace(
     Path((app_id, workspace_id)): Path<(String, String)>,
     Json(req): Json<UpdateWorkspaceRequest>,
 ) -> Result<Json<ApiResponse<Workspace>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
     if workspace.app_id != app_id {
         return Err(ConmanError::Forbidden {
@@ -411,7 +411,7 @@ pub async fn get_workspace_file_or_tree(
     Path((app_id, workspace_id)): Path<(String, String)>,
     Query(query): Query<FilePathQuery>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let app = find_app(&state, &app_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
     if workspace.app_id != app_id {
@@ -485,7 +485,7 @@ pub async fn write_workspace_file(
     Path((app_id, workspace_id)): Path<(String, String)>,
     Json(req): Json<WriteFileRequest>,
 ) -> Result<Json<ApiResponse<FileWriteResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let app = find_app(&state, &app_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
     if workspace.app_id != app_id {
@@ -586,7 +586,7 @@ pub async fn delete_workspace_file(
     Path((app_id, workspace_id)): Path<(String, String)>,
     Json(req): Json<DeleteFileRequest>,
 ) -> Result<Json<ApiResponse<FileWriteResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let app = find_app(&state, &app_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
     if workspace.app_id != app_id {
@@ -649,7 +649,7 @@ pub async fn sync_workspace_integration(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, workspace_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<SyncIntegrationResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let app = find_app(&state, &app_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
     if workspace.app_id != app_id {
@@ -721,7 +721,7 @@ pub async fn reset_workspace(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, workspace_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<ResetResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let app = find_app(&state, &app_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
     if workspace.app_id != app_id {
@@ -774,7 +774,7 @@ pub async fn create_workspace_checkpoint(
     Path((app_id, workspace_id)): Path<(String, String)>,
     Json(req): Json<CreateCheckpointRequest>,
 ) -> Result<Json<ApiResponse<CheckpointResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
     if workspace.app_id != app_id {
         return Err(ConmanError::Forbidden {

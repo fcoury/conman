@@ -79,7 +79,7 @@ pub async fn list_temp_envs(
     Path(app_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<ApiResponse<Vec<TempEnvironment>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let pagination = pagination.validate()?;
     let (rows, total) = conman_db::TempEnvRepo::new(state.db.clone())
         .list_by_app(&app_id, pagination.skip(), pagination.limit)
@@ -98,7 +98,7 @@ pub async fn create_temp_env(
     Path(app_id): Path<String>,
     Json(req): Json<CreateTempEnvRequest>,
 ) -> Result<Json<ApiResponse<TempEnvActionResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let kind = parse_kind(&req.kind)?;
     let temp_env = conman_db::TempEnvRepo::new(state.db.clone())
         .create(conman_db::CreateTempEnvInput {
@@ -165,7 +165,7 @@ pub async fn extend_temp_env(
     Path((app_id, temp_env_id)): Path<(String, String)>,
     Json(req): Json<ExtendTempEnvRequest>,
 ) -> Result<Json<ApiResponse<TempEnvActionResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let _owned = find_owned_temp_env(&state, &app_id, &temp_env_id, &auth.user_id).await?;
     let seconds = req.seconds.unwrap_or(24 * 3600).max(300);
     let temp_env = conman_db::TempEnvRepo::new(state.db.clone())
@@ -197,7 +197,7 @@ pub async fn undo_expire_temp_env(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, temp_env_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<TempEnvActionResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let _owned = find_owned_temp_env(&state, &app_id, &temp_env_id, &auth.user_id).await?;
     let temp_env = conman_db::TempEnvRepo::new(state.db.clone())
         .set_state(&temp_env_id, TempEnvState::Active, None)
@@ -231,7 +231,7 @@ pub async fn delete_temp_env(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, temp_env_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<TempEnvActionResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let _owned = find_owned_temp_env(&state, &app_id, &temp_env_id, &auth.user_id).await?;
     let grace = Utc::now() + Duration::hours(1);
     let temp_env = conman_db::TempEnvRepo::new(state.db.clone())

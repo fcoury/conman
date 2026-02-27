@@ -6,8 +6,8 @@ use axum::{
 };
 use conman_auth::{AuthUser, decrypt_secret};
 use conman_core::{
-    App, BaselineMode, CommitMode, ConmanError, EnvVarValue, Environment, Invite,
-    ProfileApprovalPolicy, Role, RuntimeProfile, RuntimeProfileKind, mask_secret,
+    App, BaselineMode, CommitMode, ConmanError, EnvVarValue, Environment, ProfileApprovalPolicy,
+    Role, RuntimeProfile, RuntimeProfileKind, mask_secret,
 };
 use conman_db::{EnvironmentInput, RuntimeProfileInput, RuntimeProfileUpdate};
 use serde::{Deserialize, Serialize};
@@ -47,12 +47,6 @@ pub struct MemberResponse {
 #[derive(Debug, Deserialize)]
 pub struct AssignMemberRequest {
     pub user_id: String,
-    pub role: Role,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateInviteRequest {
-    pub email: String,
     pub role: Role,
 }
 
@@ -279,7 +273,7 @@ pub async fn create_app(
         .await?;
 
     membership_repo
-        .assign_role(&auth.user_id, &app.id, Role::AppAdmin)
+        .assign_role(&auth.user_id, &app.id, Role::Admin)
         .await?;
     if let Err(err) = emit_audit(
         &state,
@@ -305,7 +299,7 @@ pub async fn get_app(
     Extension(auth): Extension<AuthUser>,
     Path(app_id): Path<String>,
 ) -> Result<Json<ApiResponse<App>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::User)?;
+    require_role(&auth, &app_id, Role::Member)?;
     let app = conman_db::AppRepo::new(state.db.clone())
         .find_by_id(&app_id)
         .await?
@@ -322,7 +316,7 @@ pub async fn update_app_settings(
     Path(app_id): Path<String>,
     Json(req): Json<UpdateAppSettingsRequest>,
 ) -> Result<Json<ApiResponse<App>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::AppAdmin)?;
+    require_role(&auth, &app_id, Role::Admin)?;
 
     let app_repo = conman_db::AppRepo::new(state.db.clone());
     let mut app = app_repo
@@ -383,7 +377,7 @@ pub async fn list_members(
     Extension(auth): Extension<AuthUser>,
     Path(app_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<MemberResponse>>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::User)?;
+    require_role(&auth, &app_id, Role::Member)?;
     let memberships = conman_db::MembershipRepo::new(state.db.clone())
         .list_by_app_id(&app_id)
         .await?;
@@ -409,7 +403,7 @@ pub async fn assign_member(
     Path(app_id): Path<String>,
     Json(req): Json<AssignMemberRequest>,
 ) -> Result<Json<ApiResponse<MemberResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::AppAdmin)?;
+    require_role(&auth, &app_id, Role::Admin)?;
     let membership = conman_db::MembershipRepo::new(state.db.clone())
         .assign_role(&req.user_id, &app_id, req.role)
         .await?;
@@ -444,53 +438,12 @@ pub async fn assign_member(
     })))
 }
 
-pub async fn create_invite(
-    State(state): State<AppState>,
-    Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
-    Json(req): Json<CreateInviteRequest>,
-) -> Result<Json<ApiResponse<Invite>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::AppAdmin)?;
-    if req.email.trim().is_empty() {
-        return Err(ConmanError::Validation {
-            message: "email is required".to_string(),
-        }
-        .into());
-    }
-
-    let invite = conman_db::InviteRepo::new(state.db.clone())
-        .create(
-            &app_id,
-            &req.email,
-            req.role,
-            &auth.user_id,
-            state.config.invite_expiry_days,
-        )
-        .await?;
-    if let Err(err) = emit_audit(
-        &state,
-        Some(&auth.user_id),
-        Some(&app_id),
-        "invite",
-        &invite.id,
-        "created",
-        None,
-        serde_json::to_value(&invite).ok(),
-        None,
-    )
-    .await
-    {
-        tracing::warn!(error = %err, "failed to write audit event");
-    }
-    Ok(Json(ApiResponse::ok(invite)))
-}
-
 pub async fn list_environments(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
     Path(app_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<Environment>>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::User)?;
+    require_role(&auth, &app_id, Role::Member)?;
     let environments = conman_db::EnvironmentRepo::new(state.db.clone())
         .list_by_app(&app_id)
         .await?;
@@ -503,7 +456,7 @@ pub async fn replace_environments(
     Path(app_id): Path<String>,
     Json(req): Json<UpdateEnvironmentsRequest>,
 ) -> Result<Json<ApiResponse<Vec<Environment>>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::AppAdmin)?;
+    require_role(&auth, &app_id, Role::Admin)?;
     let input = req
         .environments
         .iter()
@@ -550,7 +503,7 @@ pub async fn list_runtime_profiles(
     Extension(auth): Extension<AuthUser>,
     Path(app_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<RuntimeProfileResponse>>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::User)?;
+    require_role(&auth, &app_id, Role::Member)?;
     let profiles = conman_db::RuntimeProfileRepo::new(state.db.clone())
         .list_by_app(&app_id)
         .await?;
@@ -570,7 +523,7 @@ pub async fn create_runtime_profile(
     Path(app_id): Path<String>,
     Json(req): Json<CreateRuntimeProfileRequest>,
 ) -> Result<Json<ApiResponse<RuntimeProfileResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::AppAdmin)?;
+    require_role(&auth, &app_id, Role::Admin)?;
     validate_env_keys(&req.env_vars)?;
     validate_surface_endpoint_keys(&state, &app_id, &req.surface_endpoints).await?;
     let kind = parse_enum::<RuntimeProfileKind>(&req.kind, "kind")?;
@@ -626,7 +579,7 @@ pub async fn get_runtime_profile(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, profile_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<RuntimeProfileResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::User)?;
+    require_role(&auth, &app_id, Role::Member)?;
     let profile = conman_db::RuntimeProfileRepo::new(state.db.clone())
         .find_by_id(&profile_id)
         .await?
@@ -652,7 +605,7 @@ pub async fn update_runtime_profile(
     Path((app_id, profile_id)): Path<(String, String)>,
     Json(req): Json<UpdateRuntimeProfileRequest>,
 ) -> Result<Json<ApiResponse<RuntimeProfileResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::AppAdmin)?;
+    require_role(&auth, &app_id, Role::Admin)?;
     if let Some(env_vars) = req.env_vars.as_ref() {
         validate_env_keys(env_vars)?;
     }
@@ -717,7 +670,7 @@ pub async fn reveal_runtime_profile_secret(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, profile_id, key)): Path<(String, String, String)>,
 ) -> Result<Json<ApiResponse<RevealSecretResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::AppAdmin)?;
+    require_role(&auth, &app_id, Role::Admin)?;
     let value = conman_db::RuntimeProfileRepo::new(state.db.clone())
         .reveal_secret(&profile_id, &key, &state.config.secrets_master_key)
         .await?;

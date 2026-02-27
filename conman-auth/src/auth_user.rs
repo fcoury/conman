@@ -47,6 +47,6 @@ mod tests {
         };
 
         assert!(user.require_role("app-1", Role::Reviewer).is_ok());
-        assert!(user.require_role("app-1", Role::AppAdmin).is_err());
+        assert!(user.require_role("app-1", Role::Admin).is_err());
     }
 }

@@ -91,7 +91,7 @@ async fn validate_exceptional_approvals(
         if !role_can_approve_exceptional(role) {
             return Err(ConmanError::Validation {
                 message: format!(
-                    "approver {approver_user_id} must be reviewer/config_manager/app_admin"
+                    "approver {approver_user_id} must be reviewer/config_manager/admin/owner"
                 ),
             });
         }
@@ -99,7 +99,7 @@ async fn validate_exceptional_approvals(
     }
     if !has_privileged_approver {
         return Err(ConmanError::Validation {
-            message: "skip-stage/concurrent deploy requires at least one config_manager or app_admin approver"
+            message: "skip-stage/concurrent deploy requires at least one config_manager/admin/owner approver"
                 .to_string(),
         });
     }
@@ -419,7 +419,7 @@ pub async fn list_deployments(
     Path(app_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<ApiResponse<Vec<Deployment>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let pagination = pagination.validate()?;
     let (rows, total) = conman_db::DeploymentRepo::new(state.db.clone())
         .list_by_app(&app_id, pagination.skip(), pagination.limit)
@@ -445,13 +445,15 @@ mod tests {
 
     #[test]
     fn exceptional_role_rules() {
-        assert!(!role_can_approve_exceptional(Role::User));
+        assert!(!role_can_approve_exceptional(Role::Member));
         assert!(role_can_approve_exceptional(Role::Reviewer));
         assert!(role_can_approve_exceptional(Role::ConfigManager));
-        assert!(role_can_approve_exceptional(Role::AppAdmin));
+        assert!(role_can_approve_exceptional(Role::Admin));
+        assert!(role_can_approve_exceptional(Role::Owner));
 
         assert!(!role_is_privileged_for_exceptional(Role::Reviewer));
         assert!(role_is_privileged_for_exceptional(Role::ConfigManager));
-        assert!(role_is_privileged_for_exceptional(Role::AppAdmin));
+        assert!(role_is_privileged_for_exceptional(Role::Admin));
+        assert!(role_is_privileged_for_exceptional(Role::Owner));
     }
 }

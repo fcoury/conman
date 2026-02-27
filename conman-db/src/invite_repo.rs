@@ -14,7 +14,7 @@ use crate::EnsureIndexes;
 struct InviteDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    team_id: ObjectId,
     email: String,
     role: Role,
     token: String,
@@ -31,7 +31,7 @@ impl From<InviteDoc> for Invite {
     fn from(value: InviteDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            team_id: value.team_id.to_hex(),
             email: value.email,
             role: value.role,
             token: value.token,
@@ -57,14 +57,14 @@ impl InviteRepo {
 
     pub async fn create(
         &self,
-        app_id: &str,
+        team_id: &str,
         email: &str,
         role: Role,
         invited_by: &str,
         expiry_days: u64,
     ) -> Result<Invite, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let team_id = ObjectId::parse_str(team_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid team_id: {e}"),
         })?;
         let invited_by = ObjectId::parse_str(invited_by).map_err(|e| ConmanError::Validation {
             message: format!("invalid invited_by: {e}"),
@@ -73,7 +73,7 @@ impl InviteRepo {
         let now = Utc::now();
         let doc = InviteDoc {
             id: ObjectId::new(),
-            app_id,
+            team_id,
             email: email.to_lowercase(),
             role,
             token: Uuid::now_v7().to_string(),
@@ -140,10 +140,10 @@ impl EnsureIndexes for InviteRepo {
             )
             .build();
         let app_email_idx = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "email": 1, "accepted_at": 1})
+            .keys(doc! {"team_id": 1, "email": 1, "accepted_at": 1})
             .options(
                 IndexOptions::builder()
-                    .name("invites_app_email_lookup".to_string())
+                    .name("invites_team_email_lookup".to_string())
                     .build(),
             )
             .build();

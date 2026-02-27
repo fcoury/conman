@@ -22,7 +22,7 @@ pub async fn list_jobs(
     Path(app_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<ApiResponse<Vec<Job>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let pagination = pagination.validate()?;
     let (jobs, total) = conman_db::JobRepo::new(state.db.clone())
         .list_by_app(&app_id, pagination.skip(), pagination.limit)
@@ -40,7 +40,7 @@ pub async fn get_job(
     Extension(auth): Extension<AuthUser>,
     Path((app_id, job_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<JobDetailResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::User)?;
+    auth.require_role(&app_id, Role::Member)?;
     let repo = conman_db::JobRepo::new(state.db.clone());
     let job = repo
         .get(&job_id)

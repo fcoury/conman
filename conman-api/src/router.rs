@@ -8,10 +8,12 @@ use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use uuid::Uuid;
 
-use crate::auth::{accept_invite, auth_middleware, forgot_password, login, logout, reset_password};
+use crate::auth::{
+    accept_invite, auth_middleware, forgot_password, login, logout, reset_password, signup,
+};
 use crate::handlers::apps::{
-    assign_member, create_app, create_invite, create_runtime_profile, get_app, get_runtime_profile,
-    list_apps, list_environments, list_members, list_runtime_profiles, replace_environments,
+    assign_member, create_runtime_profile, get_app, get_runtime_profile, list_apps,
+    list_environments, list_members, list_runtime_profiles, replace_environments,
     reveal_runtime_profile_secret, update_app_settings, update_runtime_profile,
 };
 use crate::handlers::changesets::{
@@ -30,12 +32,12 @@ use crate::handlers::releases::{
     assemble_release, create_release, get_release, list_releases, publish_release,
     reorder_release_changesets, set_release_changesets,
 };
+use crate::handlers::teams::{
+    create_repo_surface, create_repo_under_team, create_team, create_team_invite, get_team,
+    list_repo_surfaces, list_teams, update_repo_surface,
+};
 use crate::handlers::temp_envs::{
     create_temp_env, delete_temp_env, extend_temp_env, list_temp_envs, undo_expire_temp_env,
-};
-use crate::handlers::tenants::{
-    create_repo_surface, create_repo_under_tenant, create_tenant, get_tenant, list_repo_surfaces,
-    list_tenants, update_repo_surface,
 };
 use crate::handlers::workspaces::{
     create_workspace, create_workspace_checkpoint, delete_workspace_file, get_workspace,
@@ -54,16 +56,14 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/openapi.json", get(openapi_json))
         .route("/api/docs", get(openapi_docs))
         .route("/api/auth/login", post(login))
+        .route("/api/auth/signup", post(signup))
         .route("/api/auth/logout", post(logout))
         .route("/api/auth/forgot-password", post(forgot_password))
         .route("/api/auth/reset-password", post(reset_password))
         .route("/api/auth/accept-invite", post(accept_invite))
-        .route("/api/tenants", get(list_tenants).post(create_tenant))
-        .route("/api/tenants/{tenantId}", get(get_tenant))
-        .route(
-            "/api/tenants/{tenantId}/repos",
-            post(create_repo_under_tenant),
-        )
+        .route("/api/teams", get(list_teams).post(create_team))
+        .route("/api/teams/{teamId}", get(get_team))
+        .route("/api/teams/{teamId}/repos", post(create_repo_under_team))
         .route(
             "/api/repos/{appId}/apps",
             get(list_repo_surfaces).post(create_repo_surface),
@@ -72,14 +72,14 @@ pub fn build_router(state: AppState) -> Router {
             "/api/repos/{appId}/apps/{surfaceId}",
             patch(update_repo_surface),
         )
-        .route("/api/repos", get(list_apps).post(create_app))
+        .route("/api/repos", get(list_apps))
         .route("/api/repos/{appId}", get(get_app))
         .route("/api/repos/{appId}/settings", patch(update_app_settings))
         .route(
             "/api/repos/{appId}/members",
             get(list_members).post(assign_member),
         )
-        .route("/api/repos/{appId}/invites", post(create_invite))
+        .route("/api/teams/{teamId}/invites", post(create_team_invite))
         .route(
             "/api/repos/{appId}/workspaces",
             get(list_workspaces).post(create_workspace),
