@@ -6,7 +6,7 @@ import path from "node:path";
 const apiProxyTarget = process.env.CONMAN_WEB_API_PROXY ?? "http://127.0.0.1:3000";
 
 export default defineConfig({
-  base: "/app/",
+  base: "/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

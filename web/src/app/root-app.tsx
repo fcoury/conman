@@ -21,7 +21,7 @@ export function RootApp(): React.ReactElement {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>
       </AuthProvider>

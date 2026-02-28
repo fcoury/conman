@@ -4,7 +4,7 @@ use axum::http::HeaderValue;
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{delete, get, patch, post};
+use axum::routing::{any, delete, get, patch, post};
 use axum::{Json, Router};
 use uuid::Uuid;
 
@@ -54,8 +54,6 @@ use crate::state::AppState;
 
 pub fn build_router(state: AppState) -> Router {
     Router::new()
-        .route("/app", get(serve_app_index))
-        .route("/app/{*path}", get(serve_app_asset))
         .route("/api/health", get(health_check))
         .route("/api/metrics", get(scrape_metrics))
         .route("/api/openapi.json", get(openapi_json))
@@ -228,6 +226,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/me/notification-preferences",
             get(get_notification_preferences).patch(update_notification_preferences),
         )
+        .route("/api", any(fallback_404))
+        .route("/api/{*path}", any(fallback_404))
+        .route("/", get(serve_app_index))
+        .route("/{*path}", get(serve_app_asset))
         .fallback(fallback_404)
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
         .layer(axum::middleware::from_fn_with_state(
