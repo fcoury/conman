@@ -80,6 +80,14 @@
     - context-aware primary actions (submit/resubmit/queue/move-to-draft),
     - reviewer action panel + semantic-first diff loading.
   - Added page-level status feedback cards for action outcomes.
+  - Refactored `Releases` into a release-composer UX:
+    - queued changeset selection checkboxes,
+    - composition order controls (up/down),
+    - explicit save-selection/save-order/assemble/publish flow.
+  - Refactored `Deployments` into pipeline-oriented UX:
+    - environment snapshot cards with latest state,
+    - action form centered on env + release + action,
+    - filtered history list with stronger status readability.
 
 ## Verification
 - `cargo check` (workspace): ✅

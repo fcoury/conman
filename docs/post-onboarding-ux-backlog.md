@@ -9,7 +9,7 @@ Legend:
 
 ### E1-1 Draft Changes information hierarchy
 - Priority: P0
-- Status: in_progress
+- Status: done
 - Scope:
   - Replace API-console framing with a 3-step author flow.
   - Add clear workspace summary and focused editor context.
@@ -19,7 +19,7 @@ Legend:
 
 ### E1-2 Workspace actions and safety
 - Priority: P0
-- Status: in_progress
+- Status: done
 - Scope:
   - Make sync/reset/checkpoint actions explicit and visible.
   - Improve save/delete error and validation messaging.
@@ -29,7 +29,7 @@ Legend:
 
 ### E1-3 Create changeset from workspace
 - Priority: P0
-- Status: in_progress
+- Status: done
 - Scope:
   - Add inline "create changeset" action from selected workspace.
   - Pre-fill title/description and avoid manual navigation friction.
@@ -40,7 +40,7 @@ Legend:
 
 ### E2-1 Changeset list/detail split
 - Priority: P0
-- Status: in_progress
+- Status: done
 - Scope:
   - Left list with status pills + counts.
   - Right detail with selected changeset context.
@@ -49,7 +49,7 @@ Legend:
 
 ### E2-2 Review actions and semantic-first model
 - Priority: P0
-- Status: in_progress
+- Status: done
 - Scope:
   - Keep semantic diff as default mode.
   - Present approve/request changes/reject as primary reviewer actions.
@@ -67,7 +67,7 @@ Legend:
 
 ### E3-1 Release draft and composition model
 - Priority: P1
-- Status: todo
+- Status: in_progress
 - Scope:
   - Replace free-form IDs with selectable queued changesets.
   - Clarify sequence: create -> compose -> reorder -> assemble -> publish.
@@ -82,7 +82,7 @@ Legend:
 
 ### E4-1 Environment pipeline framing
 - Priority: P1
-- Status: todo
+- Status: in_progress
 - Scope:
   - Visualize environment chain and selected release context.
   - Remove CSV-centric approvals from default path.
