@@ -12,6 +12,11 @@ import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
 import { canManageReleases, formatRoleLabel } from "@/lib/rbac";
 import { formatDate } from "@/lib/utils";
+import {
+  countDeploymentHistoryByState,
+  filterDeploymentHistory,
+  type DeploymentHistoryFilterState,
+} from "@/modules/deployments/deployments-utils";
 import { Page } from "@/modules/shared/page";
 import type { Deployment, ReleaseBatch } from "@/types/api";
 
@@ -30,6 +35,9 @@ export function DeploymentsPage(): React.ReactElement {
   const [rollbackMode, setRollbackMode] = useState("revert_and_release");
   const [action, setAction] = useState<DeploymentAction>("deploy");
   const [historyEnvironmentFilter, setHistoryEnvironmentFilter] = useState("all");
+  const [historyStateFilter, setHistoryStateFilter] = useState<DeploymentHistoryFilterState>("all");
+  const [historySearch, setHistorySearch] = useState("");
+  const [selectedDeploymentId, setSelectedDeploymentId] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,13 +81,26 @@ export function DeploymentsPage(): React.ReactElement {
     return map;
   }, [deploymentsQuery.data]);
 
-  const historyItems = useMemo(() => {
-    const all = [...(deploymentsQuery.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
-    if (historyEnvironmentFilter === "all") {
-      return all;
-    }
-    return all.filter((deployment) => deployment.environment_id === historyEnvironmentFilter);
-  }, [deploymentsQuery.data, historyEnvironmentFilter]);
+  const historyCounts = useMemo(
+    () => countDeploymentHistoryByState(deploymentsQuery.data ?? []),
+    [deploymentsQuery.data],
+  );
+
+  const historyItems = useMemo(
+    () =>
+      filterDeploymentHistory(
+        deploymentsQuery.data ?? [],
+        historyEnvironmentFilter,
+        historyStateFilter,
+        historySearch,
+      ),
+    [deploymentsQuery.data, historyEnvironmentFilter, historyStateFilter, historySearch],
+  );
+
+  const selectedDeployment = useMemo(
+    () => historyItems.find((deployment) => deployment.id === selectedDeploymentId) ?? historyItems[0] ?? null,
+    [historyItems, selectedDeploymentId],
+  );
 
   const parseApprovals = (): string[] =>
     approvalsCsv
@@ -174,12 +195,12 @@ export function DeploymentsPage(): React.ReactElement {
         <CardTitle>Deployment Action</CardTitle>
         <CardDescription>Pick environment and release, then execute deploy/promotion action.</CardDescription>
         <div className="grid gap-2 lg:grid-cols-4">
-          <Select value={action} onChange={(event) => setAction(event.target.value as DeploymentAction)}>
+          <Select id="deployment-action" label="Action" value={action} onChange={(event) => setAction(event.target.value as DeploymentAction)}>
             <option value="deploy">deploy</option>
             <option value="promote">promote</option>
             <option value="rollback">rollback</option>
           </Select>
-          <Select value={environmentId} onChange={(event) => setEnvironmentId(event.target.value)}>
+          <Select id="deployment-environment" label="Environment" value={environmentId} onChange={(event) => setEnvironmentId(event.target.value)}>
             <option value="">environment</option>
             {(environmentsQuery.data ?? []).map((environment) => (
               <option key={environment.id} value={environment.id}>
@@ -187,7 +208,7 @@ export function DeploymentsPage(): React.ReactElement {
               </option>
             ))}
           </Select>
-          <Select value={releaseId} onChange={(event) => setReleaseId(event.target.value)}>
+          <Select id="deployment-release" label="Release" value={releaseId} onChange={(event) => setReleaseId(event.target.value)}>
             <option value="">release</option>
             {(releasesQuery.data ?? []).map((release) => (
               <option key={release.id} value={release.id}>
@@ -227,19 +248,49 @@ export function DeploymentsPage(): React.ReactElement {
       <Card className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle>Deployment History</CardTitle>
-          <Select value={historyEnvironmentFilter} onChange={(event) => setHistoryEnvironmentFilter(event.target.value)}>
-            <option value="all">all environments</option>
-            {(environmentsQuery.data ?? []).map((environment) => (
-              <option key={environment.id} value={environment.id}>
-                {environment.name}
-              </option>
-            ))}
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select id="history-environment-filter" label="Environment filter" value={historyEnvironmentFilter} onChange={(event) => setHistoryEnvironmentFilter(event.target.value)}>
+              <option value="all">all environments</option>
+              {(environmentsQuery.data ?? []).map((environment) => (
+                <option key={environment.id} value={environment.id}>
+                  {environment.name}
+                </option>
+              ))}
+            </Select>
+            <Select
+              id="history-state-filter"
+              label="State filter"
+              value={historyStateFilter}
+              onChange={(event) => setHistoryStateFilter(event.target.value as DeploymentHistoryFilterState)}
+            >
+              <option value="all">all states ({historyCounts.all})</option>
+              <option value="running">running ({historyCounts.running})</option>
+              <option value="succeeded">succeeded ({historyCounts.succeeded})</option>
+              <option value="failed">failed ({historyCounts.failed})</option>
+            </Select>
+            <Input
+              id="history-search"
+              label="Search"
+              value={historySearch}
+              onChange={(event) => setHistorySearch(event.target.value)}
+              placeholder="search by id/release/state"
+            />
+          </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+          <div className="space-y-2">
           {historyItems.map((deployment) => (
-            <div key={deployment.id} className="rounded-md border border-border bg-muted/30 p-3">
+            <button
+              key={deployment.id}
+              type="button"
+              onClick={() => setSelectedDeploymentId(deployment.id)}
+              className={`w-full rounded-md border p-3 text-left transition-colors ${
+                selectedDeploymentId === deployment.id
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-muted/30 hover:bg-accent"
+              }`}
+            >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium">{environmentNameById.get(deployment.environment_id) || deployment.environment_id}</span>
                 <StatusPill label={deployment.state} />
@@ -248,9 +299,27 @@ export function DeploymentsPage(): React.ReactElement {
                 release {deployment.release_id} · {formatDate(deployment.created_at)}
               </p>
               <p className="text-xs text-muted-foreground">id: {deployment.id}</p>
-            </div>
+            </button>
           ))}
           {!historyItems.length ? <p className="text-sm text-muted-foreground">No deployments recorded yet.</p> : null}
+          </div>
+          <Card className="space-y-2 border border-border/60 p-3">
+            <CardTitle className="text-sm">Selected Deployment</CardTitle>
+            {!selectedDeployment ? (
+              <p className="text-sm text-muted-foreground">Select a deployment to inspect details.</p>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">id: {selectedDeployment.id}</p>
+                <p className="text-xs text-muted-foreground">
+                  environment: {environmentNameById.get(selectedDeployment.environment_id) || selectedDeployment.environment_id}
+                </p>
+                <p className="text-xs text-muted-foreground">release: {selectedDeployment.release_id}</p>
+                <p className="text-xs text-muted-foreground">state: {selectedDeployment.state}</p>
+                <p className="text-xs text-muted-foreground">created: {formatDate(selectedDeployment.created_at)}</p>
+                <p className="text-xs text-muted-foreground">updated: {formatDate(selectedDeployment.updated_at)}</p>
+              </>
+            )}
+          </Card>
         </div>
       </Card>
 

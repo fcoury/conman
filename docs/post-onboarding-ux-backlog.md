@@ -58,7 +58,7 @@ Legend:
 
 ### E2-3 Queue transition clarity
 - Priority: P1
-- Status: todo
+- Status: done
 - Scope:
   - Highlight when changeset is queue-eligible.
   - Show queue action states and completion feedback.
@@ -74,7 +74,7 @@ Legend:
 
 ### E3-2 Impact visibility
 - Priority: P1
-- Status: todo
+- Status: done
 - Scope:
   - Show selected changesets and high-level impact summary before publish.
 
@@ -89,7 +89,7 @@ Legend:
 
 ### E4-2 Deployment history usability
 - Priority: P1
-- Status: todo
+- Status: done
 - Scope:
   - Improve scanning and filtering of deployment history.
   - Show outcome/state prominently.
@@ -110,7 +110,7 @@ Legend:
 
 ### E5-3 Members/admin cleanup
 - Priority: P2
-- Status: todo
+- Status: done
 - Scope:
   - Reduce internal-ID reliance and streamline admin forms.
 
@@ -118,18 +118,17 @@ Legend:
 
 ### E6-1 Accessibility pass
 - Priority: P0
-- Status: todo
+- Status: done
 - Scope:
   - Ensure labels, keyboard interaction, aria-live status updates.
 
 ### E6-2 Regression coverage
 - Priority: P0
-- Status: todo
+- Status: done
 - Scope:
   - Add/update tests for redesigned Draft Changes and Changesets pages.
 
 ## Current Sprint (Now)
 
-1. E1-1, E1-2, E1-3
-2. E2-1, E2-2
-3. Update progress document and commit
+1. Backlog execution completed for E1-E6 in this branch.
+2. Next recommended sprint: role-specific Playwright journey tests and visual polish.

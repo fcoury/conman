@@ -11,6 +11,7 @@ import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
 import { canManageReleases, formatRoleLabel } from "@/lib/rbac";
 import { formatDate } from "@/lib/utils";
+import { summarizeReleaseImpact, type ReleaseImpactSummary } from "@/modules/releases/releases-impact-utils";
 import { Page } from "@/modules/shared/page";
 import type { Changeset, ReleaseBatch } from "@/types/api";
 
@@ -23,6 +24,9 @@ export function ReleasesPage(): React.ReactElement {
 
   const [selectedReleaseId, setSelectedReleaseId] = useState("");
   const [selectedChangesetIds, setSelectedChangesetIds] = useState<string[]>([]);
+  const [impactSummary, setImpactSummary] = useState<ReleaseImpactSummary | null>(null);
+  const [impactDiffPayloads, setImpactDiffPayloads] = useState<unknown[]>([]);
+  const [impactLoading, setImpactLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +72,8 @@ export function ReleasesPage(): React.ReactElement {
     } else {
       setSelectedChangesetIds([]);
     }
+    setImpactSummary(null);
+    setImpactDiffPayloads([]);
   }, [selectedRelease]);
 
   const refresh = async (): Promise<void> => {
@@ -103,6 +109,7 @@ export function ReleasesPage(): React.ReactElement {
   };
 
   const toggleChangeset = (changesetId: string): void => {
+    setImpactSummary(null);
     setSelectedChangesetIds((prev) =>
       prev.includes(changesetId) ? prev.filter((id) => id !== changesetId) : [...prev, changesetId],
     );
@@ -113,6 +120,7 @@ export function ReleasesPage(): React.ReactElement {
     if (nextIndex < 0 || nextIndex >= selectedChangesetIds.length) {
       return;
     }
+    setImpactSummary(null);
     setSelectedChangesetIds((prev) => {
       const next = [...prev];
       const [item] = next.splice(index, 1);
@@ -127,6 +135,36 @@ export function ReleasesPage(): React.ReactElement {
       .map((id) => map.get(id))
       .filter((changeset): changeset is Changeset => Boolean(changeset));
   }, [changesetsQuery.data, selectedChangesetIds]);
+
+  const loadImpactSummary = async (): Promise<void> => {
+    if (!repoId || !selectedChangesets.length) {
+      setImpactSummary(null);
+      setImpactDiffPayloads([]);
+      return;
+    }
+
+    setImpactLoading(true);
+    setError(null);
+    try {
+      const results = await Promise.all(
+        selectedChangesets.map(async (changeset) => {
+          try {
+            return await api.data(
+              `/api/repos/${repoId}/changesets/${changeset.id}/diff?format=${encodeURIComponent("semantic")}`,
+            );
+          } catch {
+            return { changeset_id: changeset.id, note: "diff unavailable" };
+          }
+        }),
+      );
+      setImpactDiffPayloads(results);
+      setImpactSummary(summarizeReleaseImpact(selectedChangesets, results));
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : "failed to load impact summary");
+    } finally {
+      setImpactLoading(false);
+    }
+  };
 
   if (!repoId) {
     return <Page title="Releases">Bind a repo first in Setup.</Page>;
@@ -162,9 +200,10 @@ export function ReleasesPage(): React.ReactElement {
           </Button>
 
           <Select
+            id="release-select"
+            label="Release"
             value={selectedReleaseId}
             onChange={(event) => setSelectedReleaseId(event.target.value)}
-            aria-label="Select release"
           >
             <option value="">Select release</option>
             {(releasesQuery.data ?? []).map((release) => (
@@ -284,7 +323,7 @@ export function ReleasesPage(): React.ReactElement {
                 </Card>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="secondary"
@@ -339,9 +378,9 @@ export function ReleasesPage(): React.ReactElement {
                 >
                   Assemble
                 </Button>
-                <Button
-                  type="button"
-                  disabled={!selectedReleaseId || !canManage}
+                  <Button
+                    type="button"
+                    disabled={!selectedReleaseId || !canManage}
                   onClick={() =>
                     void perform(
                       async () => {
@@ -353,10 +392,64 @@ export function ReleasesPage(): React.ReactElement {
                       "Release published.",
                     )
                   }
-                >
-                  Publish
-                </Button>
-              </div>
+                  >
+                    Publish
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={impactLoading || !selectedChangesets.length}
+                    onClick={() => void loadImpactSummary()}
+                  >
+                    {impactLoading ? "Loading impact..." : "Refresh impact summary"}
+                  </Button>
+                </div>
+
+              <Card className="space-y-2 border border-border/60 p-3">
+                <CardTitle className="text-sm">Release Impact Preview</CardTitle>
+                {!impactSummary ? (
+                  <p className="text-sm text-muted-foreground">
+                    Load impact summary to preview changed surfaces before assemble/publish.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid gap-2 text-sm lg:grid-cols-3">
+                      <div className="rounded-md bg-muted/30 p-2">
+                        <p className="text-xs text-muted-foreground">Selected changesets</p>
+                        <p className="font-semibold">{impactSummary.selectedCount}</p>
+                      </div>
+                      <div className="rounded-md bg-muted/30 p-2">
+                        <p className="text-xs text-muted-foreground">Unique authors</p>
+                        <p className="font-semibold">{impactSummary.uniqueAuthors}</p>
+                      </div>
+                      <div className="rounded-md bg-muted/30 p-2">
+                        <p className="text-xs text-muted-foreground">Detected changed paths</p>
+                        <p className="font-semibold">{impactSummary.changedPathCount}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <p className="font-medium text-foreground">State distribution</p>
+                      <p>{Object.entries(impactSummary.stateCounts).map(([k, v]) => `${k}: ${v}`).join(" · ")}</p>
+                    </div>
+
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <p className="font-medium text-foreground">Changed path preview</p>
+                      {impactSummary.changedPathsPreview.length ? (
+                        <ul className="space-y-1">
+                          {impactSummary.changedPathsPreview.map((path) => (
+                            <li key={path} className="truncate">
+                              {path}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>No path metadata found in semantic diff payloads.</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </Card>
             </>
           )}
         </Card>
@@ -364,8 +457,9 @@ export function ReleasesPage(): React.ReactElement {
 
       <details>
         <summary className="cursor-pointer text-xs text-muted-foreground">Advanced release payload</summary>
-        <div className="mt-2">
+        <div className="mt-2 space-y-2">
           <RawDataPanel title="Releases payload" value={releasesQuery.data ?? []} />
+          {impactDiffPayloads.length ? <RawDataPanel title="Impact diff payloads" value={impactDiffPayloads} /> : null}
         </div>
       </details>
     </Page>

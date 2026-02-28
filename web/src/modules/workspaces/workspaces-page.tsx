@@ -15,6 +15,7 @@ import { useRepoContext } from "@/hooks/use-repo-context";
 import { formatRoleLabel } from "@/lib/rbac";
 import { fileExtension, formatDate, isProbablyTextFile } from "@/lib/utils";
 import { Page } from "@/modules/shared/page";
+import { parentPath } from "@/modules/workspaces/workspaces-utils";
 import type { Workspace } from "@/types/api";
 
 interface FileEntry {
@@ -77,16 +78,6 @@ function validateContent(path: string, content: string): string | null {
   } catch (error) {
     return error instanceof Error ? error.message : "invalid content";
   }
-}
-
-function parentPath(path: string): string {
-  const trimmed = path.trim().replace(/^\/+|\/+$/g, "");
-  if (!trimmed) {
-    return "";
-  }
-  const parts = trimmed.split("/");
-  parts.pop();
-  return parts.join("/");
 }
 
 export function WorkspacesPage(): React.ReactElement {

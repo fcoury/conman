@@ -96,7 +96,7 @@ export function SidebarNav(): React.ReactElement {
                   )
                 }
               >
-                <item.icon className="h-4 w-4 shrink-0" />
+                <item.icon aria-hidden="true" className="h-4 w-4 shrink-0" />
                 {item.label}
               </NavLink>
             ))}

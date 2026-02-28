@@ -11,7 +11,7 @@
 - [x] M8 Setup wizard hardening (explicit selection, scoped repo selection, post-bind redirect)
 - [x] M9 Explicit onboarding flow (`instance` first) with `<app>--<instance>.dxflow-app.com`
 - [x] M10 Role-first dashboard UX sweep (author/reviewer/release/admin flows)
-- [ ] M11 Post-onboarding product realignment (task-first UX for build/review/release)
+- [x] M11 Post-onboarding product realignment (task-first UX for build/review/release)
 
 ## Completed
 ### M1 Backend foundation for single-repo UI context
@@ -64,7 +64,7 @@
   - This unblocks invited reviewers/config managers from being forced into setup or blocked by another user's binding.
   - `PATCH /api/repo` now requires `member` access on target repo (instead of `admin`) for per-user binding.
 
-### M11 Post-onboarding product realignment (in progress)
+### M11 Post-onboarding product realignment (completed)
 - Added delivery docs for scope and execution tracking:
   - `docs/post-onboarding-ux-plan.md`
   - `docs/post-onboarding-ux-backlog.md`
@@ -98,6 +98,22 @@
     - list cards emphasize state, expiry, and preview URL.
   - Updated navigation/route access so preview environments are visible in `Build`
     as `Preview Envs` (member-accessible), aligning with author-first validation flow.
+  - Added release impact visibility:
+    - semantic-diff-based impact summary with changed-path preview and author/state stats.
+  - Expanded deployment history usability:
+    - environment + state filters, search, selectable history rows, detail panel.
+  - Cleaned up admin/member operations:
+    - Members page now centers invite-by-email and member-role update flow.
+    - Settings rebind flow now uses team/instance selectors instead of raw ID-first UX.
+  - Accessibility pass for core controls:
+    - added reusable `label` support to `Select` and `Textarea`,
+    - applied labels and `aria-live` status announcements on workflow pages,
+    - marked decorative sidebar icons with `aria-hidden`.
+  - Added regression coverage for redesigned workflows via new utility tests:
+    - changeset state/filter helpers,
+    - workspace path navigation helper,
+    - release impact summarization helper,
+    - deployment history filter/count helpers.
 
 ## Verification
 - `cargo check` (workspace): ✅
@@ -127,13 +143,17 @@
   - `pnpm --dir web lint`: ✅ (existing warning remains in setup step dependencies)
   - `pnpm --dir web test -- --run`: ✅
   - `pnpm --dir web build`: ✅
+- M11 Phase 2-4 checks:
+  - `pnpm --dir web lint`: ✅ (same existing setup warning)
+  - `pnpm --dir web test -- --run`: ✅ (5 files, 8 tests)
+  - `pnpm --dir web build`: ✅
 
 ## Notes
 - `.aidocs` is locally ignored via global gitignore; this progress log is intentionally local unless ignore rules change.
-- Current ESLint output includes 2 non-blocking `react-hooks/exhaustive-deps` warnings in setup page memo helpers.
+- Current ESLint output includes 1 non-blocking `react-hooks/exhaustive-deps` warning in setup memo dependencies.
 - Scope update applied after implementation feedback: web app now mounts at `/`
   instead of `/app`; backend preserves `/api/*` behavior and 404 semantics.
 - Realignment planning docs added:
   - `docs/post-onboarding-ux-plan.md`
   - `docs/post-onboarding-ux-backlog.md`
-  - Current execution focus is Phase 1: Draft Changes + Changesets.
+  - All listed backlog slices are now implemented in the current branch.

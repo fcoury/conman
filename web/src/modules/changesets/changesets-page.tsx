@@ -13,34 +13,17 @@ import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
 import { canManageReleases, canReviewChangesets, formatRoleLabel } from "@/lib/rbac";
 import { formatDate } from "@/lib/utils";
+import {
+  countChangesetsByState,
+  filterChangesetsByState,
+  parseOverrides,
+  type ChangesetFilterState,
+} from "@/modules/changesets/changesets-utils";
 import { Page } from "@/modules/shared/page";
 import type { Changeset, Workspace } from "@/types/api";
 
 const reviewActions = ["approve", "request_changes", "reject"] as const;
 type ReviewAction = (typeof reviewActions)[number];
-type FilterState = "all" | "draft" | "review" | "approved" | "queued";
-
-function stateCategory(state: string): Exclude<FilterState, "all"> {
-  const normalized = state.toLowerCase();
-  if (normalized.includes("queue")) {
-    return "queued";
-  }
-  if (normalized.includes("approve")) {
-    return "approved";
-  }
-  if (normalized.includes("review")) {
-    return "review";
-  }
-  return "draft";
-}
-
-function parseOverrides(raw: string): unknown[] {
-  const parsed = JSON.parse(raw);
-  if (!Array.isArray(parsed)) {
-    throw new Error("profile overrides must be a JSON array");
-  }
-  return parsed;
-}
 
 export function ChangesetsPage(): React.ReactElement {
   const api = useApi();
@@ -53,7 +36,7 @@ export function ChangesetsPage(): React.ReactElement {
   const [title, setTitle] = useState("Update config");
   const [description, setDescription] = useState("Change request from UI");
   const [selectedChangesetId, setSelectedChangesetId] = useState("");
-  const [filterState, setFilterState] = useState<FilterState>("all");
+  const [filterState, setFilterState] = useState<ChangesetFilterState>("all");
   const [reviewAction, setReviewAction] = useState<ReviewAction>("approve");
   const [submitOverridesJson, setSubmitOverridesJson] = useState("[]");
   const [commentBody, setCommentBody] = useState("looks good");
@@ -83,22 +66,11 @@ export function ChangesetsPage(): React.ReactElement {
   });
 
   const counts = useMemo(() => {
-    const all = changesetsQuery.data ?? [];
-    return {
-      all: all.length,
-      draft: all.filter((changeset) => stateCategory(changeset.state) === "draft").length,
-      review: all.filter((changeset) => stateCategory(changeset.state) === "review").length,
-      approved: all.filter((changeset) => stateCategory(changeset.state) === "approved").length,
-      queued: all.filter((changeset) => stateCategory(changeset.state) === "queued").length,
-    };
+    return countChangesetsByState(changesetsQuery.data ?? []);
   }, [changesetsQuery.data]);
 
   const filteredChangesets = useMemo(() => {
-    const all = changesetsQuery.data ?? [];
-    if (filterState === "all") {
-      return all;
-    }
-    return all.filter((changeset) => stateCategory(changeset.state) === filterState);
+    return filterChangesetsByState(changesetsQuery.data ?? [], filterState);
   }, [changesetsQuery.data, filterState]);
 
   useEffect(() => {
@@ -249,7 +221,7 @@ export function ChangesetsPage(): React.ReactElement {
                 ["review", `In Review (${counts.review})`],
                 ["approved", `Approved (${counts.approved})`],
                 ["queued", `Queued (${counts.queued})`],
-              ] as Array<[FilterState, string]>).map(([key, label]) => (
+              ] as Array<[ChangesetFilterState, string]>).map(([key, label]) => (
                 <Button
                   key={key}
                   type="button"
