@@ -21,6 +21,7 @@ import { Page } from "@/modules/shared/page";
 import type { Deployment, ReleaseBatch } from "@/types/api";
 
 type DeploymentAction = "deploy" | "promote" | "rollback";
+const activeDeploymentStates = new Set(["pending", "running"]);
 
 export function DeploymentsPage(): React.ReactElement {
   const api = useApi();
@@ -62,7 +63,12 @@ export function DeploymentsPage(): React.ReactElement {
     queryKey: ["deployments", repoId],
     queryFn: () => api.data<Deployment[]>(`/api/repos/${repoId}/deployments`),
     enabled: Boolean(repoId),
-    refetchInterval: 3000,
+    refetchInterval: (query) => {
+      const deployments = query.state.data ?? [];
+      if (!deployments.length) return false;
+      return deployments.some((deployment) => activeDeploymentStates.has(deployment.state.toLowerCase())) ? 3000 : 12000;
+    },
+    refetchIntervalInBackground: false,
   });
 
   const environmentNameById = useMemo(

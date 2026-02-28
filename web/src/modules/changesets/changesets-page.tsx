@@ -24,6 +24,7 @@ import type { Changeset, Workspace } from "@/types/api";
 
 const reviewActions = ["approve", "request_changes", "reject"] as const;
 type ReviewAction = (typeof reviewActions)[number];
+const activeChangesetSignals = ["review", "approve", "queue"];
 
 interface ChangesetsPageProps {
   mode?: "all" | "review";
@@ -71,7 +72,15 @@ export function ChangesetsPage({ mode = "all" }: ChangesetsPageProps): React.Rea
       return envelope.data;
     },
     enabled: Boolean(repoId),
-    refetchInterval: 3000,
+    refetchInterval: (query) => {
+      const changesets = query.state.data ?? [];
+      if (!changesets.length) return false;
+      const hasActiveReviewFlow = changesets.some((changeset) =>
+        activeChangesetSignals.some((signal) => changeset.state.toLowerCase().includes(signal)),
+      );
+      return hasActiveReviewFlow ? 3000 : 10000;
+    },
+    refetchIntervalInBackground: false,
   });
 
   const counts = useMemo(() => {

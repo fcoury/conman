@@ -126,6 +126,9 @@
     - `/review` now opens a reviewer-focused queue view,
     - sidebar includes role-aware `Review Queue` entry for reviewer+ roles,
     - reviewer flow copy in app shell is role-adapted.
+  - Reduced polling overhead on heavy pages:
+    - changesets/deployments now use active-state-aware refetch intervals,
+    - jobs/changesets/deployments disable background-tab refetching.
   - Updated Playwright config with `webServer` startup to make `test:e2e` self-contained.
 
 ## Verification

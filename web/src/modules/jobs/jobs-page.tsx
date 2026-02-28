@@ -31,6 +31,7 @@ export function JobsPage(): React.ReactElement {
       const jobs = (query.state.data ?? []) as Job[];
       return jobs.some((job) => activeStates.has(job.state)) ? 2000 : false;
     },
+    refetchIntervalInBackground: false,
   });
 
   const selectedJob = useMemo(
@@ -46,6 +47,7 @@ export function JobsPage(): React.ReactElement {
       const state = (query.state.data as Job | undefined)?.state;
       return state && activeStates.has(state) ? 2000 : false;
     },
+    refetchIntervalInBackground: false,
   });
 
   if (!repoId) {
