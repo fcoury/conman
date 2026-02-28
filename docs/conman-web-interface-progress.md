@@ -114,6 +114,11 @@
     - workspace path navigation helper,
     - release impact summarization helper,
     - deployment history filter/count helpers.
+  - Added Playwright workflow coverage with API-mocked role journeys:
+    - release impact summary flow,
+    - deployment history filtering/detail flow,
+    - members + settings guided admin flow.
+  - Updated Playwright config with `webServer` startup to make `test:e2e` self-contained.
 
 ## Verification
 - `cargo check` (workspace): ✅
@@ -147,6 +152,7 @@
   - `pnpm --dir web lint`: ✅ (same existing setup warning)
   - `pnpm --dir web test -- --run`: ✅ (5 files, 8 tests)
   - `pnpm --dir web build`: ✅
+  - `pnpm --dir web test:e2e`: ✅ (4 tests passing)
 
 ## Notes
 - `.aidocs` is locally ignored via global gitignore; this progress log is intentionally local unless ignore rules change.
