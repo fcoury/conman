@@ -142,14 +142,7 @@ export function AppRoutes(): React.ReactElement {
               </RequireRole>
             }
           />
-          <Route
-            path="/temp-envs"
-            element={
-              <RequireRole minimum="config_manager">
-                <TempEnvsPage />
-              </RequireRole>
-            }
-          />
+          <Route path="/temp-envs" element={<TempEnvsPage />} />
           <Route path="/jobs" element={<JobsPage />} />
           <Route
             path="/apps"

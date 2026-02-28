@@ -88,6 +88,16 @@
     - environment snapshot cards with latest state,
     - action form centered on env + release + action,
     - filtered history list with stronger status readability.
+  - Refactored `Runtime` page toward typed forms:
+    - profile create/update with common typed fields,
+    - environment-chain editor with ordering controls,
+    - advanced JSON patch moved behind explicit disclosure.
+  - Refactored `Temp Environments` page into preview-centered workflow:
+    - source selection via workspace/changeset dropdowns,
+    - selected-environment actions (extend/undo/delete) without manual IDs,
+    - list cards emphasize state, expiry, and preview URL.
+  - Updated navigation/route access so preview environments are visible in `Build`
+    as `Preview Envs` (member-accessible), aligning with author-first validation flow.
 
 ## Verification
 - `cargo check` (workspace): ✅

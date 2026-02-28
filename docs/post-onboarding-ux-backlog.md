@@ -67,7 +67,7 @@ Legend:
 
 ### E3-1 Release draft and composition model
 - Priority: P1
-- Status: in_progress
+- Status: done
 - Scope:
   - Replace free-form IDs with selectable queued changesets.
   - Clarify sequence: create -> compose -> reorder -> assemble -> publish.
@@ -82,7 +82,7 @@ Legend:
 
 ### E4-1 Environment pipeline framing
 - Priority: P1
-- Status: in_progress
+- Status: done
 - Scope:
   - Visualize environment chain and selected release context.
   - Remove CSV-centric approvals from default path.
@@ -98,13 +98,13 @@ Legend:
 
 ### E5-1 Runtime typed forms first
 - Priority: P1
-- Status: todo
+- Status: done
 - Scope:
   - Move JSON payload editing behind advanced disclosure.
 
 ### E5-2 Temp envs as preview assets
 - Priority: P1
-- Status: todo
+- Status: done
 - Scope:
   - Emphasize preview URL, TTL, source linkage.
 

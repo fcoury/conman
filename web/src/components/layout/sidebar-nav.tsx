@@ -36,6 +36,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/workspaces", label: "Draft Changes", icon: GitBranch },
       { to: "/changesets", label: "Changesets", icon: GitPullRequest },
+      { to: "/temp-envs", label: "Preview Envs", icon: FlaskConical },
     ],
   },
   {
@@ -43,7 +44,6 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/releases", label: "Releases", icon: Package, minRole: "config_manager" },
       { to: "/deployments", label: "Deployments", icon: Rocket, minRole: "config_manager" },
-      { to: "/temp-envs", label: "Temp Envs", icon: FlaskConical, minRole: "config_manager" },
     ],
   },
   {
