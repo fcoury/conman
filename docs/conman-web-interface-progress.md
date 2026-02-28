@@ -137,6 +137,10 @@
     - apps create + rename flow,
     - notification preference update flow,
     - jobs queue snapshot/detail visibility checks.
+  - Added Playwright error-state regressions for operator/admin workflows:
+    - app create failure feedback,
+    - notification preference save failure feedback,
+    - deployment action failure feedback.
   - Updated Playwright config with `webServer` startup to make `test:e2e` self-contained.
 
 ## Verification
@@ -171,7 +175,7 @@
   - `pnpm --dir web lint`: ✅
   - `pnpm --dir web test -- --run`: ✅ (5 files, 8 tests)
   - `pnpm --dir web build`: ✅
-  - `pnpm --dir web test:e2e`: ✅ (11 tests passing)
+  - `pnpm --dir web test:e2e`: ✅ (14 tests passing)
 
 ## Notes
 - `.aidocs` is locally ignored via global gitignore; this progress log is intentionally local unless ignore rules change.

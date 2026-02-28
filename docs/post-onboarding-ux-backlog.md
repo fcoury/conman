@@ -135,4 +135,5 @@ Legend:
 3. Performance cleanup for polling-heavy pages is now completed.
 4. Final visual consistency pass across dashboard cards/forms is now completed.
 5. Journey tests for Apps/Notifications/Jobs interactions are now completed.
-6. Next recommended sprint: add API error-state UX regression tests for admin and operator flows.
+6. API error-state UX regression tests for admin/operator flows are now completed.
+7. Next recommended sprint: tighten semantic-diff/release-impact reviewer flows with richer UI assertions.

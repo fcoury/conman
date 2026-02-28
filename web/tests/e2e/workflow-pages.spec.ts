@@ -15,9 +15,21 @@ async function json(route: Route, status: number, body: unknown) {
   });
 }
 
-async function setupApiMock(page: Page, options?: { role?: MockRole; canRebind?: boolean }): Promise<void> {
+async function setupApiMock(
+  page: Page,
+  options?: {
+    role?: MockRole;
+    canRebind?: boolean;
+    failCreateApp?: boolean;
+    failNotificationUpdate?: boolean;
+    failDeployAction?: boolean;
+  },
+): Promise<void> {
   const role = options?.role ?? "owner";
   const canRebind = options?.canRebind ?? (role === "admin" || role === "owner");
+  const failCreateApp = options?.failCreateApp ?? false;
+  const failNotificationUpdate = options?.failNotificationUpdate ?? false;
+  const failDeployAction = options?.failDeployAction ?? false;
   let invites = [
     {
       id: "inv-1",
@@ -311,6 +323,15 @@ async function setupApiMock(page: Page, options?: { role?: MockRole; canRebind?:
     }
 
     if (pathname === "/api/repos/repo-1/apps" && method === "POST") {
+      if (failCreateApp) {
+        return json(route, 500, {
+          error: {
+            code: "internal",
+            message: "simulated app creation failure",
+            request_id: "mock-create-app-error",
+          },
+        });
+      }
       const body = JSON.parse(request.postData() || "{}");
       const created = {
         id: `app-${apps.length + 1}`,
@@ -338,6 +359,15 @@ async function setupApiMock(page: Page, options?: { role?: MockRole; canRebind?:
     }
 
     if (pathname === "/api/me/notification-preferences" && method === "PATCH") {
+      if (failNotificationUpdate) {
+        return json(route, 500, {
+          error: {
+            code: "internal",
+            message: "simulated notification update failure",
+            request_id: "mock-notification-error",
+          },
+        });
+      }
       const body = JSON.parse(request.postData() || "{}");
       notificationPreference = {
         ...notificationPreference,
@@ -377,6 +407,15 @@ async function setupApiMock(page: Page, options?: { role?: MockRole; canRebind?:
     }
 
     if (pathname.match(/^\/api\/repos\/repo-1\/environments\/[^/]+\/(deploy|promote|rollback)$/) && method === "POST") {
+      if (failDeployAction) {
+        return json(route, 500, {
+          error: {
+            code: "internal",
+            message: "simulated deployment action failure",
+            request_id: "mock-deploy-error",
+          },
+        });
+      }
       return json(route, 200, ok({ success: true }));
     }
 
@@ -581,4 +620,37 @@ test("jobs page shows queue snapshot and selected detail", async ({ page }) => {
   await expect(page.getByText("running 1")).toBeVisible();
   await expect(page.getByText("failed 1")).toBeVisible();
   await expect(page.getByText("retry 0 of 3")).toBeVisible();
+});
+
+test("apps page shows actionable error when create fails", async ({ page }) => {
+  await setupApiMock(page, { role: "owner", failCreateApp: true });
+  await authenticate(page);
+  await page.goto("/apps");
+
+  await page.getByLabel("App key").fill("broken");
+  await page.getByLabel("App title").fill("Broken App");
+  await page.getByRole("button", { name: "Create app" }).click();
+  await expect(page.getByText("simulated app creation failure")).toBeVisible();
+});
+
+test("notifications page shows error when save fails", async ({ page }) => {
+  await setupApiMock(page, { role: "member", canRebind: false, failNotificationUpdate: true });
+  await authenticate(page);
+  await page.goto("/notifications");
+
+  await page.getByLabel("Email delivery").selectOption("false");
+  await page.getByRole("button", { name: "Save preference" }).click();
+  await expect(page.getByText("simulated notification update failure")).toBeVisible();
+});
+
+test("deployments page surfaces action failure state", async ({ page }) => {
+  await setupApiMock(page, { role: "config_manager", canRebind: false, failDeployAction: true });
+  await authenticate(page);
+  await page.goto("/deployments");
+
+  await page.getByLabel("Action", { exact: true }).selectOption("deploy");
+  await page.getByLabel("Environment", { exact: true }).selectOption("env-dev");
+  await page.getByLabel("Release", { exact: true }).selectOption("rel-1");
+  await page.getByRole("button", { name: "Execute" }).click();
+  await expect(page.getByText("simulated deployment action failure")).toBeVisible();
 });
