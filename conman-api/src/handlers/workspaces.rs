@@ -28,6 +28,8 @@ pub struct UpdateWorkspaceRequest {
 pub struct FilePathQuery {
     #[serde(default)]
     pub path: String,
+    #[serde(default)]
+    pub recursive: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -453,7 +455,7 @@ pub async fn get_workspace_file_or_tree(
 
     let entries = state
         .git_adapter
-        .get_tree_entries(&git_repo, &workspace.branch_name, &path, false)
+        .get_tree_entries(&git_repo, &workspace.branch_name, &path, query.recursive)
         .await?;
 
     let mapped = entries
