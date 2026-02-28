@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Execution Tracker — Conman Docs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#conman-v1-execution-tracker"
+      id="toc-conman-v1-execution-tracker">Conman V1 Execution
+      Tracker</a>
+      <ul>
+      <li><a href="#1-program-status" id="toc-1-program-status">1)
+      Program Status</a></li>
+      <li><a href="#2-epic-tracker-dependency-controlled"
+      id="toc-2-epic-tracker-dependency-controlled">2) Epic Tracker
+      (Dependency Controlled)</a></li>
+      <li><a href="#3-dependency-gate-rules-hard-stop"
+      id="toc-3-dependency-gate-rules-hard-stop">3) Dependency Gate
+      Rules (Hard Stop)</a></li>
+      <li><a href="#4-wave-and-milestone-gates"
+      id="toc-4-wave-and-milestone-gates">4) Wave and Milestone
+      Gates</a></li>
+      <li><a href="#gate-a-m1-foundation-e00-e03"
+      id="toc-gate-a-m1-foundation-e00-e03">Gate A (M1 foundation:
+      E00-E03)</a></li>
+      <li><a href="#gate-b-m1-completion-e04-e06"
+      id="toc-gate-b-m1-completion-e04-e06">Gate B (M1 completion:
+      E04-E06)</a></li>
+      <li><a href="#gate-c-m2-e07-e08" id="toc-gate-c-m2-e07-e08">Gate C
+      (M2: E07-E08)</a></li>
+      <li><a href="#gate-d-m3-e09-e10" id="toc-gate-d-m3-e09-e10">Gate D
+      (M3: E09-E10)</a></li>
+      <li><a href="#gate-e-m4-e11" id="toc-gate-e-m4-e11">Gate E (M4:
+      E11)</a></li>
+      <li><a href="#5-ci-quality-gates-required-for-merge"
+      id="toc-5-ci-quality-gates-required-for-merge">5) CI Quality Gates
+      (Required for Merge)</a></li>
+      <li><a href="#6-weekly-operating-cadence"
+      id="toc-6-weekly-operating-cadence">6) Weekly Operating
+      Cadence</a></li>
+      <li><a href="#7-change-control" id="toc-7-change-control">7)
+      Change Control</a></li>
+      <li><a href="#8-implementation-sign-off"
+      id="toc-8-implementation-sign-off">8) Implementation
+      Sign-Off</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">Execution Tracker</h1>
+      </header>
+      <h1 id="conman-v1-execution-tracker">Conman V1 Execution
+      Tracker</h1>
+      <p>Sources:</p>
+      <ul>
+      <li><a href="./execution-plan.html">execution-plan.md</a></li>
+      <li><a href="./IMPLEMENTATION.html">IMPLEMENTATION.md</a></li>
+      <li><a href="./conman-v1-backlog.html">conman-v1-backlog.md</a></li>
+      </ul>
+      <p>Use this file as the live control plane for delivery.</p>
+      <h2 id="1-program-status">1) Program Status</h2>
+      <ul>
+      <li>Start date:</li>
+      <li>Target date:</li>
+      <li>Current wave: <code>E</code></li>
+      <li>Current milestone: <code>M4</code></li>
+      <li>Overall progress:
+      <ul>
+      <li>Epics complete: <code>12 / 12</code></li>
+      <li>Gates passed: <code>5 / 5</code></li>
+      </ul></li>
+      <li>Active blockers:
+      <ul>
+      <li>none</li>
+      </ul></li>
+      </ul>
+      <h2 id="2-epic-tracker-dependency-controlled">2) Epic Tracker
+      (Dependency Controlled)</h2>
+      <p>Legend:</p>
+      <ul>
+      <li>Status:
+      <code>not_started | in_progress | blocked | in_review | done</code></li>
+      <li>Gate: first wave where epic can merge by dependency</li>
+      </ul>
+      <table>
+      <thead>
+      <tr>
+      <th>Epic</th>
+      <th>Owner</th>
+      <th>Depends On</th>
+      <th>Gate</th>
+      <th>Status</th>
+      <th>PR/Branch</th>
+      <th style="text-align: right;">Checklist %</th>
+      <th>Blocker</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>E00 Platform Foundation</td>
+      <td>worker-platform</td>
+      <td>none</td>
+      <td>A</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      <tr>
+      <td>E01 Git Adapter</td>
+      <td>worker-git</td>
+      <td>E00</td>
+      <td>A</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      <tr>
+      <td>E02 Auth &amp; RBAC</td>
+      <td>worker-auth</td>
+      <td>E00</td>
+      <td>A</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      <tr>
+      <td>E03 Team/Repo Setup</td>
+      <td>worker-app</td>
+      <td>E01, E02</td>
+      <td>A</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      <tr>
+      <td>E04 Workspaces</td>
+      <td>worker-workspace</td>
+      <td>E01, E03</td>
+      <td>B</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      <tr>
+      <td>E05 Changesets</td>
+      <td>worker-changeset</td>
+      <td>E02, E04</td>
+      <td>B</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      <tr>
+      <td>E06 Async Jobs</td>
+      <td>worker-jobs</td>
+      <td>E00, E05</td>
+      <td>B</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      <tr>
+      <td>E07 Queue Orchestration</td>
+      <td>worker-queue-release</td>
+      <td>E05, E06</td>
+      <td>C</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      <tr>
+      <td>E08 Releases</td>
+      <td>worker-queue-release</td>
+      <td>E01, E06, E07</td>
+      <td>C</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      <tr>
+      <td>E09 Deployments</td>
+      <td>worker-deploy</td>
+      <td>E03, E06, E08</td>
+      <td>D</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td>Deploy gate sequence validated in staged full-flow smoke
+      (<code>runtime_profile_drift_check</code> -&gt;
+      <code>msuite_deploy</code> -&gt; <code>deploy_release</code>)</td>
+      </tr>
+      <tr>
+      <td>E10 Temp Environments</td>
+      <td>worker-tempenv</td>
+      <td>E03, E06</td>
+      <td>D</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td>Temp env create/provision/extend lifecycle validated in staged
+      full-flow smoke</td>
+      </tr>
+      <tr>
+      <td>E11 Notifications &amp; Audit</td>
+      <td>worker-observability</td>
+      <td>E05-E10</td>
+      <td>E</td>
+      <td>done</td>
+      <td>master</td>
+      <td style="text-align: right;">100</td>
+      <td></td>
+      </tr>
+      </tbody>
+      </table>
+      <h2 id="3-dependency-gate-rules-hard-stop">3) Dependency Gate
+      Rules (Hard Stop)</h2>
+      <p>Do not merge when prerequisites are incomplete:</p>
+      <ol type="1">
+      <li>E01/E02 require E00 merged.</li>
+      <li>E03 requires E01 and E02 merged.</li>
+      <li>E04 requires E01 and E03 merged.</li>
+      <li>E05 requires E02 and E04 merged.</li>
+      <li>E06 requires E00 and E05 merged.</li>
+      <li>E07 requires E05 and E06 merged.</li>
+      <li>E08 requires E01, E06, E07 merged.</li>
+      <li>E09 requires E03, E06, E08 merged.</li>
+      <li>E10 requires E03 and E06 merged.</li>
+      <li>E11 requires E05 through E10 merged.</li>
+      </ol>
+      <h2 id="4-wave-and-milestone-gates">4) Wave and Milestone
+      Gates</h2>
+      <h2 id="gate-a-m1-foundation-e00-e03">Gate A (M1 foundation:
+      E00-E03)</h2>
+      <ul class="task-list">
+      <li><label><input type="checkbox" checked="" />E00
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />E01
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />E02
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />E03
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />Service boots with
+      shared error/pagination/request-id conventions</label></li>
+      <li><label><input type="checkbox" checked="" />Git adapter
+      boundary implemented (no direct gitaly calls in
+      handlers)</label></li>
+      <li><label><input type="checkbox" checked="" />Auth + RBAC
+      enforcement active</label></li>
+      <li><label><input type="checkbox" checked="" />Team/repo/surface +
+      env/runtime-profile baseline APIs available</label></li>
+      </ul>
+      <ul>
+      <li>Result: <code>pass</code></li>
+      <li>Date: <code>2026-02-26</code></li>
+      <li>Notes: Full gitaly-rs RPC mappings now implemented in
+      <code>conman-git::GitalyClient</code>.</li>
+      </ul>
+      <h2 id="gate-b-m1-completion-e04-e06">Gate B (M1 completion:
+      E04-E06)</h2>
+      <ul class="task-list">
+      <li><label><input type="checkbox" checked="" />E04
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />E05
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />E06
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />End-to-end: author
+      -&gt; submit -&gt; review path works</label></li>
+      <li><label><input type="checkbox" checked="" />Async jobs run and
+      gate transitions</label></li>
+      <li><label><input type="checkbox" checked="" />Required audit
+      events emitted</label></li>
+      </ul>
+      <ul>
+      <li>Result: <code>pass</code></li>
+      <li>Date: <code>2026-02-26</code></li>
+      <li>Notes: Live staged runs confirm workspace write +
+      submit/review path with gitaly-rs, including blocked-path and
+      file-size guardrail checks
+      (<code>tests/e2e/results/20260226044825-full-e2e-summary.md</code>).</li>
+      </ul>
+      <h2 id="gate-c-m2-e07-e08">Gate C (M2: E07-E08)</h2>
+      <ul class="task-list">
+      <li><label><input type="checkbox" checked="" />E07
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />E08
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />Queue-first flow
+      works with revalidation</label></li>
+      <li><label><input type="checkbox" checked="" />Config manager can
+      publish subset-based releases</label></li>
+      </ul>
+      <ul>
+      <li>Result: <code>pass</code></li>
+      <li>Date: <code>2026-02-26</code></li>
+      <li>Notes: Publish flow now composes selected queued changesets
+      through gitaly merges, fast-forwards integration branch with
+      optimistic checks, and tags releases.</li>
+      </ul>
+      <h2 id="gate-d-m3-e09-e10">Gate D (M3: E09-E10)</h2>
+      <ul class="task-list">
+      <li><label><input type="checkbox" checked="" />E09
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />E10
+      merged</label></li>
+      <li><label><input type="checkbox"
+      checked="" />Deploy/promote/rollback flows pass</label></li>
+      <li><label><input type="checkbox" checked="" />Temp env
+      provisioning + TTL/grace/cleanup pass</label></li>
+      </ul>
+      <ul>
+      <li>Result: <code>pass</code></li>
+      <li>Date: <code>2026-02-26</code></li>
+      <li>Notes: Deploy/promote/rollback and deploy-gate jobs reached
+      terminal success in staged run; temp env
+      provision/expire/undo-expire also succeeded
+      (<code>tests/e2e/results/20260226044825-full-e2e-summary.md</code>).</li>
+      </ul>
+      <h2 id="gate-e-m4-e11">Gate E (M4: E11)</h2>
+      <ul class="task-list">
+      <li><label><input type="checkbox" checked="" />E11
+      merged</label></li>
+      <li><label><input type="checkbox" checked="" />Notification
+      coverage complete</label></li>
+      <li><label><input type="checkbox" checked="" />Audit completeness
+      validated</label></li>
+      </ul>
+      <ul>
+      <li>Result: <code>pass</code></li>
+      <li>Date: <code>2026-02-26</code></li>
+      <li>Notes: Email notification events and audit completeness remain
+      validated in staged end-to-end runs
+      (<code>tests/e2e/results/20260226044825-full-e2e-summary.md</code>).</li>
+      </ul>
+      <h2 id="5-ci-quality-gates-required-for-merge">5) CI Quality Gates
+      (Required for Merge)</h2>
+      <p>Every epic PR must pass:</p>
+      <ol type="1">
+      <li>Build and test pipeline green.</li>
+      <li>Contract/state-machine tests for touched flows.</li>
+      <li>RBAC enforcement tests for touched endpoints.</li>
+      <li>Audit-event assertions for touched mutations.</li>
+      <li>No dependency rule violations from section 3.</li>
+      </ol>
+      <h2 id="6-weekly-operating-cadence">6) Weekly Operating
+      Cadence</h2>
+      <p>Twice weekly program review (recommended Tue/Fri):</p>
+      <ol type="1">
+      <li>Update epic statuses and checklist %.</li>
+      <li>Review critical path slip risk (E00-&gt;E09 chain).</li>
+      <li>Escalate blockers older than 24h.</li>
+      <li>Approve or reject scope changes for active wave.</li>
+      <li>Record next 3 highest-priority tasks per owner.</li>
+      </ol>
+      <h2 id="7-change-control">7) Change Control</h2>
+      <p>For any scope change:</p>
+      <ul>
+      <li>Change summary:</li>
+      <li>Affected epics:</li>
+      <li>Critical-path impact:</li>
+      <li>Approved by:</li>
+      <li>Decision date:</li>
+      </ul>
+      <p>Rules:</p>
+      <ol type="1">
+      <li>No scope expansion mid-wave unless blocker/severity-high.</li>
+      <li>Any accepted change must update:
+      <ul>
+      <li><code>conman-v1-scope.md</code></li>
+      <li><code>conman-v1-backlog.md</code></li>
+      <li>affected epic files</li>
+      </ul></li>
+      <li>Recompute milestone gate criteria when dependency
+      changes.</li>
+      </ol>
+      <h2 id="8-implementation-sign-off">8) Implementation Sign-Off</h2>
+      <ul class="task-list">
+      <li><label><input type="checkbox" checked="" />M1
+      passed</label></li>
+      <li><label><input type="checkbox" checked="" />M2
+      passed</label></li>
+      <li><label><input type="checkbox" checked="" />M3
+      passed</label></li>
+      <li><label><input type="checkbox" checked="" />M4
+      passed</label></li>
+      <li><label><input type="checkbox" checked="" />No P0 blockers
+      open</label></li>
+      <li><label><input type="checkbox" checked="" />Final sign-off
+      (names/date)</label></li>
+      </ul>
+      <p>Final sign-off: <code>2026-02-26</code> (<code>fcoury</code>).
+      Plan completion gate (strict): latest
+      <code>tests/ops/results/*-plan-completion-gate-summary.md</code>.</p>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>V1 Implementation Guide — Conman Docs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#conman-v1-implementation-guide"
+      id="toc-conman-v1-implementation-guide">Conman V1 Implementation
+      Guide</a>
+      <ul>
+      <li><a href="#1-crate-structure" id="toc-1-crate-structure">1.
+      Crate Structure</a>
+      <ul>
+      <li><a href="#crate-responsibilities"
+      id="toc-crate-responsibilities">Crate responsibilities</a></li>
+      </ul></li>
+      <li><a href="#2-conventions" id="toc-2-conventions">2.
+      Conventions</a>
+      <ul>
+      <li><a href="#error-handling" id="toc-error-handling">Error
+      handling</a></li>
+      <li><a href="#response-envelope"
+      id="toc-response-envelope">Response envelope</a></li>
+      <li><a href="#pagination" id="toc-pagination">Pagination</a></li>
+      <li><a href="#request-tracing" id="toc-request-tracing">Request
+      tracing</a></li>
+      <li><a href="#mongodb-patterns" id="toc-mongodb-patterns">MongoDB
+      patterns</a></li>
+      <li><a href="#file-paths-in-api" id="toc-file-paths-in-api">File
+      paths in API</a></li>
+      <li><a href="#testing-strategy" id="toc-testing-strategy">Testing
+      strategy</a></li>
+      <li><a href="#audit-pattern" id="toc-audit-pattern">Audit
+      pattern</a></li>
+      </ul></li>
+      <li><a href="#3-cross-cutting-concerns"
+      id="toc-3-cross-cutting-concerns">3. Cross-Cutting Concerns</a>
+      <ul>
+      <li><a href="#authentication-flow"
+      id="toc-authentication-flow">Authentication flow</a></li>
+      <li><a href="#gitaly-rs-connection"
+      id="toc-gitaly-rs-connection">Gitaly-rs connection</a></li>
+      <li><a href="#configuration"
+      id="toc-configuration">Configuration</a></li>
+      </ul></li>
+      <li><a href="#4-domain-quick-reference"
+      id="toc-4-domain-quick-reference">4. Domain Quick Reference</a>
+      <ul>
+      <li><a href="#terminology"
+      id="toc-terminology">Terminology</a></li>
+      <li><a href="#changeset-states"
+      id="toc-changeset-states">Changeset states</a></li>
+      <li><a href="#release-states" id="toc-release-states">Release
+      states</a></li>
+      <li><a href="#deployment-states"
+      id="toc-deployment-states">Deployment states</a></li>
+      <li><a href="#rbac-permission-matrix"
+      id="toc-rbac-permission-matrix">RBAC permission matrix</a></li>
+      <li><a href="#baseline-resolution"
+      id="toc-baseline-resolution">Baseline resolution</a></li>
+      <li><a href="#runtime-profile-defaults"
+      id="toc-runtime-profile-defaults">Runtime profile
+      defaults</a></li>
+      </ul></li>
+      <li><a href="#5-epic-index" id="toc-5-epic-index">5. Epic
+      Index</a>
+      <ul>
+      <li><a href="#critical-path" id="toc-critical-path">Critical
+      path</a></li>
+      <li><a href="#milestone-mapping"
+      id="toc-milestone-mapping">Milestone mapping</a></li>
+      </ul></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">V1 Implementation Guide</h1>
+      </header>
+      <h1 id="conman-v1-implementation-guide">Conman V1 Implementation
+      Guide</h1>
+      <p><strong>Goal:</strong> Build a Git-backed configuration manager
+      for DxFlow-style config repositories. API-only backend in
+      Rust.</p>
+      <p><strong>Architecture:</strong> Axum HTTP server exposing a REST
+      API. Git operations delegated to a running gitaly-rs instance via
+      gRPC (Tonic client). MongoDB stores workflow state, audit trails,
+      and team/repository metadata. Async job runner handles
+      long-running operations (msuite, revalidation, deployments).
+      Runtime profiles model URL/env vars/secrets/database/data
+      configuration for environments and temp envs, including per-app
+      endpoint mappings.</p>
+      <p><strong>Tech Stack:</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Component</th>
+      <th>Choice</th>
+      <th>Version</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Language</td>
+      <td>Rust</td>
+      <td>edition 2024</td>
+      </tr>
+      <tr>
+      <td>HTTP framework</td>
+      <td>Axum</td>
+      <td>0.8</td>
+      </tr>
+      <tr>
+      <td>gRPC client</td>
+      <td>Tonic</td>
+      <td>0.12</td>
+      </tr>
+      <tr>
+      <td>Protobuf</td>
+      <td>Prost</td>
+      <td>0.13</td>
+      </tr>
+      <tr>
+      <td>Async runtime</td>
+      <td>Tokio</td>
+      <td>1.x</td>
+      </tr>
+      <tr>
+      <td>MongoDB driver</td>
+      <td>mongodb (official)</td>
+      <td>latest</td>
+      </tr>
+      <tr>
+      <td>Serialization</td>
+      <td>serde + serde_json</td>
+      <td>latest</td>
+      </tr>
+      <tr>
+      <td>Error handling</td>
+      <td>thiserror</td>
+      <td>latest</td>
+      </tr>
+      <tr>
+      <td>Password hashing</td>
+      <td>argon2</td>
+      <td>latest</td>
+      </tr>
+      <tr>
+      <td>JWT</td>
+      <td>jsonwebtoken</td>
+      <td>latest</td>
+      </tr>
+      <tr>
+      <td>Time</td>
+      <td>chrono</td>
+      <td>latest</td>
+      </tr>
+      <tr>
+      <td>Tracing</td>
+      <td>tracing + tracing-subscriber</td>
+      <td>latest</td>
+      </tr>
+      <tr>
+      <td>UUID</td>
+      <td>uuid</td>
+      <td>latest (<code>v7</code> generation)</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Full scope:</strong> <a
+      href="./conman-v1-scope.html"><code>docs/conman-v1-scope.md</code></a>
+      and <a
+      href="./runtime-profiles-draft.html"><code>docs/runtime-profiles-draft.md</code></a></p>
+      <hr />
+      <h2 id="1-crate-structure">1. Crate Structure</h2>
+      <p>Cargo workspace with 7 crates. Dependency arrows point
+      downward.</p>
+      <pre><code>conman (binary)
+├── conman-api        (Axum router, handlers, middleware, extractors)
+│   ├── conman-core
+│   ├── conman-db
+│   ├── conman-git
+│   ├── conman-jobs
+│   └── conman-auth
+├── conman-core       (domain types, state machines, business rules — zero infra deps)
+├── conman-db         (MongoDB repositories, index setup)
+│   └── conman-core
+├── conman-git        (Tonic client wrapping gitaly-rs gRPC)
+│   └── conman-core
+├── conman-jobs       (async job runner, workers)
+│   ├── conman-core
+│   ├── conman-db
+│   └── conman-git
+└── conman-auth       (password hashing, JWT, RBAC policy)
+    └── conman-core</code></pre>
+      <h3 id="crate-responsibilities">Crate responsibilities</h3>
+      <p><strong><code>conman-core</code></strong> — Pure domain layer.
+      No IO, no frameworks. Contains:</p>
+      <ul>
+      <li>Domain structs: <code>Team</code>, <code>Repo</code>,
+      <code>App</code>, <code>Workspace</code>, <code>Changeset</code>,
+      <code>Release</code>, <code>Deployment</code>, etc.</li>
+      <li>Enums: <code>ChangesetState</code>, <code>ReleaseState</code>,
+      <code>DeploymentState</code>, <code>Role</code>,
+      <code>BaselineMode</code></li>
+      <li>State machine transition functions with guard conditions</li>
+      <li>Validation logic (blocked paths, file size limits, branch
+      naming)</li>
+      <li>Error types (<code>ConmanError</code> enum via thiserror)</li>
+      </ul>
+      <p><strong><code>conman-db</code></strong> — MongoDB persistence.
+      Contains:</p>
+      <ul>
+      <li>One repository struct per collection (e.g.,
+      <code>RepoStore</code>, <code>AppRepo</code>,
+      <code>WorkspaceRepo</code>)</li>
+      <li>Index creation at startup</li>
+      <li>BSON serialization/deserialization</li>
+      <li>Query builders for filtered/paginated listing</li>
+      <li>Audit event writer</li>
+      </ul>
+      <p><strong><code>conman-git</code></strong> — Gitaly-rs gRPC
+      client. Contains:</p>
+      <ul>
+      <li><code>GitalyClient</code> struct holding tonic channel +
+      service stubs</li>
+      <li>Methods mapping domain operations to gRPC calls</li>
+      <li>Type conversion between gitaly proto types and
+      <code>conman-core</code> domain types</li>
+      <li>Retry logic for transient gRPC failures</li>
+      </ul>
+      <p><strong><code>conman-auth</code></strong> — Authentication and
+      authorization. Contains:</p>
+      <ul>
+      <li>Password hashing (argon2) and verification</li>
+      <li>JWT token issuance and validation</li>
+      <li><code>AuthUser</code> struct (extracted from JWT claims)</li>
+      <li>RBAC policy:
+      <code>fn check_permission(user, repo_id, capability) -&gt; Result&lt;()&gt;</code></li>
+      </ul>
+      <p><strong><code>conman-api</code></strong> — HTTP layer.
+      Contains:</p>
+      <ul>
+      <li>Axum router with all route definitions</li>
+      <li>Handler functions (resources include teams, repos/apps,
+      workspaces, changesets, etc.)</li>
+      <li>Middleware: auth extraction, request ID injection, error
+      mapping</li>
+      <li>Request/response types (API-facing DTOs, not domain
+      types)</li>
+      <li>Pagination extractor</li>
+      </ul>
+      <p><strong><code>conman-jobs</code></strong> — Background
+      processing. Contains:</p>
+      <ul>
+      <li>Job runner (polls MongoDB <code>jobs</code> collection)</li>
+      <li>Worker implementations per job type</li>
+      <li>Job state machine management</li>
+      <li>Structured log writer</li>
+      </ul>
+      <p><strong><code>conman</code></strong> — Binary. Contains:</p>
+      <ul>
+      <li><code>main.rs</code>: parse config → connect MongoDB → connect
+      gitaly → build Axum app → start job runner → serve</li>
+      </ul>
+      <hr />
+      <h2 id="2-conventions">2. Conventions</h2>
+      <h3 id="error-handling">Error handling</h3>
+      <p><code>conman-core</code> defines the error enum:</p>
+      <div class="sourceCode" id="cb2"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="pp">thiserror::</span><span class="bu">Error</span><span class="at">)]</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">enum</span> ConmanError <span class="op">{</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>error<span class="at">(</span><span class="st">&quot;not found: {entity} {id}&quot;</span><span class="at">)]</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    NotFound <span class="op">{</span> entity<span class="op">:</span> <span class="op">&amp;</span><span class="ot">&#39;static</span> <span class="dt">str</span><span class="op">,</span> id<span class="op">:</span> <span class="dt">String</span> <span class="op">},</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>error<span class="at">(</span><span class="st">&quot;conflict: {message}&quot;</span><span class="at">)]</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    Conflict <span class="op">{</span> message<span class="op">:</span> <span class="dt">String</span> <span class="op">},</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>error<span class="at">(</span><span class="st">&quot;forbidden: {message}&quot;</span><span class="at">)]</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    Forbidden <span class="op">{</span> message<span class="op">:</span> <span class="dt">String</span> <span class="op">},</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>error<span class="at">(</span><span class="st">&quot;validation: {message}&quot;</span><span class="at">)]</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    Validation <span class="op">{</span> message<span class="op">:</span> <span class="dt">String</span> <span class="op">},</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>error<span class="at">(</span><span class="st">&quot;invalid state transition: {from} -&gt; {to}&quot;</span><span class="at">)]</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    InvalidTransition <span class="op">{</span> from<span class="op">:</span> <span class="dt">String</span><span class="op">,</span> to<span class="op">:</span> <span class="dt">String</span> <span class="op">},</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>error<span class="at">(</span><span class="st">&quot;git error: {message}&quot;</span><span class="at">)]</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    Git <span class="op">{</span> message<span class="op">:</span> <span class="dt">String</span> <span class="op">},</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>error<span class="at">(</span><span class="st">&quot;internal: {message}&quot;</span><span class="at">)]</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    Internal <span class="op">{</span> message<span class="op">:</span> <span class="dt">String</span> <span class="op">},</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <p><code>conman-api</code> maps this to HTTP responses:</p>
+      <div class="sourceCode" id="cb3"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> IntoResponse <span class="cf">for</span> ConmanError <span class="op">{</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">fn</span> into_response(<span class="kw">self</span>) <span class="op">-&gt;</span> Response <span class="op">{</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> (status<span class="op">,</span> code) <span class="op">=</span> <span class="cf">match</span> <span class="op">&amp;</span><span class="kw">self</span> <span class="op">{</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>            <span class="pp">ConmanError::</span>NotFound <span class="op">{</span> <span class="op">..</span> <span class="op">}</span> <span class="op">=&gt;</span> (<span class="pp">StatusCode::</span>NOT_FOUND<span class="op">,</span> <span class="st">&quot;not_found&quot;</span>)<span class="op">,</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>            <span class="pp">ConmanError::</span>Conflict <span class="op">{</span> <span class="op">..</span> <span class="op">}</span> <span class="op">=&gt;</span> (<span class="pp">StatusCode::</span>CONFLICT<span class="op">,</span> <span class="st">&quot;conflict&quot;</span>)<span class="op">,</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>            <span class="pp">ConmanError::</span>Forbidden <span class="op">{</span> <span class="op">..</span> <span class="op">}</span> <span class="op">=&gt;</span> (<span class="pp">StatusCode::</span>FORBIDDEN<span class="op">,</span> <span class="st">&quot;forbidden&quot;</span>)<span class="op">,</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>            <span class="pp">ConmanError::</span>Validation <span class="op">{</span> <span class="op">..</span> <span class="op">}</span> <span class="op">=&gt;</span> (<span class="pp">StatusCode::</span>BAD_REQUEST<span class="op">,</span> <span class="st">&quot;validation_error&quot;</span>)<span class="op">,</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>            <span class="pp">ConmanError::</span>InvalidTransition <span class="op">{</span> <span class="op">..</span> <span class="op">}</span> <span class="op">=&gt;</span> (<span class="pp">StatusCode::</span>CONFLICT<span class="op">,</span> <span class="st">&quot;invalid_transition&quot;</span>)<span class="op">,</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>            <span class="pp">ConmanError::</span>Git <span class="op">{</span> <span class="op">..</span> <span class="op">}</span> <span class="op">=&gt;</span> (<span class="pp">StatusCode::</span>BAD_GATEWAY<span class="op">,</span> <span class="st">&quot;git_error&quot;</span>)<span class="op">,</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>            <span class="pp">ConmanError::</span>Internal <span class="op">{</span> <span class="op">..</span> <span class="op">}</span> <span class="op">=&gt;</span> (<span class="pp">StatusCode::</span>INTERNAL_SERVER_ERROR<span class="op">,</span> <span class="st">&quot;internal&quot;</span>)<span class="op">,</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>        <span class="op">};</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>        <span class="co">// ... build JSON envelope</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="response-envelope">Response envelope</h3>
+      <p>Success:</p>
+      <div class="sourceCode" id="cb4"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;data&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="er">...</span> <span class="fu">},</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;pagination&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;page&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span> <span class="dt">&quot;limit&quot;</span><span class="fu">:</span> <span class="dv">20</span><span class="fu">,</span> <span class="dt">&quot;total&quot;</span><span class="fu">:</span> <span class="dv">42</span> <span class="fu">}</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <p>Error:</p>
+      <div class="sourceCode" id="cb5"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;error&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;code&quot;</span><span class="fu">:</span> <span class="st">&quot;not_found&quot;</span><span class="fu">,</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;message&quot;</span><span class="fu">:</span> <span class="st">&quot;not found: changeset abc123&quot;</span><span class="fu">,</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;request_id&quot;</span><span class="fu">:</span> <span class="st">&quot;req-uuid-here&quot;</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <h3 id="pagination">Pagination</h3>
+      <p>Query params <code>page</code> (1-based, default 1) and
+      <code>limit</code> (default 20, max 100). Axum extractor:</p>
+      <div class="sourceCode" id="cb6"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> Deserialize<span class="at">)]</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> Pagination <span class="op">{</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>serde<span class="at">(</span><span class="kw">default</span> <span class="op">=</span> <span class="st">&quot;default_page&quot;</span><span class="at">)]</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> page<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>serde<span class="at">(</span><span class="kw">default</span> <span class="op">=</span> <span class="st">&quot;default_limit&quot;</span><span class="at">)]</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> limit<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="request-tracing">Request tracing</h3>
+      <p>Every request gets a UUID via middleware
+      (<code>X-Request-Id</code> header or generated). Conman standard
+      is UUIDv7 for generated IDs. Propagated through tracing spans and
+      included in error responses.</p>
+      <h3 id="mongodb-patterns">MongoDB patterns</h3>
+      <ul>
+      <li>Collection names: snake_case plural (<code>teams</code>,
+      <code>repos</code>, <code>apps</code>, <code>workspaces</code>,
+      <code>changesets</code>)</li>
+      <li>Document IDs: <code>ObjectId</code>, serialized as hex strings
+      in API responses</li>
+      <li>Timestamps: <code>chrono::DateTime&lt;Utc&gt;</code> stored as
+      BSON DateTime</li>
+      <li>No soft deletes — audit log is the history</li>
+      <li>Indexes created at startup by each repo's
+      <code>ensure_indexes()</code> method</li>
+      <li>Optimistic concurrency where needed via version field or
+      expected state checks</li>
+      </ul>
+      <h3 id="file-paths-in-api">File paths in API</h3>
+      <p>File paths are always sent as query parameters or JSON body
+      fields. Never as URL path segments (avoids encoding issues with
+      <code>/</code> in paths).</p>
+      <h3 id="testing-strategy">Testing strategy</h3>
+      <ul>
+      <li><strong>Unit tests</strong>: <code>#[cfg(test)]</code> modules
+      in each crate. Pure logic, no IO.</li>
+      <li><strong>Integration tests</strong>: <code>tests/</code>
+      directory in workspace root. Require:
+      <ul>
+      <li>Running MongoDB (testcontainers or local)</li>
+      <li>Mock gitaly gRPC server (tonic mock)</li>
+      </ul></li>
+      <li><strong>Test helpers</strong>: factory functions for creating
+      test fixtures (<code>test_repo()</code>,
+      <code>test_workspace()</code>, <code>test_user()</code>,
+      etc.)</li>
+      <li>All public functions have at least one test</li>
+      <li>State machine transitions have exhaustive positive + negative
+      tests</li>
+      </ul>
+      <h3 id="audit-pattern">Audit pattern</h3>
+      <p>Every mutation handler emits an audit event after success:</p>
+      <div class="sourceCode" id="cb7"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>audit_repo<span class="op">.</span>emit(AuditEvent <span class="op">{</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    occurred_at<span class="op">:</span> <span class="pp">Utc::</span>now()<span class="op">,</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    actor_user_id<span class="op">:</span> auth_user<span class="op">.</span>id<span class="op">,</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    repo_id<span class="op">:</span> <span class="cn">Some</span>(repo_id)<span class="op">,</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    entity_type<span class="op">:</span> <span class="st">&quot;changeset&quot;</span><span class="op">,</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    entity_id<span class="op">:</span> changeset_id<span class="op">.</span>to_hex()<span class="op">,</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    action<span class="op">:</span> <span class="st">&quot;submitted&quot;</span><span class="op">,</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    before<span class="op">:</span> <span class="cn">Some</span>(<span class="pp">serde_json::</span>to_value(<span class="op">&amp;</span>old_state)<span class="op">?</span>)<span class="op">,</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    after<span class="op">:</span> <span class="cn">Some</span>(<span class="pp">serde_json::</span>to_value(<span class="op">&amp;</span>new_state)<span class="op">?</span>)<span class="op">,</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    git_sha<span class="op">:</span> <span class="cn">Some</span>(head_sha)<span class="op">,</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    context<span class="op">:</span> request_context<span class="op">.</span>clone()<span class="op">,</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>)<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span></code></pre></div>
+      <p>Audit writes are fire-and-forget (logged on failure, never
+      block the request).</p>
+      <hr />
+      <h2 id="3-cross-cutting-concerns">3. Cross-Cutting Concerns</h2>
+      <h3 id="authentication-flow">Authentication flow</h3>
+      <ol type="1">
+      <li><code>POST /api/auth/signup</code> — create user, bootstrap
+      first team + repository, assign <code>owner</code>, issue
+      JWT.</li>
+      <li><code>POST /api/auth/login</code> — validate email/password →
+      issue JWT (24h expiry).</li>
+      <li>Axum middleware extracts
+      <code>Authorization: Bearer &lt;token&gt;</code> header.</li>
+      <li>Middleware decodes JWT → queries <code>repo_memberships</code>
+      → populates <code>Extension&lt;AuthUser&gt;</code>:
+      <div class="sourceCode" id="cb8"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> AuthUser <span class="op">{</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> user_id<span class="op">:</span> ObjectId<span class="op">,</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> email<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> roles<span class="op">:</span> HashMap<span class="op">&lt;</span>ObjectId<span class="op">,</span> Role<span class="op">&gt;,</span>  <span class="co">// repo_id -&gt; role</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div></li>
+      <li>Route handlers call
+      <code>auth_user.require_role(repo_id, Role::ConfigManager)?</code>.</li>
+      <li>Returns <code>ConmanError::Forbidden</code> on failure.</li>
+      </ol>
+      <h3 id="gitaly-rs-connection">Gitaly-rs connection</h3>
+      <ul>
+      <li>Tonic <code>Channel</code> created at startup from
+      <code>CONMAN_GITALY_ADDRESS</code> env var</li>
+      <li>Single channel with HTTP/2 multiplexing (no manual pool
+      needed)</li>
+      <li>Service stubs created per-request from the shared channel</li>
+      <li>Retry on <code>UNAVAILABLE</code> and
+      <code>DEADLINE_EXCEEDED</code> (3 attempts, exponential
+      backoff)</li>
+      <li>Each <code>Repo</code> maps to a gitaly
+      <code>Repository</code>:
+      <div class="sourceCode" id="cb9"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> repo_to_gitaly_repo(repo<span class="op">:</span> <span class="op">&amp;</span>Repo) <span class="op">-&gt;</span> <span class="pp">gitaly::</span>Repository <span class="op">{</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="pp">gitaly::</span>Repository <span class="op">{</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>        storage_name<span class="op">:</span> <span class="st">&quot;default&quot;</span><span class="op">.</span>to_string()<span class="op">,</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>        relative_path<span class="op">:</span> repo<span class="op">.</span>repo_path<span class="op">.</span>clone()<span class="op">,</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>        gl_repository<span class="op">:</span> <span class="pp">format!</span>(<span class="st">&quot;repo-{}&quot;</span><span class="op">,</span> repo<span class="op">.</span>id<span class="op">.</span>to_hex())<span class="op">,</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>        <span class="op">..</span><span class="bu">Default</span><span class="pp">::</span><span class="kw">default</span>()</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div></li>
+      </ul>
+      <h3 id="configuration">Configuration</h3>
+      <p>Loaded from environment variables with <code>CONMAN_</code>
+      prefix:</p>
+      <table>
+      <thead>
+      <tr>
+      <th>Variable</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>CONMAN_PORT</code></td>
+      <td><code>3000</code></td>
+      <td>HTTP listen port</td>
+      </tr>
+      <tr>
+      <td><code>CONMAN_MONGO_URI</code></td>
+      <td><code>mongodb://localhost:27017</code></td>
+      <td>MongoDB connection string</td>
+      </tr>
+      <tr>
+      <td><code>CONMAN_MONGO_DB</code></td>
+      <td><code>conman</code></td>
+      <td>Database name</td>
+      </tr>
+      <tr>
+      <td><code>CONMAN_GITALY_ADDRESS</code></td>
+      <td><code>http://localhost:8075</code></td>
+      <td>gitaly-rs gRPC address</td>
+      </tr>
+      <tr>
+      <td><code>CONMAN_JWT_SECRET</code></td>
+      <td>(required)</td>
+      <td>JWT signing secret</td>
+      </tr>
+      <tr>
+      <td><code>CONMAN_JWT_EXPIRY_HOURS</code></td>
+      <td><code>24</code></td>
+      <td>JWT token lifetime</td>
+      </tr>
+      <tr>
+      <td><code>CONMAN_INVITE_EXPIRY_DAYS</code></td>
+      <td><code>7</code></td>
+      <td>Invite token lifetime</td>
+      </tr>
+      <tr>
+      <td><code>CONMAN_SECRETS_MASTER_KEY</code></td>
+      <td>(required)</td>
+      <td>Master key for envelope encryption of runtime secrets</td>
+      </tr>
+      <tr>
+      <td><code>CONMAN_TEMP_URL_DOMAIN</code></td>
+      <td>(required)</td>
+      <td>Base domain for generated temp runtime URLs</td>
+      </tr>
+      </tbody>
+      </table>
+      <hr />
+      <h2 id="4-domain-quick-reference">4. Domain Quick Reference</h2>
+      <h3 id="terminology">Terminology</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Term</th>
+      <th>Definition</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Team</td>
+      <td>Top-level customer/account boundary for repositories</td>
+      </tr>
+      <tr>
+      <td>Repository</td>
+      <td>Managed config repository (stored in <code>Repo</code>;
+      exposed by <code>/api/repos</code>)</td>
+      </tr>
+      <tr>
+      <td>App</td>
+      <td>User-facing app within a repository (domains/branding/role
+      hints)</td>
+      </tr>
+      <tr>
+      <td>Workspace</td>
+      <td>User-owned mutable branch
+      (<code>ws/&lt;user&gt;/&lt;repo&gt;</code>)</td>
+      </tr>
+      <tr>
+      <td>Changeset</td>
+      <td>Reviewable proposal: workspace HEAD vs integration
+      baseline</td>
+      </tr>
+      <tr>
+      <td>Release</td>
+      <td>Immutable Git tag (<code>rYYYY.MM.DD.N</code>) of composed
+      changesets</td>
+      </tr>
+      <tr>
+      <td>Environment</td>
+      <td>Deploy target stage (Dev, QA, UAT, Prod)</td>
+      </tr>
+      <tr>
+      <td>Runtime Profile</td>
+      <td>Versioned runtime blueprint (URL, app endpoints, env vars,
+      secrets, DB/data strategy)</td>
+      </tr>
+      <tr>
+      <td>Canonical env</td>
+      <td>Production-facing environment for baseline calculations</td>
+      </tr>
+      <tr>
+      <td>Baseline</td>
+      <td>The reference point workspaces branch from (integration branch
+      HEAD or canonical env release)</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3 id="changeset-states">Changeset states</h3>
+      <pre><code>draft
+  → submitted
+    → in_review
+      → approved → queued → released (terminal)
+      → changes_requested → draft
+      → rejected (terminal)
+    queued → conflicted → draft
+         → needs_revalidation → draft</code></pre>
+      <p>Rules:</p>
+      <ul>
+      <li>New commits while
+      <code>submitted</code>/<code>in_review</code>: keep same
+      changeset, create revision, reset approvals</li>
+      <li>One open changeset per workspace branch</li>
+      <li>After approval + further edits needed: create new
+      changeset</li>
+      </ul>
+      <h3 id="release-states">Release states</h3>
+      <pre><code>draft_release → assembling → validated → published
+  → deployed_partial → deployed_full
+  → rolled_back</code></pre>
+      <h3 id="deployment-states">Deployment states</h3>
+      <pre><code>pending → running → succeeded | failed | canceled</code></pre>
+      <h3 id="rbac-permission-matrix">RBAC permission matrix</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Capability</th>
+      <th style="text-align: center;">member</th>
+      <th style="text-align: center;">reviewer</th>
+      <th style="text-align: center;">config_manager</th>
+      <th style="text-align: center;">admin</th>
+      <th style="text-align: center;">owner</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Read app/repo metadata</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Create/edit own workspace</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Create/modify own changeset</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Submit changeset</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Comment in review</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Approve/request changes/reject</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Move conflicted/needs_revalidation to draft</td>
+      <td style="text-align: center;">Own</td>
+      <td style="text-align: center;">Own</td>
+      <td style="text-align: center;">Any</td>
+      <td style="text-align: center;">Any</td>
+      <td style="text-align: center;">Any</td>
+      </tr>
+      <tr>
+      <td>Assemble release from queue</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Publish release</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Deploy/promote release</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Skip stage / concurrent deploy approval</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Invite users</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      <tr>
+      <td>Manage repo settings/roles/envs</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">-</td>
+      <td style="text-align: center;">Y</td>
+      <td style="text-align: center;">Y</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><code>owner</code> inherits all <code>admin</code>
+      capabilities.</p>
+      <h3 id="baseline-resolution">Baseline resolution</h3>
+      <div class="sourceCode" id="cb13"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> resolve_baseline(repo<span class="op">:</span> <span class="op">&amp;</span>Repo<span class="op">,</span> envs<span class="op">:</span> <span class="op">&amp;</span>[Environment]<span class="op">,</span> releases<span class="op">:</span> <span class="op">&amp;</span>[Release]) <span class="op">-&gt;</span> <span class="dt">String</span> <span class="op">{</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">match</span> repo<span class="op">.</span>baseline_mode <span class="op">{</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>        <span class="pp">BaselineMode::</span>IntegrationHead <span class="op">=&gt;</span> <span class="op">{</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>            <span class="pp">format!</span>(<span class="st">&quot;refs/heads/{}&quot;</span><span class="op">,</span> repo<span class="op">.</span>integration_branch)</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>        <span class="pp">BaselineMode::</span>CanonicalEnvRelease <span class="op">=&gt;</span> <span class="op">{</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>            <span class="co">// Find latest deployed release to canonical environment</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>            <span class="co">// Fallback to integration branch HEAD if no release exists</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="runtime-profile-defaults">Runtime profile defaults</h3>
+      <div class="sourceCode" id="cb14"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> ValidationGates <span class="op">{</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">// submit: temp profile only</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> submit_scope<span class="op">:</span> ValidationScope<span class="op">,</span> <span class="co">// TempOnly</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">// release publish: environment profiles only</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> release_scope<span class="op">:</span> ValidationScope<span class="op">,</span> <span class="co">// EnvOnly</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">// deploy: target environment profile only</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> deploy_scope<span class="op">:</span> ValidationScope<span class="op">,</span> <span class="co">// TargetEnvOnly</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <p>Runtime profile rules in v1:</p>
+      <ul>
+      <li>Profiles are versioned and tied to releases.</li>
+      <li>Precedence is
+      <code>app defaults &lt; environment profile &lt; temp overrides</code>.</li>
+      <li><code>app_endpoints</code> keys must map to existing app keys
+      for that repo.</li>
+      <li>Secrets are encrypted at rest via envelope encryption (master
+      key from config, per-record data keys).</li>
+      <li>Secret plaintext reveal is <code>admin</code>-only; other
+      roles get masked previews.</li>
+      <li>Env vars are typed
+      (<code>string | number | boolean | json</code>).</li>
+      <li>Runtime profile schema is strict typed (no arbitrary top-level
+      custom fields).</li>
+      <li>Canonical environment profile changes default to stricter
+      two-approval policy (configurable to
+      <code>same_as_changeset</code>).</li>
+      <li><code>admin</code> emergency direct profile edits are allowed,
+      audited, and still trigger deploy drift blocking until
+      revalidation passes.</li>
+      <li>Changeset profile overrides are auto-included on submit and
+      shown in submit summary.</li>
+      <li>Deploy is blocked on profile drift across env vars, secrets,
+      URL, DB settings, or migration set differences.</li>
+      </ul>
+      <hr />
+      <h2 id="5-epic-index">5. Epic Index</h2>
+      <p>Execution order is topological. Each epic file is
+      self-contained with Rust types, database schemas, API endpoints,
+      proto definitions, implementation checklist, and test cases.</p>
+      <table>
+      <thead>
+      <tr>
+      <th>Epic</th>
+      <th>Name</th>
+      <th>Dependencies</th>
+      <th>Summary</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><a href="epics/E00-platform.html">E00</a></td>
+      <td>Platform Foundation</td>
+      <td>none</td>
+      <td>Server skeleton, MongoDB bootstrap, config, error envelope,
+      pagination</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E01-git-adapter.html">E01</a></td>
+      <td>Git Adapter</td>
+      <td>E00</td>
+      <td>Tonic client wrapping gitaly-rs gRPC services</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E02-auth.html">E02</a></td>
+      <td>Auth &amp; RBAC</td>
+      <td>E00</td>
+      <td>Local auth, invites, memberships, role-based access</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E03-app-setup.html">E03</a></td>
+      <td>Team/Repo Setup</td>
+      <td>E01, E02</td>
+      <td>Team + repo + app APIs, settings, environment metadata,
+      runtime profiles</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E04-workspaces.html">E04</a></td>
+      <td>Workspaces</td>
+      <td>E01, E03</td>
+      <td>Workspace lifecycle, file operations, guardrails</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E05-changesets.html">E05</a></td>
+      <td>Changesets</td>
+      <td>E02, E04</td>
+      <td>Changeset lifecycle, review, comments, diffs, profile
+      overrides</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E06-async-jobs.html">E06</a></td>
+      <td>Async Jobs</td>
+      <td>E00, E05</td>
+      <td>Job framework, msuite workers, profile-aware gates/drift
+      jobs</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E07-queue.html">E07</a></td>
+      <td>Queue Orchestration</td>
+      <td>E05, E06</td>
+      <td>Queue-first workflow, revalidation loop, override-key
+      conflicts</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E08-releases.html">E08</a></td>
+      <td>Releases</td>
+      <td>E01, E06, E07</td>
+      <td>Release assembly, env-profile validation, tagging,
+      publish</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E09-deployments.html">E09</a></td>
+      <td>Deployments</td>
+      <td>E03, E06, E08</td>
+      <td>Deploy, promote, skip-stage, rollback, drift blocking</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E10-temp-envs.html">E10</a></td>
+      <td>Temp Environments</td>
+      <td>E03, E06</td>
+      <td>On-demand envs, profile derivation, TTL, cleanup</td>
+      </tr>
+      <tr>
+      <td><a href="epics/E11-notifications.html">E11</a></td>
+      <td>Notifications &amp; Audit</td>
+      <td>E05-E10</td>
+      <td>Email notifications, audit completeness, runtime profile
+      events</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3 id="critical-path">Critical path</h3>
+      <pre><code>E00 → E01 → E03 → E04 → E05 → E06 → E07 → E08 → E09</code></pre>
+      <p>Parallelizable after E06: E08 can proceed with E10. E11 can run
+      alongside E09/E10.</p>
+      <h3 id="milestone-mapping">Milestone mapping</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Milestone</th>
+      <th>Epics</th>
+      <th>Exit criteria</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>M1: Authoring + Review</td>
+      <td>E00–E06</td>
+      <td>Users can author, submit, and review changesets</td>
+      </tr>
+      <tr>
+      <td>M2: Queue + Release</td>
+      <td>E07–E08</td>
+      <td>Config managers can publish subset-based releases</td>
+      </tr>
+      <tr>
+      <td>M3: Environments + Recovery</td>
+      <td>E09–E10</td>
+      <td>Full release movement and recovery paths</td>
+      </tr>
+      <tr>
+      <td>M4: Notifications + Audit</td>
+      <td>E11</td>
+      <td>Notification coverage and audit completeness pass</td>
+      </tr>
+      </tbody>
+      </table>
+    </main>
+  </div>
+</body>
+</html>

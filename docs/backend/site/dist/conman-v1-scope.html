@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Conman V1 Scope — Conman Docs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#conman-v1-scope-specification"
+      id="toc-conman-v1-scope-specification">Conman V1 Scope
+      Specification</a>
+      <ul>
+      <li><a href="#1-objective" id="toc-1-objective">1)
+      Objective</a></li>
+      <li><a href="#2-domain-terminology"
+      id="toc-2-domain-terminology">2) Domain Terminology</a></li>
+      <li><a href="#3-core-v1-decisions" id="toc-3-core-v1-decisions">3)
+      Core V1 Decisions</a>
+      <ul>
+      <li><a href="#31-baseline-and-branching"
+      id="toc-31-baseline-and-branching">3.1 Baseline and
+      branching</a></li>
+      <li><a href="#32-workspace-model" id="toc-32-workspace-model">3.2
+      Workspace model</a></li>
+      <li><a href="#33-changeset-model" id="toc-33-changeset-model">3.3
+      Changeset model</a></li>
+      <li><a href="#34-review-and-queue-model"
+      id="toc-34-review-and-queue-model">3.4 Review and queue
+      model</a></li>
+      <li><a href="#35-release-and-deployment-model"
+      id="toc-35-release-and-deployment-model">3.5 Release and
+      deployment model</a></li>
+      <li><a href="#36-hotpatch-and-rollback"
+      id="toc-36-hotpatch-and-rollback">3.6 Hotpatch and
+      rollback</a></li>
+      <li><a href="#37-edit-and-commit-strategy"
+      id="toc-37-edit-and-commit-strategy">3.7 Edit and commit
+      strategy</a></li>
+      <li><a href="#38-file-scope-and-guardrails"
+      id="toc-38-file-scope-and-guardrails">3.8 File scope and
+      guardrails</a></li>
+      <li><a href="#39-temporary-environments"
+      id="toc-39-temporary-environments">3.9 Temporary
+      environments</a></li>
+      <li><a href="#310-auth-membership-and-notifications"
+      id="toc-310-auth-membership-and-notifications">3.10 Auth,
+      membership, and notifications</a></li>
+      <li><a href="#311-api-conventions"
+      id="toc-311-api-conventions">3.11 API conventions</a></li>
+      <li><a href="#312-runtime-profiles"
+      id="toc-312-runtime-profiles">3.12 Runtime profiles</a></li>
+      </ul></li>
+      <li><a href="#4-roles-and-rbac" id="toc-4-roles-and-rbac">4) Roles
+      and RBAC</a>
+      <ul>
+      <li><a href="#41-permission-matrix-v1"
+      id="toc-41-permission-matrix-v1">4.1 Permission matrix
+      (v1)</a></li>
+      </ul></li>
+      <li><a href="#5-state-machines" id="toc-5-state-machines">5) State
+      Machines</a>
+      <ul>
+      <li><a href="#51-changeset-state-machine"
+      id="toc-51-changeset-state-machine">5.1 Changeset state
+      machine</a></li>
+      <li><a href="#52-release-state-machine"
+      id="toc-52-release-state-machine">5.2 Release state
+      machine</a></li>
+      <li><a href="#53-deployment-state-machine"
+      id="toc-53-deployment-state-machine">5.3 Deployment state
+      machine</a></li>
+      </ul></li>
+      <li><a href="#6-git-mapping-and-flow"
+      id="toc-6-git-mapping-and-flow">6) Git Mapping and Flow</a></li>
+      <li><a href="#61-mapping" id="toc-61-mapping">6.1 Mapping</a></li>
+      <li><a href="#62-queue-first-release-composition"
+      id="toc-62-queue-first-release-composition">6.2 Queue-first
+      release composition</a></li>
+      <li><a href="#63-up-to-date-with-integration-branch-gate"
+      id="toc-63-up-to-date-with-integration-branch-gate">6.3 "Up to
+      date with integration branch" gate</a></li>
+      <li><a href="#7-data-model-mongodb"
+      id="toc-7-data-model-mongodb">7) Data Model (MongoDB)</a>
+      <ul>
+      <li><a href="#71-collections" id="toc-71-collections">7.1
+      Collections</a></li>
+      <li><a href="#72-important-fields"
+      id="toc-72-important-fields">7.2 Important fields</a></li>
+      </ul></li>
+      <li><a href="#8-api-contract-v1" id="toc-8-api-contract-v1">8) API
+      Contract (v1)</a></li>
+      <li><a href="#81-teams-and-repositories"
+      id="toc-81-teams-and-repositories">8.1 Teams and
+      repositories</a></li>
+      <li><a href="#82-workspaces" id="toc-82-workspaces">8.2
+      Workspaces</a></li>
+      <li><a href="#83-workspace-files" id="toc-83-workspace-files">8.3
+      Workspace files</a></li>
+      <li><a href="#84-changesets" id="toc-84-changesets">8.4
+      Changesets</a></li>
+      <li><a href="#85-diffs-comments-and-ai"
+      id="toc-85-diffs-comments-and-ai">8.5 Diffs, comments, and
+      AI</a></li>
+      <li><a href="#86-releases" id="toc-86-releases">8.6
+      Releases</a></li>
+      <li><a href="#87-environments-and-deployments"
+      id="toc-87-environments-and-deployments">8.7 Environments and
+      deployments</a></li>
+      <li><a href="#88-runtime-profiles"
+      id="toc-88-runtime-profiles">8.8 Runtime profiles</a></li>
+      <li><a href="#89-temp-environments-and-jobs"
+      id="toc-89-temp-environments-and-jobs">8.9 Temp environments and
+      jobs</a></li>
+      <li><a href="#810-notifications-and-auth"
+      id="toc-810-notifications-and-auth">8.10 Notifications and
+      auth</a></li>
+      <li><a href="#9-asynchronous-jobs" id="toc-9-asynchronous-jobs">9)
+      Asynchronous Jobs</a></li>
+      <li><a href="#10-notifications-email"
+      id="toc-10-notifications-email">10) Notifications (Email)</a></li>
+      <li><a href="#11-audit-requirements"
+      id="toc-11-audit-requirements">11) Audit Requirements</a></li>
+      <li><a href="#12-ui-component-scope-v1"
+      id="toc-12-ui-component-scope-v1">12) UI Component Scope
+      (v1)</a></li>
+      <li><a href="#13-explicit-v1-constraints"
+      id="toc-13-explicit-v1-constraints">13) Explicit V1
+      Constraints</a></li>
+      <li><a href="#14-delivery-plan" id="toc-14-delivery-plan">14)
+      Delivery Plan</a>
+      <ul>
+      <li><a href="#phase-a-foundations"
+      id="toc-phase-a-foundations">Phase A: Foundations</a></li>
+      <li><a href="#phase-b-queue-and-releases"
+      id="toc-phase-b-queue-and-releases">Phase B: Queue and
+      releases</a></li>
+      <li><a href="#phase-c-environments-and-temp-envs"
+      id="toc-phase-c-environments-and-temp-envs">Phase C: Environments
+      and temp envs</a></li>
+      <li><a href="#phase-d-hardening" id="toc-phase-d-hardening">Phase
+      D: Hardening</a></li>
+      </ul></li>
+      <li><a href="#15-open-items-to-confirm-during-implementation"
+      id="toc-15-open-items-to-confirm-during-implementation">15) Open
+      Items to Confirm During Implementation</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">Conman V1 Scope</h1>
+      </header>
+      <h1 id="conman-v1-scope-specification">Conman V1 Scope
+      Specification</h1>
+      <h2 id="1-objective">1) Objective</h2>
+      <p>Define and deliver v1 of Conman as a Git-backed configuration
+      manager for DxFlow-style config repositories.</p>
+      <p>Conman v1 model:</p>
+      <ul>
+      <li><code>Team</code> -&gt; <code>Repository</code> -&gt;
+      <code>App</code></li>
+      <li>Repository workflow: <code>Workspace</code> -&gt;
+      <code>Changeset</code> -&gt; <code>Release</code></li>
+      <li>Git is source of truth for files and history</li>
+      <li>MongoDB stores team/repository metadata, workflow state, and
+      audit trails</li>
+      <li><code>gitaly-rs</code> is the Git backend interface</li>
+      </ul>
+      <h2 id="2-domain-terminology">2) Domain Terminology</h2>
+      <ul>
+      <li><strong>Team</strong>: Top-level customer/account boundary.
+      Owns repositories.</li>
+      <li><strong>Repository</strong>: A managed config repository
+      (stored in <code>repos</code> collection in v1).</li>
+      <li><strong>App</strong>: A user-facing app within a repository
+      (domain/branding/role hints).</li>
+      <li><strong>Workspace</strong>: A user-owned mutable branch used
+      to edit repository files.</li>
+      <li><strong>Changeset</strong>: A reviewable proposal from one
+      workspace branch against the repository integration baseline.</li>
+      <li><strong>Release</strong>: Immutable selected set of approved
+      changesets, published to Git and promoted across
+      environments.</li>
+      <li><strong>Environment</strong>: A deploy target stage
+      (configurable per repository).</li>
+      <li><strong>Canonical user-facing environment</strong>: The
+      environment designated as production-facing for baseline
+      calculations.</li>
+      <li><strong>Integration branch</strong>: The repository-level
+      branch where published releases are applied (default
+      <code>main</code>, configurable per repository).</li>
+      <li><strong>Baseline mode</strong>: How new workspace baselines
+      are resolved: <code>integration_head</code> or
+      <code>canonical_env_release</code>.</li>
+      <li><strong>Runtime profile</strong>: The runtime blueprint for an
+      environment or temp env. Contains URL, typed env vars, encrypted
+      secrets, database settings, migration settings, data strategy, and
+      lifecycle controls.</li>
+      <li><strong>Changeset profile override</strong>: Runtime-profile
+      deltas attached to a changeset. They are auto-included on submit
+      and travel with release/promotion.</li>
+      <li><strong>Queue states</strong>:
+      <ul>
+      <li><code>queued</code>: Approved and waiting for release
+      selection.</li>
+      <li><code>conflicted</code>: Cannot be cleanly
+      composed/revalidated against latest integration context.</li>
+      <li><code>needs_revalidation</code>: Conflict-free but failed
+      required validation.</li>
+      </ul></li>
+      <li><strong>Drift</strong>: Runtime mismatch between expected
+      profile state and target environment state (env vars, secrets,
+      URL, DB settings, or migration set).</li>
+      <li><strong>Temp environment</strong>: On-demand ephemeral
+      validation environment tied to a workspace or changeset, with idle
+      TTL + grace lifecycle.</li>
+      <li><strong>Release assemble</strong>: Compose selected queued
+      changesets in chosen order into a candidate release artifact.</li>
+      <li><strong>Release publish</strong>: Move the integration
+      branch/tag to the assembled artifact, making it deployable.</li>
+      <li><strong>Validation scopes</strong>:
+      <ul>
+      <li>submit: temp profile only</li>
+      <li>release publish: environment profiles only</li>
+      <li>deploy: target environment profile only</li>
+      </ul></li>
+      <li><strong>Migration execution metadata</strong>: Conman-tracked
+      records of migration runs used by drift checks and deployment
+      gating.</li>
+      <li><strong>Emergency profile edit</strong>: Direct
+      <code>admin</code> runtime-profile update outside normal changeset
+      flow; fully audited and still subject to drift blocking.</li>
+      </ul>
+      <h2 id="3-core-v1-decisions">3) Core V1 Decisions</h2>
+      <h3 id="31-baseline-and-branching">3.1 Baseline and branching</h3>
+      <ul>
+      <li>Integration branch is configurable per repository
+      (<code>integration_branch</code>), defaulting to
+      <code>main</code>.</li>
+      <li>New repositories default baseline mode:
+      <code>latest deployed release of canonical user-facing environment</code>.</li>
+      <li>Fallback baseline when no release exists: integration branch
+      HEAD.</li>
+      <li>Baseline mode is configurable per repository and editable by
+      repository admins.</li>
+      </ul>
+      <h3 id="32-workspace-model">3.2 Workspace model</h3>
+      <ul>
+      <li>Default v1 behavior: one long-lived workspace branch per user
+      per repository.</li>
+      <li>Branch naming convention:
+      <code>ws/&lt;user&gt;/&lt;repo&gt;</code>.</li>
+      <li>Metadata supports optional workspace title now, for future
+      multi-workspace UI.</li>
+      <li>Extra workspace creation API is supported in v1 backend; UI
+      can defer it.</li>
+      </ul>
+      <h3 id="33-changeset-model">3.3 Changeset model</h3>
+      <ul>
+      <li>One open changeset per workspace branch in v1.</li>
+      <li>Changesets are incremental until submitted.</li>
+      <li>On submit, freeze <code>head_sha</code> for review.</li>
+      <li>If updated before approval, keep same changeset and create new
+      revision internally; reset approvals to zero.</li>
+      <li>If already approved and user wants further edits, create a new
+      changeset.</li>
+      </ul>
+      <h3 id="34-review-and-queue-model">3.4 Review and queue model</h3>
+      <ul>
+      <li>Queue-first model:
+      <ul>
+      <li>Approved changesets are queued.</li>
+      <li>Releases are manually assembled from a selected subset of
+      queued changesets.</li>
+      <li>Non-selected queued changesets remain queued.</li>
+      </ul></li>
+      <li>Queued changesets auto-revalidate after each published
+      release:
+      <ul>
+      <li>conflict check</li>
+      <li>full <code>msuite</code> test run</li>
+      </ul></li>
+      <li>Revalidation failures:
+      <ul>
+      <li>conflict -&gt; <code>conflicted</code></li>
+      <li>test fail -&gt; <code>needs_revalidation</code></li>
+      <li>both can be moved back to draft by author or config
+      manager.</li>
+      </ul></li>
+      </ul>
+      <h3 id="35-release-and-deployment-model">3.5 Release and
+      deployment model</h3>
+      <ul>
+      <li>Release tag format: <code>rYYYY.MM.DD.N</code>.</li>
+      <li>Release creation is manual (not automatic on merge).</li>
+      <li>Release is immutable once created.</li>
+      <li>Promotion moves the exact same release artifact across
+      environments.</li>
+      <li>Skip-stage flow and concurrent multi-environment deployment
+      are exceptional flows requiring two approvals:
+      <ul>
+      <li>approvals must be from distinct users</li>
+      <li>at least one approver must be <code>reviewer</code>,
+      <code>config_manager</code>, or <code>admin</code></li>
+      </ul></li>
+      <li>Normal promotion requires no additional deploy-time approval
+      beyond changeset/release approvals.</li>
+      <li>Deployments may run concurrently across environments, with
+      lock scope of one active deployment per environment.</li>
+      </ul>
+      <h3 id="36-hotpatch-and-rollback">3.6 Hotpatch and rollback</h3>
+      <ul>
+      <li>Hotpatch flow in v1:
+      <ul>
+      <li>create workspace from current canonical user-facing release
+      tag</li>
+      <li>go through changeset/review/queue</li>
+      <li>can fast-track to release with two approvals</li>
+      </ul></li>
+      <li>Rollback support in v1:
+      <ul>
+      <li>default:
+      <code>revert on integration_branch + new release</code></li>
+      <li>also support: redeploy prior release tag to an
+      environment</li>
+      </ul></li>
+      </ul>
+      <h3 id="37-edit-and-commit-strategy">3.7 Edit and commit
+      strategy</h3>
+      <ul>
+      <li>Repository setting <code>commit_mode</code> supports:
+      <ul>
+      <li><code>submit_commit</code> (default): autosave to workspace
+      working state; commit on submit</li>
+      <li><code>manual_checkpoint</code>: user checkpoints become
+      commits</li>
+      </ul></li>
+      <li>Repository default is configurable and can be overridden per
+      user.</li>
+      <li><code>submit_commit</code> keeps detailed edit history in
+      metadata/audit while keeping cleaner Git history.</li>
+      </ul>
+      <h3 id="38-file-scope-and-guardrails">3.8 File scope and
+      guardrails</h3>
+      <ul>
+      <li>Editable scope: full repo by default.</li>
+      <li>Blocklist defaults (configurable per repository):
+      <ul>
+      <li><code>.git/**</code></li>
+      <li><code>.gitignore</code></li>
+      <li><code>.github/**</code></li>
+      </ul></li>
+      <li>File size limit default: 5 MB per file, configurable per
+      repository.</li>
+      <li>No Git LFS support in v1.</li>
+      </ul>
+      <h3 id="39-temporary-environments">3.9 Temporary environments</h3>
+      <ul>
+      <li>Types supported: workspace temp env and changeset temp
+      env.</li>
+      <li>Provisioning: on-demand only.</li>
+      <li>TTL: 24h idle.</li>
+      <li>Idle means no API activity, no test runs, and no deployment
+      events.</li>
+      <li>Manual TTL extension is allowed before expiry.</li>
+      <li>On expiry:
+      <ul>
+      <li>soft-delete for 1h grace period</li>
+      <li>notify before expiry and at expiry</li>
+      <li>allow undo/restore during grace window</li>
+      </ul></li>
+      </ul>
+      <h3 id="310-auth-membership-and-notifications">3.10 Auth,
+      membership, and notifications</h3>
+      <ul>
+      <li>Auth v1: local email/password.</li>
+      <li>Signup: open to anyone via
+      <code>POST /api/auth/signup</code>.</li>
+      <li>Signup bootstrap: automatically creates first team and first
+      repository, and assigns creator role <code>owner</code>.</li>
+      <li>Team invites are created at team scope by
+      <code>admin</code>/<code>owner</code>.</li>
+      <li>Invite expiration: 7 days.</li>
+      <li>Password policy: minimum length + reset via email token.</li>
+      <li>User can belong to multiple teams and repositories, with roles
+      scoped per repository.</li>
+      <li>Email notifications are per-user single toggle in v1.</li>
+      </ul>
+      <h3 id="311-api-conventions">3.11 API conventions</h3>
+      <ul>
+      <li>Base path starts at <code>/api</code> (no version prefix in
+      v1).</li>
+      <li>Pagination uses <code>page</code> + <code>limit</code>.</li>
+      <li>File path is sent as query/body field (not
+      <code>/:path</code>).</li>
+      <li>Generated request IDs use UUIDv7.</li>
+      <li>Long-running operations (<code>msuite</code>, deployments,
+      compose) run async with status and logs.</li>
+      <li>Conman uses an internal Git adapter service boundary; adapter
+      implementation targets <code>gitaly-rs</code> in v1.</li>
+      </ul>
+      <h3 id="312-runtime-profiles">3.12 Runtime profiles</h3>
+      <ul>
+      <li>Runtime configuration is modeled as a first-class
+      <code>RuntimeProfile</code> and is versioned with releases.</li>
+      <li>Runtime variable precedence is:
+      <code>repo defaults &lt; environment profile &lt; temp profile overrides</code>.</li>
+      <li>Runtime profile overrides may be attached to changesets and
+      travel with release/promotion.</li>
+      <li>Runtime profile overrides are auto-included on changeset
+      submit and surfaced in the submit summary payload.</li>
+      <li>If two queued changesets override the same env var key, the
+      later changeset becomes <code>conflicted</code>.</li>
+      <li>If both overrides resolve to the same typed value for the same
+      key/target, they are treated as non-conflicting.</li>
+      <li>Canonical user-facing environment profile changes require
+      configurable policy: <code>same_as_changeset</code> or
+      <code>stricter_two_approvals</code> (default).</li>
+      <li>Deployment is blocked on runtime profile drift until
+      revalidation passes.</li>
+      <li><code>admin</code> may apply direct emergency edits to
+      persistent runtime profiles; these edits are fully audited and
+      still trigger drift/revalidation gating.</li>
+      <li>v1 DB engine scope is MongoDB only.</li>
+      <li>Temp DB provisioning defaults to snapshot clone with
+      dump/restore fallback.</li>
+      <li>Secrets are encrypted at rest in Conman (no external secret
+      manager required for v1).</li>
+      <li>Secret plaintext reveal is <code>admin</code>-only in v1;
+      other roles get masked preview only.</li>
+      <li>Secret reveal does not require forced re-auth or reason entry
+      in v1.</li>
+      <li>Secret masking policy:
+      <ul>
+      <li>length &lt;= 8: reveal only last 4 chars</li>
+      <li>length &gt; 8: reveal first 4 and last 4 chars</li>
+      </ul></li>
+      <li>Env vars are typed in v1
+      (<code>string | number | boolean | json</code>).</li>
+      <li>Runtime profile schema is strict typed in v1 (no arbitrary
+      top-level custom fields).</li>
+      <li>Applied migration metadata is stored in Conman and used by
+      drift checks.</li>
+      <li>Temp environment URLs are auto-generated and
+      human-readable.</li>
+      <li>Validation defaults:
+      <ul>
+      <li>submit: temp profile only</li>
+      <li>release publish: environment profiles only</li>
+      <li>deploy: target environment profile only</li>
+      </ul></li>
+      </ul>
+      <h2 id="4-roles-and-rbac">4) Roles and RBAC</h2>
+      <p>Roles:</p>
+      <ul>
+      <li><code>member</code></li>
+      <li><code>reviewer</code></li>
+      <li><code>config_manager</code></li>
+      <li><code>admin</code></li>
+      <li><code>owner</code></li>
+      </ul>
+      <p>Notes:</p>
+      <ul>
+      <li><code>owner</code> inherits <code>admin</code>
+      capabilities.</li>
+      <li><code>admin</code> inherits <code>config_manager</code>
+      capabilities.</li>
+      <li><code>reviewer</code>, <code>config_manager</code>,
+      <code>admin</code>, and <code>owner</code> can approve
+      changesets.</li>
+      <li><code>config_manager</code> is responsible for release
+      assembly and governance.</li>
+      </ul>
+      <h3 id="41-permission-matrix-v1">4.1 Permission matrix (v1)</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Capability</th>
+      <th style="text-align: right;">member</th>
+      <th style="text-align: right;">reviewer</th>
+      <th style="text-align: right;">config_manager</th>
+      <th style="text-align: right;">admin</th>
+      <th style="text-align: right;">owner</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Read app/repo metadata</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Create/edit own workspace</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Create/modify own changeset</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Submit changeset</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Comment in review</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Approve/request changes/reject</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Move <code>conflicted</code>/<code>needs_revalidation</code>
+      to draft</td>
+      <td style="text-align: right;">Own</td>
+      <td style="text-align: right;">Own</td>
+      <td style="text-align: right;">Any</td>
+      <td style="text-align: right;">Any</td>
+      <td style="text-align: right;">Any</td>
+      </tr>
+      <tr>
+      <td>Assemble release from queue</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Publish release</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Deploy/promote release</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Skip stage / concurrent deploy approval</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Invite users</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Manage repo settings/roles/envs</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Manage persistent runtime profiles directly</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      <tr>
+      <td>Reveal secret plaintext</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">N</td>
+      <td style="text-align: right;">Y</td>
+      <td style="text-align: right;">Y</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><code>Own</code> means for items authored by that user.</p>
+      <h2 id="5-state-machines">5) State Machines</h2>
+      <h3 id="51-changeset-state-machine">5.1 Changeset state
+      machine</h3>
+      <pre class="text"><code>draft
+  -&gt; submitted
+  -&gt; in_review
+      -&gt; approved
+      -&gt; changes_requested -&gt; draft
+      -&gt; rejected
+approved
+  -&gt; queued
+queued
+  -&gt; released
+  -&gt; conflicted -&gt; draft
+  -&gt; needs_revalidation -&gt; draft
+released
+  -&gt; terminal
+rejected
+  -&gt; terminal (or clone/new changeset)</code></pre>
+      <p>Rules:</p>
+      <ul>
+      <li>New commits while
+      <code>submitted</code>/<code>in_review</code> keep same changeset
+      revision chain, reset approvals, and continue review flow.</li>
+      <li>One open changeset per workspace branch.</li>
+      </ul>
+      <h3 id="52-release-state-machine">5.2 Release state machine</h3>
+      <pre class="text"><code>draft_release
+  -&gt; assembling
+  -&gt; validated
+  -&gt; published
+  -&gt; deployed_partial
+  -&gt; deployed_full
+  -&gt; rolled_back (optional)</code></pre>
+      <h3 id="53-deployment-state-machine">5.3 Deployment state
+      machine</h3>
+      <pre class="text"><code>pending -&gt; running -&gt; succeeded
+                   -&gt; failed
+                   -&gt; canceled</code></pre>
+      <h2 id="6-git-mapping-and-flow">6) Git Mapping and Flow</h2>
+      <h2 id="61-mapping">6.1 Mapping</h2>
+      <ul>
+      <li>Repository (<code>Repo</code> record): Git repository.</li>
+      <li>Workspace: branch from repository baseline.</li>
+      <li>Changeset: metadata object comparing workspace
+      <code>head_sha</code> vs baseline.</li>
+      <li>Release: immutable Git tag (<code>rYYYY.MM.DD.N</code>)
+      representing selected queued changesets composed onto the
+      repository integration branch.</li>
+      </ul>
+      <h2 id="62-queue-first-release-composition">6.2 Queue-first
+      release composition</h2>
+      <ol type="1">
+      <li>Select queued changesets subset.</li>
+      <li>Config manager orders selected items manually.</li>
+      <li>Compose candidate in selected order.</li>
+      <li>Resolve failures:
+      <ul>
+      <li>conflicts -&gt; mark specific changesets
+      <code>conflicted</code></li>
+      <li>test failures -&gt; mark <code>needs_revalidation</code></li>
+      </ul></li>
+      <li>Successful compose publishes release tag and updates
+      integration branch accordingly.</li>
+      <li>Run post-publish revalidation for remaining queued items.</li>
+      </ol>
+      <h2 id="63-up-to-date-with-integration-branch-gate">6.3 "Up to
+      date with integration branch" gate</h2>
+      <ul>
+      <li>Merge/release requires changeset branch to be up to date with
+      the repository integration branch.</li>
+      <li>Either merge-based sync or rebase-based sync is accepted.</li>
+      <li>Conflict resolution in v1 is text-based UI flow.</li>
+      </ul>
+      <h2 id="7-data-model-mongodb">7) Data Model (MongoDB)</h2>
+      <p>Git remains file truth. MongoDB tracks workflow state and
+      auditability.</p>
+      <h3 id="71-collections">7.1 Collections</h3>
+      <ul>
+      <li><code>teams</code></li>
+      <li><code>repos</code></li>
+      <li><code>apps</code></li>
+      <li><code>repo_memberships</code></li>
+      <li><code>workspaces</code></li>
+      <li><code>changesets</code></li>
+      <li><code>changeset_revisions</code></li>
+      <li><code>changeset_reviews</code></li>
+      <li><code>changeset_comments</code></li>
+      <li><code>changeset_comment_revisions</code></li>
+      <li><code>changeset_profile_overrides</code></li>
+      <li><code>release_batches</code></li>
+      <li><code>release_changesets</code></li>
+      <li><code>environments</code></li>
+      <li><code>runtime_profiles</code></li>
+      <li><code>runtime_profile_revisions</code></li>
+      <li><code>migration_executions</code></li>
+      <li><code>deployments</code></li>
+      <li><code>temp_environments</code></li>
+      <li><code>jobs</code></li>
+      <li><code>audit_events</code></li>
+      <li><code>notification_preferences</code></li>
+      <li><code>invites</code></li>
+      </ul>
+      <h3 id="72-important-fields">7.2 Important fields</h3>
+      <p><code>teams</code></p>
+      <ul>
+      <li><code>id</code>, <code>name</code>, <code>slug</code></li>
+      <li><code>created_at</code>, <code>updated_at</code></li>
+      </ul>
+      <p><code>apps</code></p>
+      <ul>
+      <li><code>id</code>, <code>team_id</code>, <code>name</code>,
+      <code>repo_path</code></li>
+      <li><code>integration_branch</code> (default
+      <code>main</code>)</li>
+      <li><code>baseline_mode</code> (<code>integration_head</code> |
+      <code>canonical_env_release</code>)</li>
+      <li><code>canonical_env_id</code></li>
+      <li><code>file_size_limit_bytes</code> (default 5 MB)</li>
+      <li><code>blocked_paths[]</code></li>
+      <li><code>commit_mode_default</code> (<code>submit_commit</code> |
+      <code>manual_checkpoint</code>)</li>
+      <li><code>runtime_profile_approval_policy</code>
+      (<code>same_as_changeset</code> |
+      <code>stricter_two_approvals</code>)</li>
+      <li><code>temp_url_domain</code></li>
+      <li><code>validation_gates</code> (submit/release/deploy profile
+      scope + command overrides)</li>
+      </ul>
+      <p><code>apps</code></p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>, <code>key</code>,
+      <code>title</code></li>
+      <li><code>domains[]</code>, <code>branding?</code>,
+      <code>roles[]</code></li>
+      <li><code>created_at</code>, <code>updated_at</code></li>
+      </ul>
+      <p><code>environments</code></p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>, <code>name</code>,
+      <code>position</code>, <code>is_canonical</code></li>
+      <li><code>runtime_profile_id</code></li>
+      <li><code>created_at</code>, <code>updated_at</code></li>
+      </ul>
+      <p><code>runtime_profiles</code></p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>, <code>name</code>,
+      <code>kind</code></li>
+      <li><code>base_url</code>, <code>app_endpoints</code>,
+      <code>env_vars_typed</code>, <code>secrets_encrypted</code></li>
+      <li><code>database</code> (<code>engine=mongodb</code>,
+      <code>connection_ref</code>, <code>provisioning_mode</code>,
+      <code>base_profile_id?</code>)</li>
+      <li><code>migrations</code> (<code>repo_paths[]</code>,
+      <code>command_ref</code>, <code>applied_state_ref</code>)</li>
+      <li><code>data_strategy</code> (<code>seed_mode</code>,
+      <code>seed_source_ref?</code>)</li>
+      <li><code>lifecycle</code> (<code>ttl_idle_hours?</code>,
+      <code>grace_hours?</code>, <code>auto_cleanup</code>)</li>
+      <li><code>created_by</code>, <code>created_at</code>,
+      <code>updated_at</code></li>
+      </ul>
+      <p><code>runtime_profile_revisions</code></p>
+      <ul>
+      <li><code>id</code>, <code>runtime_profile_id</code>,
+      <code>revision_number</code></li>
+      <li><code>snapshot</code>, <code>created_by</code>,
+      <code>created_at</code></li>
+      </ul>
+      <p><code>changeset_profile_overrides</code></p>
+      <ul>
+      <li><code>id</code>, <code>changeset_id</code>,
+      <code>repo_id</code></li>
+      <li><code>target_environment_id?</code>,
+      <code>target_profile_id?</code></li>
+      <li><code>env_var_overrides_typed</code>,
+      <code>secret_overrides_encrypted</code></li>
+      <li><code>database_overrides</code>,
+      <code>data_overrides</code></li>
+      <li><code>created_by</code>, <code>updated_by</code>,
+      <code>created_at</code>, <code>updated_at</code></li>
+      </ul>
+      <p><code>migration_executions</code></p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>,
+      <code>environment_id</code>, <code>release_id</code></li>
+      <li><code>runtime_profile_revision_id</code>, <code>status</code>,
+      <code>started_at</code>, <code>finished_at</code></li>
+      <li><code>applied_migrations[]</code>, <code>logs_ref</code>,
+      <code>triggered_by</code></li>
+      </ul>
+      <p><code>workspaces</code></p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>,
+      <code>owner_user_id</code>, <code>branch_name</code>,
+      <code>title?</code>, <code>is_default</code></li>
+      <li><code>base_ref_type</code>, <code>base_ref_value</code>,
+      <code>head_sha</code></li>
+      </ul>
+      <p><code>changesets</code></p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>,
+      <code>workspace_id</code>, <code>author_user_id</code></li>
+      <li><code>title</code>, <code>description</code>,
+      <code>state</code></li>
+      <li><code>base_sha</code>, <code>head_sha</code>,
+      <code>current_revision</code></li>
+      <li><code>approval_count</code>,
+      <code>required_approval_count=1</code></li>
+      <li><code>last_revalidation_status</code>,
+      <code>last_revalidation_job_id</code></li>
+      </ul>
+      <p><code>changeset_revisions</code></p>
+      <ul>
+      <li><code>id</code>, <code>changeset_id</code>,
+      <code>revision_number</code>, <code>head_sha</code>,
+      <code>created_by</code>, <code>created_at</code></li>
+      </ul>
+      <p><code>release_batches</code></p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>, <code>tag</code>,
+      <code>state</code></li>
+      <li><code>ordered_changeset_ids[]</code></li>
+      <li><code>published_sha</code>, <code>published_at</code>,
+      <code>published_by</code></li>
+      </ul>
+      <p><code>deployments</code></p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>,
+      <code>environment_id</code>, <code>release_id</code>,
+      <code>state</code></li>
+      <li><code>skip_stage</code>, <code>approval_user_ids[]</code>,
+      <code>logs_ref</code></li>
+      </ul>
+      <p><code>temp_environments</code></p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>, <code>kind</code>
+      (<code>workspace</code> | <code>changeset</code>)</li>
+      <li><code>workspace_id?</code>, <code>changeset_id?</code></li>
+      <li><code>db_name</code>, <code>state</code>,
+      <code>last_activity_at</code>, <code>expires_at</code>,
+      <code>grace_until</code></li>
+      <li><code>base_runtime_profile_id</code>,
+      <code>runtime_profile_id</code></li>
+      <li><code>base_url_generated</code></li>
+      </ul>
+      <p><code>audit_events</code></p>
+      <ul>
+      <li><code>id</code>, <code>occurred_at</code>,
+      <code>actor_user_id</code>, <code>repo_id</code></li>
+      <li><code>entity_type</code>, <code>entity_id</code>,
+      <code>action</code></li>
+      <li><code>before</code>, <code>after</code>,
+      <code>git_sha?</code>, <code>context</code> (ip, user_agent,
+      request_id)</li>
+      </ul>
+      <h2 id="8-api-contract-v1">8) API Contract (v1)</h2>
+      <p>Base path: <code>/api</code></p>
+      <h2 id="81-teams-and-repositories">8.1 Teams and repositories</h2>
+      <ul>
+      <li><code>GET /api/teams?page=&amp;limit=</code></li>
+      <li><code>POST /api/teams</code></li>
+      <li><code>GET /api/teams/:teamId</code></li>
+      <li><code>POST /api/teams/:teamId/repos</code></li>
+      <li><code>POST /api/teams/:teamId/invites</code></li>
+      <li><code>POST /api/teams/:teamId/invites/:inviteId/resend</code></li>
+      <li><code>DELETE /api/teams/:teamId/invites/:inviteId</code></li>
+      <li><code>GET /api/repos?page=&amp;limit=</code></li>
+      <li><code>GET /api/repos/:repoId</code></li>
+      <li><code>PATCH /api/repos/:repoId/settings</code></li>
+      <li><code>GET /api/repos/:repoId/members?page=&amp;limit=</code></li>
+      <li><code>POST /api/repos/:repoId/members</code></li>
+      <li><code>GET /api/repos/:repoId/apps</code></li>
+      <li><code>POST /api/repos/:repoId/apps</code></li>
+      <li><code>PATCH /api/repos/:repoId/apps/:appId</code></li>
+      </ul>
+      <h2 id="82-workspaces">8.2 Workspaces</h2>
+      <ul>
+      <li><code>GET /api/repos/:repoId/workspaces?page=&amp;limit=</code></li>
+      <li><code>POST /api/repos/:repoId/workspaces</code></li>
+      <li><code>GET /api/repos/:repoId/workspaces/:workspaceId</code></li>
+      <li><code>PATCH /api/repos/:repoId/workspaces/:workspaceId</code></li>
+      <li><code>POST /api/repos/:repoId/workspaces/:workspaceId/reset</code></li>
+      <li><code>POST /api/repos/:repoId/workspaces/:workspaceId/sync-integration</code></li>
+      </ul>
+      <h2 id="83-workspace-files">8.3 Workspace files</h2>
+      <ul>
+      <li><code>GET /api/repos/:repoId/workspaces/:workspaceId/files?path=</code></li>
+      <li><code>PUT /api/repos/:repoId/workspaces/:workspaceId/files</code>
+      (body: <code>path</code>, <code>content</code>)</li>
+      <li><code>DELETE /api/repos/:repoId/workspaces/:workspaceId/files</code>
+      (body: <code>path</code>)</li>
+      <li><code>POST /api/repos/:repoId/workspaces/:workspaceId/checkpoints</code></li>
+      </ul>
+      <h2 id="84-changesets">8.4 Changesets</h2>
+      <ul>
+      <li><code>GET /api/repos/:repoId/changesets?page=&amp;limit=&amp;state=</code></li>
+      <li><code>POST /api/repos/:repoId/changesets</code> (from
+      workspace)</li>
+      <li><code>GET /api/repos/:repoId/changesets/:changesetId</code></li>
+      <li><code>PATCH /api/repos/:repoId/changesets/:changesetId</code></li>
+      <li><code>POST /api/repos/:repoId/changesets/:changesetId/submit</code></li>
+      <li><code>POST /api/repos/:repoId/changesets/:changesetId/resubmit</code></li>
+      <li><code>POST /api/repos/:repoId/changesets/:changesetId/review</code></li>
+      <li><code>POST /api/repos/:repoId/changesets/:changesetId/queue</code></li>
+      <li><code>POST /api/repos/:repoId/changesets/:changesetId/move-to-draft</code></li>
+      <li><code>GET /api/repos/:repoId/changesets/:changesetId/profile-overrides</code></li>
+      <li><code>PUT /api/repos/:repoId/changesets/:changesetId/profile-overrides</code></li>
+      </ul>
+      <p><code>POST .../submit</code> responses include an
+      <code>included_profile_overrides</code> summary.</p>
+      <h2 id="85-diffs-comments-and-ai">8.5 Diffs, comments, and AI</h2>
+      <ul>
+      <li><code>GET /api/repos/:repoId/changesets/:changesetId/diff?mode=raw|semantic</code></li>
+      <li><code>GET /api/repos/:repoId/changesets/:changesetId/comments?page=&amp;limit=</code></li>
+      <li><code>POST /api/repos/:repoId/changesets/:changesetId/comments</code></li>
+      <li><code>PATCH /api/repos/:repoId/changesets/:changesetId/comments/:commentId</code>
+      (stores comment revision history)</li>
+      <li><code>POST /api/repos/:repoId/changesets/:changesetId/analyze</code></li>
+      <li><code>POST /api/repos/:repoId/changesets/:changesetId/chat</code></li>
+      </ul>
+      <p>Semantic diff API contract (v1 standard):</p>
+      <div class="sourceCode" id="cb4"><pre
+      class="sourceCode ts"><code class="sourceCode typescript"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> SemanticConfigType <span class="op">=</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;entity&#39;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;page&#39;</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;queue&#39;</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;provider&#39;</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;workflow&#39;</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;team&#39;</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;menu&#39;</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;asset&#39;</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="op">|</span> <span class="st">&#39;script&#39;</span><span class="op">;</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="kw">type</span> SemanticOperation <span class="op">=</span> <span class="st">&#39;added&#39;</span> <span class="op">|</span> <span class="st">&#39;modified&#39;</span> <span class="op">|</span> <span class="st">&#39;removed&#39;</span> <span class="op">|</span> <span class="st">&#39;moved&#39;</span><span class="op">;</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> SemanticChange {</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  configType<span class="op">:</span> SemanticConfigType<span class="op">;</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  operation<span class="op">:</span> SemanticOperation<span class="op">;</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  target<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  description<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  filePath<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  lineStart<span class="op">?:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>  lineEnd<span class="op">?:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  details<span class="op">?:</span> <span class="bu">Record</span><span class="op">&lt;</span><span class="dt">string</span><span class="op">,</span> <span class="dt">unknown</span><span class="op">&gt;;</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="kw">interface</span> SemanticDiffResponse {</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>  baseSha<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>  headSha<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>  summary<span class="op">:</span> {</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>    totalChanges<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>    byConfigType<span class="op">:</span> <span class="bu">Record</span><span class="op">&lt;</span>SemanticConfigType<span class="op">,</span> <span class="dt">number</span><span class="op">&gt;;</span></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>  }<span class="op">;</span></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>  changes<span class="op">:</span> SemanticChange[]<span class="op">;</span></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+      <h2 id="86-releases">8.6 Releases</h2>
+      <ul>
+      <li><code>GET /api/repos/:repoId/releases?page=&amp;limit=&amp;state=</code></li>
+      <li><code>POST /api/repos/:repoId/releases</code> (create draft
+      release)</li>
+      <li><code>POST /api/repos/:repoId/releases/:releaseId/changesets</code>
+      (add/remove subset)</li>
+      <li><code>POST /api/repos/:repoId/releases/:releaseId/reorder</code></li>
+      <li><code>POST /api/repos/:repoId/releases/:releaseId/assemble</code></li>
+      <li><code>POST /api/repos/:repoId/releases/:releaseId/publish</code></li>
+      <li><code>GET /api/repos/:repoId/releases/:releaseId</code></li>
+      </ul>
+      <h2 id="87-environments-and-deployments">8.7 Environments and
+      deployments</h2>
+      <ul>
+      <li><code>GET /api/repos/:repoId/environments</code></li>
+      <li><code>PATCH /api/repos/:repoId/environments</code></li>
+      <li><code>POST /api/repos/:repoId/environments/:envId/deploy</code></li>
+      <li><code>POST /api/repos/:repoId/environments/:envId/promote</code></li>
+      <li><code>POST /api/repos/:repoId/environments/:envId/rollback</code></li>
+      <li><code>POST /api/repos/:repoId/environments/:envId/create-drift-fix-changeset</code></li>
+      <li><code>GET /api/repos/:repoId/deployments?page=&amp;limit=</code></li>
+      </ul>
+      <h2 id="88-runtime-profiles">8.8 Runtime profiles</h2>
+      <ul>
+      <li><code>GET /api/repos/:repoId/runtime-profiles?page=&amp;limit=</code></li>
+      <li><code>POST /api/repos/:repoId/runtime-profiles</code></li>
+      <li><code>GET /api/repos/:repoId/runtime-profiles/:profileId</code></li>
+      <li><code>PATCH /api/repos/:repoId/runtime-profiles/:profileId</code></li>
+      <li><code>GET /api/repos/:repoId/runtime-profiles/:profileId/revisions?page=&amp;limit=</code></li>
+      <li><code>POST /api/repos/:repoId/runtime-profiles/:profileId/revert</code></li>
+      <li><code>POST /api/repos/:repoId/runtime-profiles/:profileId/rotate-key</code>
+      (manual)</li>
+      <li><code>POST /api/repos/:repoId/runtime-profiles/:profileId/secrets/:key/reveal</code>
+      (<code>admin</code> only; audited)</li>
+      <li><code>app_endpoints</code> keys must reference existing
+      <code>/api/repos/:repoId/apps</code> keys</li>
+      </ul>
+      <p><code>PATCH .../runtime-profiles/:profileId</code> allows
+      direct emergency edits by <code>admin</code>; resulting drift
+      still blocks deployment until revalidation.</p>
+      <h2 id="89-temp-environments-and-jobs">8.9 Temp environments and
+      jobs</h2>
+      <ul>
+      <li><code>POST /api/repos/:repoId/temp-envs</code> (workspace or
+      changeset)</li>
+      <li><code>GET /api/repos/:repoId/temp-envs?page=&amp;limit=</code></li>
+      <li><code>POST /api/repos/:repoId/temp-envs/:tempEnvId/extend</code></li>
+      <li><code>POST /api/repos/:repoId/temp-envs/:tempEnvId/undo-expire</code></li>
+      <li><code>DELETE /api/repos/:repoId/temp-envs/:tempEnvId</code></li>
+      <li><code>GET /api/repos/:repoId/jobs/:jobId</code></li>
+      <li><code>GET /api/repos/:repoId/jobs?page=&amp;limit=&amp;type=&amp;state=</code></li>
+      </ul>
+      <h2 id="810-notifications-and-auth">8.10 Notifications and
+      auth</h2>
+      <ul>
+      <li><code>GET /api/me/notification-preferences</code></li>
+      <li><code>PATCH /api/me/notification-preferences</code></li>
+      <li><code>POST /api/auth/signup</code></li>
+      <li><code>POST /api/auth/login</code></li>
+      <li><code>POST /api/auth/logout</code></li>
+      <li><code>POST /api/auth/forgot-password</code></li>
+      <li><code>POST /api/auth/reset-password</code></li>
+      <li><code>POST /api/auth/accept-invite</code></li>
+      </ul>
+      <h2 id="9-asynchronous-jobs">9) Asynchronous Jobs</h2>
+      <p>Job types:</p>
+      <ul>
+      <li><code>msuite_submit</code></li>
+      <li><code>msuite_merge</code></li>
+      <li><code>msuite_deploy</code></li>
+      <li><code>revalidate_queued_changeset</code></li>
+      <li><code>release_assemble</code></li>
+      <li><code>deploy_release</code></li>
+      <li><code>runtime_profile_drift_check</code></li>
+      <li><code>temp_env_provision</code></li>
+      <li><code>temp_env_expire</code></li>
+      </ul>
+      <p>Job states:</p>
+      <ul>
+      <li><code>queued</code></li>
+      <li><code>running</code></li>
+      <li><code>succeeded</code></li>
+      <li><code>failed</code></li>
+      <li><code>canceled</code></li>
+      </ul>
+      <p>Each job stores structured logs and terminal result
+      payload.</p>
+      <h2 id="10-notifications-email">10) Notifications (Email)</h2>
+      <p>v1 event set:</p>
+      <ul>
+      <li>changeset submitted</li>
+      <li>review requested</li>
+      <li>changeset approved</li>
+      <li>changes requested</li>
+      <li>changeset rejected</li>
+      <li>changeset queued</li>
+      <li>release created</li>
+      <li>release published</li>
+      <li>deployment started</li>
+      <li>deployment succeeded</li>
+      <li>deployment failed</li>
+      <li>deployment blocked by drift</li>
+      <li>runtime profile changed</li>
+      <li>temp environment expiry warning</li>
+      <li>temp environment expired</li>
+      </ul>
+      <p>Per-user single on/off toggle in v1.</p>
+      <h2 id="11-audit-requirements">11) Audit Requirements</h2>
+      <p>Audit everything immutable and append-only:</p>
+      <ul>
+      <li>workspace creation/reset/sync</li>
+      <li>file edits/deletes/checkpoints</li>
+      <li>changeset submit/resubmit/review/queue/state changes</li>
+      <li>changeset profile override changes</li>
+      <li>comment creation and comment edits</li>
+      <li>runtime profile create/update/revert/rotation/direct-edit</li>
+      <li>runtime secret reveal events</li>
+      <li>release compose/reorder/publish</li>
+      <li>deployment/promotion/rollback</li>
+      <li>temp env create/extend/expire/undo</li>
+      <li>membership/invite/role changes</li>
+      <li>settings changes</li>
+      </ul>
+      <p>Retention: keep forever in v1.</p>
+      <h2 id="12-ui-component-scope-v1">12) UI Component Scope (v1)</h2>
+      <ul>
+      <li>Dashboard: team/repository cards and role-aware quick
+      actions.</li>
+      <li>App shell: sidebar, breadcrumbs, app switcher.</li>
+      <li>Workspace page:
+      <ul>
+      <li>repo tree with markers</li>
+      <li>editor/diff tabs</li>
+      <li>AI chat panel</li>
+      <li>checkpoint/submit controls</li>
+      </ul></li>
+      <li>Changeset list and detail/review UI.</li>
+      <li>Queue view for config managers (prioritize and reorder).</li>
+      <li>Runtime profile editor:
+      <ul>
+      <li>environment profile assignment</li>
+      <li>typed env vars and secret values (encrypted storage)</li>
+      <li>secret masked preview for non-admin roles, admin reveal
+      action</li>
+      <li>DB provisioning mode and base profile selection</li>
+      <li>migration command/path config and applied migration
+      history</li>
+      <li>revision history and manual key rotation actions</li>
+      </ul></li>
+      <li>Release builder page:
+      <ul>
+      <li>select queued changesets</li>
+      <li>reorder</li>
+      <li>assemble preview</li>
+      <li>publish</li>
+      </ul></li>
+      <li>Environment pipeline page:
+      <ul>
+      <li>deploy/promote/rollback</li>
+      <li>skip-stage approval controls</li>
+      </ul></li>
+      <li>Temp environments page:
+      <ul>
+      <li>provision</li>
+      <li>TTL and expiry UX</li>
+      </ul></li>
+      <li>Settings page:
+      <ul>
+      <li>baseline mode</li>
+      <li>commit mode defaults</li>
+      <li>blocked paths/file size limit</li>
+      <li>environment stages/canonical env</li>
+      <li>email notification defaults</li>
+      </ul></li>
+      <li>Auth and invite management screens.</li>
+      </ul>
+      <h2 id="13-explicit-v1-constraints">13) Explicit V1
+      Constraints</h2>
+      <ul>
+      <li>No Git LFS support.</li>
+      <li>No semantic merge assistant; text conflict resolution
+      only.</li>
+      <li>Local auth only (no SSO).</li>
+      <li>API path prefix is <code>/api</code>.</li>
+      </ul>
+      <h2 id="14-delivery-plan">14) Delivery Plan</h2>
+      <h3 id="phase-a-foundations">Phase A: Foundations</h3>
+      <ul>
+      <li>Auth/invites, team/repository setup, memberships, RBAC.</li>
+      <li>Workspace CRUD and file editing with guardrails.</li>
+      <li>Changeset creation/submit/review and approval reset
+      behavior.</li>
+      <li>Async <code>msuite</code> at submit.</li>
+      <li>Runtime profile schema, storage, and environment linkage.</li>
+      </ul>
+      <h3 id="phase-b-queue-and-releases">Phase B: Queue and
+      releases</h3>
+      <ul>
+      <li>Queue-first workflow and revalidation.</li>
+      <li>Release draft/assemble/reorder/publish.</li>
+      <li>Tagging (<code>rYYYY.MM.DD.N</code>) and immutable release
+      records.</li>
+      <li>Changeset profile override flow and override conflict
+      detection.</li>
+      </ul>
+      <h3 id="phase-c-environments-and-temp-envs">Phase C: Environments
+      and temp envs</h3>
+      <ul>
+      <li>Environment pipeline and deployment orchestration.</li>
+      <li>Skip-stage 2-approval flow.</li>
+      <li>Rollback modes (revert+new release and redeploy prior
+      tag).</li>
+      <li>Temp env lifecycle with TTL, grace period, and undo.</li>
+      <li>Runtime profile drift checks and deploy-block rules.</li>
+      </ul>
+      <h3 id="phase-d-hardening">Phase D: Hardening</h3>
+      <ul>
+      <li>Auditing completeness verification.</li>
+      <li>Email notifications and user toggle.</li>
+      <li>Operational limits, retries, observability, and backfill
+      tooling.</li>
+      <li>Secrets encryption hardening and manual key-rotation
+      procedures.</li>
+      </ul>
+      <h2 id="15-open-items-to-confirm-during-implementation">15) Open
+      Items to Confirm During Implementation</h2>
+      <ul>
+      <li>Final email provider and templates.</li>
+      <li>Locking mechanism details for per-environment concurrent
+      deployment safety.</li>
+      <li>Runtime profile URL generator wordlist/domain strategy.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Conman V1 Backlog — Conman Docs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#conman-v1-implementation-backlog"
+      id="toc-conman-v1-implementation-backlog">Conman V1 Implementation
+      Backlog</a>
+      <ul>
+      <li><a href="#1-dependency-ordered-execution-plan"
+      id="toc-1-dependency-ordered-execution-plan">1) Dependency-Ordered
+      Execution Plan</a></li>
+      <li><a href="#2-epics-and-issues" id="toc-2-epics-and-issues">2)
+      Epics and Issues</a></li>
+      <li><a href="#e00-platform-foundation"
+      id="toc-e00-platform-foundation">E00 Platform Foundation</a></li>
+      <li><a href="#e01-git-adapter-service-gitaly-rs-boundary"
+      id="toc-e01-git-adapter-service-gitaly-rs-boundary">E01 Git
+      Adapter Service (<code>gitaly-rs</code> boundary)</a></li>
+      <li><a href="#e02-auth-invites-memberships-rbac"
+      id="toc-e02-auth-invites-memberships-rbac">E02 Auth, Invites,
+      Memberships, RBAC</a></li>
+      <li><a href="#e03-teamrepo-setup-settings-environment-metadata"
+      id="toc-e03-teamrepo-setup-settings-environment-metadata">E03
+      Team/Repo Setup, Settings, Environment Metadata</a></li>
+      <li><a href="#e04-workspace-lifecycle--file-operations"
+      id="toc-e04-workspace-lifecycle--file-operations">E04 Workspace
+      Lifecycle + File Operations</a></li>
+      <li><a href="#e05-changesets-review-comments-revisions"
+      id="toc-e05-changesets-review-comments-revisions">E05 Changesets,
+      Review, Comments, Revisions</a></li>
+      <li><a href="#e06-async-jobs--msuite-pipeline"
+      id="toc-e06-async-jobs--msuite-pipeline">E06 Async Jobs +
+      <code>msuite</code> Pipeline</a></li>
+      <li><a href="#e07-queue-first-orchestration--revalidation"
+      id="toc-e07-queue-first-orchestration--revalidation">E07
+      Queue-First Orchestration + Revalidation</a></li>
+      <li><a href="#e08-release-assembly-publish-and-tagging"
+      id="toc-e08-release-assembly-publish-and-tagging">E08 Release
+      Assembly, Publish, and Tagging</a></li>
+      <li><a href="#e09-deploy-promote-skip-rollback"
+      id="toc-e09-deploy-promote-skip-rollback">E09 Deploy, Promote,
+      Skip, Rollback</a></li>
+      <li><a href="#e10-temp-environments--ttl-lifecycle"
+      id="toc-e10-temp-environments--ttl-lifecycle">E10 Temp
+      Environments + TTL Lifecycle</a></li>
+      <li><a href="#e11-notifications--audit-completeness"
+      id="toc-e11-notifications--audit-completeness">E11 Notifications +
+      Audit Completeness</a></li>
+      <li><a href="#3-milestone-cuts" id="toc-3-milestone-cuts">3)
+      Milestone Cuts</a></li>
+      <li><a href="#m1-authoring--review-baseline"
+      id="toc-m1-authoring--review-baseline">M1: Authoring + Review
+      Baseline</a></li>
+      <li><a href="#m2-queue--release-management"
+      id="toc-m2-queue--release-management">M2: Queue + Release
+      Management</a></li>
+      <li><a href="#m3-environments--recovery"
+      id="toc-m3-environments--recovery">M3: Environments +
+      Recovery</a></li>
+      <li><a href="#m4-notifications-and-audit"
+      id="toc-m4-notifications-and-audit">M4: Notifications and
+      Audit</a></li>
+      <li><a href="#4-critical-path" id="toc-4-critical-path">4)
+      Critical Path</a></li>
+      <li><a href="#5-suggested-first-sprint-execution-ready"
+      id="toc-5-suggested-first-sprint-execution-ready">5) Suggested
+      First Sprint (Execution-Ready)</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">Conman V1 Backlog</h1>
+      </header>
+      <h1 id="conman-v1-implementation-backlog">Conman V1 Implementation
+      Backlog</h1>
+      <p>Source scope: <a
+      href="./conman-v1-scope.html"><code>docs/conman-v1-scope.md</code></a></p>
+      <h2 id="1-dependency-ordered-execution-plan">1) Dependency-Ordered
+      Execution Plan</h2>
+      <p>Execution order (topological):</p>
+      <ol type="1">
+      <li>E00 Platform foundation</li>
+      <li>E01 Git adapter (<code>gitaly-rs</code>) + repository
+      abstraction</li>
+      <li>E02 Auth, invites, memberships, RBAC</li>
+      <li>E03 Team/repo setup + settings + environments metadata</li>
+      <li>E04 Workspace lifecycle + file operations + guardrails</li>
+      <li>E05 Changeset lifecycle + review + comments + revisions</li>
+      <li>E06 Async jobs + <code>msuite</code> execution pipeline</li>
+      <li>E07 Queue-first orchestration + revalidation loop</li>
+      <li>E08 Release assembly + tagging + publish</li>
+      <li>E09 Deployment/promotion/rollback orchestration</li>
+      <li>E10 Temp environments (workspace/changeset) + TTL/grace</li>
+      <li>E11 Notifications + audit completeness</li>
+      </ol>
+      <p>Parallelizable tracks after E06:</p>
+      <ul>
+      <li>E08 (release assembly) can proceed with E10 (temp envs).</li>
+      <li>E11 (notifications/audit polish) can run alongside
+      E09/E10.</li>
+      </ul>
+      <h2 id="2-epics-and-issues">2) Epics and Issues</h2>
+      <h2 id="e00-platform-foundation">E00 Platform Foundation</h2>
+      <p>Goal: Establish service skeleton and shared primitives.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E00-01: Create server modules and routing skeleton under
+      <code>/api</code>.</li>
+      <li>E00-02: Add MongoDB connection, health checks, and collection
+      bootstrap.</li>
+      <li>E00-03: Add config system (env vars, feature flags, limits,
+      runtime profile encryption keys, temp URL domain).</li>
+      <li>E00-04: Standard error envelope + request tracing IDs.</li>
+      <li>E00-05: Add pagination helpers (<code>page</code>,
+      <code>limit</code>) and validation middleware.</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>Server boots with health endpoint and typed route stubs.</li>
+      <li>Mongo connection resilient with startup validation.</li>
+      <li>Shared request/response and validation utilities are used by
+      all new routes.</li>
+      </ul>
+      <p>Depends on: none.</p>
+      <h2 id="e01-git-adapter-service-gitaly-rs-boundary">E01 Git
+      Adapter Service (<code>gitaly-rs</code> boundary)</h2>
+      <p>Goal: Isolate Git operations behind a Conman adapter
+      interface.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E01-01: Define <code>GitAdapter</code> interface (branch,
+      read/write file, diff, commit, rebase/merge, tag, revert).</li>
+      <li>E01-02: Implement <code>GitalyRsAdapter</code> against current
+      <code>gitaly-rs</code> API.</li>
+      <li>E01-03: Build fake/in-memory adapter for tests.</li>
+      <li>E01-04: Add optimistic operation guards and retry semantics
+      for transient Git failures.</li>
+      <li>E01-05: Add integration tests for critical flows (workspace
+      create, submit, release publish, rollback).</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>No route calls <code>gitaly-rs</code> directly.</li>
+      <li>Adapter can be swapped in tests without networked Git
+      backend.</li>
+      </ul>
+      <p>Depends on: E00.</p>
+      <h2 id="e02-auth-invites-memberships-rbac">E02 Auth, Invites,
+      Memberships, RBAC</h2>
+      <p>Goal: Secure access and per-repository role model.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E02-01: Local email/password auth with password hashing and
+      sessions/JWT.</li>
+      <li>E02-02: Invite-only onboarding (<code>admin</code>), 7-day
+      token expiry.</li>
+      <li>E02-03: Forgot/reset password via email token.</li>
+      <li>E02-04: App membership model with roles: <code>user</code>,
+      <code>reviewer</code>, <code>config_manager</code>,
+      <code>admin</code>.</li>
+      <li>E02-05: Authorization middleware + policy checks per
+      endpoint.</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>Unauthorized access denied by default.</li>
+      <li>Role matrix enforced according to scope doc.</li>
+      </ul>
+      <p>Depends on: E00.</p>
+      <h2 id="e03-teamrepo-setup-settings-environment-metadata">E03
+      Team/Repo Setup, Settings, Environment Metadata</h2>
+      <p>Goal: Manage team/repo setup, repository-level configuration,
+      and baseline behavior.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E03-01: <code>teams</code> create/list/get APIs.</li>
+      <li>E03-02: Repository creation under team + <code>repos</code>
+      list/get APIs.</li>
+      <li>E03-03: App CRUD/list APIs per repository.</li>
+      <li>E03-04: Settings API for baseline mode, canonical env, commit
+      mode default, blocked paths, file size limit.</li>
+      <li>E03-05: Environment stage CRUD with canonical user-facing
+      environment flag.</li>
+      <li>E03-06: Membership listing and role assignment APIs.</li>
+      <li>E03-07: Runtime profile CRUD/revisions, environment linkage,
+      canonical approval policy config.</li>
+      <li>E03-08: Runtime profile secret visibility rules
+      (<code>admin</code> reveal endpoint, masked previews for other
+      roles) and typed env var schema validation.</li>
+      <li>E03-09: Runtime profile <code>app_endpoints</code> persistence
+      and validation against app keys.</li>
+      <li>E03-10: Direct app-admin runtime profile emergency edit flow
+      (audited).</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>App admin can create teams, repositories, and apps before
+      workspace/changeset flow.</li>
+      <li>Repository admin can configure baseline mode
+      (<code>integration_head</code> or
+      <code>canonical_env_release</code>).</li>
+      <li>Environment pipeline metadata is repository-configurable.</li>
+      </ul>
+      <p>Depends on: E02, E01.</p>
+      <h2 id="e04-workspace-lifecycle--file-operations">E04 Workspace
+      Lifecycle + File Operations</h2>
+      <p>Goal: Deliver editable workspaces with Git-backed
+      persistence.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E04-01: Create default workspace branch
+      (<code>ws/&lt;user&gt;/&lt;app&gt;</code>) on first use.</li>
+      <li>E04-02: Workspace CRUD (reserve multi-workspace APIs, UI can
+      hide extras).</li>
+      <li>E04-03: File tree/list/read/write/delete endpoints using
+      <code>path</code> query/body.</li>
+      <li>E04-04: Guardrails for blocked paths and max file size
+      (default 5 MB, app-configurable).</li>
+      <li>E04-05: Workspace reset/sync-integration flow with
+      rebase/merge fallback.</li>
+      <li>E04-06: Conflict detection primitives for later
+      changeset/release flows.</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>Users can edit full repo except blocked paths.</li>
+      <li>Workspace sync produces deterministic conflict status for
+      UI.</li>
+      </ul>
+      <p>Depends on: E03, E01.</p>
+      <h2 id="e05-changesets-review-comments-revisions">E05 Changesets,
+      Review, Comments, Revisions</h2>
+      <p>Goal: Implement full changeset lifecycle through approval.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E05-01: Changeset CRUD from workspace (one open changeset per
+      workspace).</li>
+      <li>E05-02: Submit/resubmit logic with frozen
+      <code>head_sha</code> and revision increment.</li>
+      <li>E05-03: Approval workflow with reset-on-new-commit
+      behavior.</li>
+      <li>E05-04: Review actions (approve/request changes/reject).</li>
+      <li>E05-05: Diff endpoints (<code>raw</code>,
+      <code>semantic</code>) and semantic diff contract.</li>
+      <li>E05-06: Comment threads with editable comments + revision
+      history.</li>
+      <li>E05-07: AI analyze/chat endpoints scoped to
+      workspace/changeset.</li>
+      <li>E05-08: Changeset profile overrides
+      (<code>changeset_profile_overrides</code>) with release-travel
+      semantics.</li>
+      <li>E05-09: Auto-include profile overrides on submit with explicit
+      submit summary payload.</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>State transitions match spec.</li>
+      <li>New commits during review reset approvals and preserve
+      revision history.</li>
+      </ul>
+      <p>Depends on: E04, E02.</p>
+      <h2 id="e06-async-jobs--msuite-pipeline">E06 Async Jobs +
+      <code>msuite</code> Pipeline</h2>
+      <p>Goal: Run mandatory checks asynchronously with logs and status
+      APIs.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E06-01: Generic jobs framework
+      (<code>queued/running/succeeded/failed/canceled</code>).</li>
+      <li>E06-02: Job worker for <code>msuite_submit</code>,
+      <code>msuite_merge</code>, <code>msuite_deploy</code>, and
+      runtime-profile drift check jobs.</li>
+      <li>E06-03: Structured job logs and result payload storage.</li>
+      <li>E06-04: Gate hooks in submit/queue/release/deploy flows with
+      configurable runtime profile scope and command.</li>
+      <li>E06-05: Retry and timeout policies with failure reason
+      codes.</li>
+      <li>E06-06: Persist migration execution metadata for
+      release/deploy validation.</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>Submit, release, deploy are blocked on failing
+      <code>msuite</code>.</li>
+      <li>Job status pollable via API.</li>
+      </ul>
+      <p>Depends on: E00, E05.</p>
+      <h2 id="e07-queue-first-orchestration--revalidation">E07
+      Queue-First Orchestration + Revalidation</h2>
+      <p>Goal: Move approved changesets into managed queue with
+      automatic revalidation.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E07-01: <code>approved -&gt; queued</code> transition and
+      queue ordering metadata.</li>
+      <li>E07-02: Queue selection and manual reorder APIs
+      (audited).</li>
+      <li>E07-03: Revalidation trigger after each published
+      release.</li>
+      <li>E07-04: Conflict + full <code>msuite</code> revalidation for
+      queued changesets.</li>
+      <li>E07-05: Transition to <code>conflicted</code> or
+      <code>needs_revalidation</code> and return-to-draft operations
+      (author or config manager).</li>
+      <li>E07-06: Detect override-key collisions between queued
+      changesets and mark later ones <code>conflicted</code>.</li>
+      <li>E07-07: Treat equal typed override values for same key/target
+      as non-conflicting.</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>Non-selected queued changesets remain queued.</li>
+      <li>Revalidation updates statuses correctly and emits
+      notifications.</li>
+      </ul>
+      <p>Depends on: E06, E05.</p>
+      <h2 id="e08-release-assembly-publish-and-tagging">E08 Release
+      Assembly, Publish, and Tagging</h2>
+      <p>Goal: Compose subset releases from queue and publish immutable
+      artifacts.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E08-01: Draft release creation and selected changeset
+      association.</li>
+      <li>E08-02: Ordered composition engine (manual order by config
+      manager).</li>
+      <li>E08-03: Publish flow to <code>integration_branch</code> +
+      lightweight tag <code>rYYYY.MM.DD.N</code>.</li>
+      <li>E08-04: Persist release metadata (<code>published_sha</code>,
+      actor, timestamps).</li>
+      <li>E08-05: Release state machine enforcement.</li>
+      <li>E08-06: Env-profile-only validation gate at publish.</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>Release can include subset of queued changesets.</li>
+      <li>Publish is immutable and auditable.</li>
+      </ul>
+      <p>Depends on: E07, E01, E06.</p>
+      <h2 id="e09-deploy-promote-skip-rollback">E09 Deploy, Promote,
+      Skip, Rollback</h2>
+      <p>Goal: Deliver environment movement and recovery workflows.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E09-01: Deploy release to environment (async).</li>
+      <li>E09-02: Promote same immutable release across stages.</li>
+      <li>E09-03: Skip-stage and concurrent multi-env deploy approvals:
+      2 distinct users, at least one privileged role.</li>
+      <li>E09-04: Deployment lock scope per environment.</li>
+      <li>E09-05: Rollback mode A:
+      <code>revert(integration_branch) + new release</code>.</li>
+      <li>E09-06: Rollback mode B: redeploy prior release tag.</li>
+      <li>E09-07: Runtime profile drift check (env vars, secrets, URL,
+      DB settings, migrations) and deploy block until revalidation.</li>
+      <li>E09-08: Drift remediation helper: create drift-fix changeset
+      from blocked deployment context.</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>Concurrent deploy allowed only with required approvals.</li>
+      <li>Both rollback modes available and audited.</li>
+      </ul>
+      <p>Depends on: E08, E06, E03.</p>
+      <h2 id="e10-temp-environments--ttl-lifecycle">E10 Temp
+      Environments + TTL Lifecycle</h2>
+      <p>Goal: Enable on-demand validation environments for
+      workspace/changeset.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E10-01: Create temp env (<code>workspace</code> or
+      <code>changeset</code>) on demand.</li>
+      <li>E10-02: TTL tracking (24h idle) based on API/test/deploy
+      activity.</li>
+      <li>E10-03: Soft expiry + 1h grace + undo-expire.</li>
+      <li>E10-04: Manual TTL extension endpoint.</li>
+      <li>E10-05: Cleanup workers and DB teardown.</li>
+      <li>E10-06: Derive temp runtime profiles from base profile with
+      readable URL generation and Mongo snapshot-&gt;dump/restore
+      strategy.</li>
+      <li>E10-07: One URL per temp-env instance (no workspace-stable
+      host reuse).</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>Temp envs expire on idle and can be restored during
+      grace.</li>
+      <li>Lifecycle events generate audit + email.</li>
+      </ul>
+      <p>Depends on: E06, E03.</p>
+      <h2 id="e11-notifications--audit-completeness">E11 Notifications +
+      Audit Completeness</h2>
+      <p>Goal: Full observability of user-visible events and immutable
+      history.</p>
+      <p>Issues:</p>
+      <ol type="1">
+      <li>E11-01: Email templates and provider integration.</li>
+      <li>E11-02: Per-user on/off notification preferences.</li>
+      <li>E11-03: Event fanout for required notifications.</li>
+      <li>E11-04: Append-only audit event writer + schema
+      enforcement.</li>
+      <li>E11-05: Backfill audit for critical legacy transitions (if
+      any).</li>
+      <li>E11-06: Runtime profile and drift notifications.</li>
+      </ol>
+      <p>Acceptance:</p>
+      <ul>
+      <li>All scoped events emit notifications (when user enabled).</li>
+      <li>All privileged/critical actions captured in immutable audit
+      log.</li>
+      </ul>
+      <p>Depends on: E05, E07, E08, E09, E10.</p>
+      <h2 id="3-milestone-cuts">3) Milestone Cuts</h2>
+      <h2 id="m1-authoring--review-baseline">M1: Authoring + Review
+      Baseline</h2>
+      <p>Includes: E00-E06 partially</p>
+      <p>Scope:</p>
+      <ul>
+      <li>Auth/invite/RBAC</li>
+      <li>App/workspace setup</li>
+      <li>File editing + guardrails</li>
+      <li>Changeset submit/review/revisions/comments</li>
+      <li>Async <code>msuite</code> at submit</li>
+      </ul>
+      <p>Exit criteria:</p>
+      <ul>
+      <li>Users can author and submit changesets.</li>
+      <li>Reviewers can approve/reject/request changes.</li>
+      </ul>
+      <h2 id="m2-queue--release-management">M2: Queue + Release
+      Management</h2>
+      <p>Includes: E07-E08</p>
+      <p>Scope:</p>
+      <ul>
+      <li>Queue-first workflow</li>
+      <li>Auto revalidation after release</li>
+      <li>Release composition/reorder/publish</li>
+      <li>Immutable tagging</li>
+      </ul>
+      <p>Exit criteria:</p>
+      <ul>
+      <li>Config manager can publish subset-based releases safely.</li>
+      </ul>
+      <h2 id="m3-environments--recovery">M3: Environments +
+      Recovery</h2>
+      <p>Includes: E09-E10</p>
+      <p>Scope:</p>
+      <ul>
+      <li>Deploy/promote</li>
+      <li>Skip-stage/concurrent deployment approvals</li>
+      <li>Rollback modes</li>
+      <li>Temp environments with TTL/grace</li>
+      </ul>
+      <p>Exit criteria:</p>
+      <ul>
+      <li>Full release movement and recovery paths are operational.</li>
+      </ul>
+      <h2 id="m4-notifications-and-audit">M4: Notifications and
+      Audit</h2>
+      <p>Includes: E11</p>
+      <p>Scope:</p>
+      <ul>
+      <li>Email notifications</li>
+      <li>Audit completeness</li>
+      </ul>
+      <p>Exit criteria:</p>
+      <ul>
+      <li>Notification coverage and audit completeness pass.</li>
+      </ul>
+      <h2 id="4-critical-path">4) Critical Path</h2>
+      <p>Critical path items (must finish in order):</p>
+      <ol type="1">
+      <li>E00 -&gt; E01 -&gt; E04 -&gt; E05 -&gt; E06 -&gt; E07 -&gt;
+      E08 -&gt; E09</li>
+      </ol>
+      <p>Fast-follow but not blocking first release assembly:</p>
+      <ol type="1">
+      <li>E10 (temp envs)</li>
+      <li>E11 (notifications/audit polish)</li>
+      </ol>
+      <h2 id="5-suggested-first-sprint-execution-ready">5) Suggested
+      First Sprint (Execution-Ready)</h2>
+      <ol type="1">
+      <li>E00-01/02/04</li>
+      <li>E01-01/03</li>
+      <li>E02-01/02/04/05</li>
+      <li>E03-01/02/03/04</li>
+      <li>E04-01/03/04</li>
+      <li>E05-01/02</li>
+      </ol>
+      <p>Definition of done for Sprint 1:</p>
+      <ul>
+      <li>Authenticated user can create team + repository, get default
+      workspace, edit files with guardrails, create changeset, and
+      submit it with persisted revision + <code>head_sha</code>.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

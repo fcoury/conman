@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Team/Repo/App Implementation Plan — Conman Docs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#teamrepoapp-implementation-plan"
+      id="toc-teamrepoapp-implementation-plan">Team/Repo/App
+      Implementation Plan</a>
+      <ul>
+      <li><a href="#goal" id="toc-goal">Goal</a></li>
+      <li><a href="#what-changes" id="toc-what-changes">What
+      changes</a></li>
+      <li><a href="#what-stays-the-same"
+      id="toc-what-stays-the-same">What stays the same</a></li>
+      <li><a href="#implementation-order-critical-path"
+      id="toc-implementation-order-critical-path">Implementation order
+      (critical path)</a></li>
+      <li><a href="#step-1-domain--storage-model"
+      id="toc-step-1-domain--storage-model">Step 1: Domain + storage
+      model</a></li>
+      <li><a href="#step-2-api-endpoint-team--repo--app"
+      id="toc-step-2-api-endpoint-team--repo--app">Step 2: API endpoint
+      (team + repo + app)</a></li>
+      <li><a href="#step-3-runtime-profile-multi-app-support"
+      id="toc-step-3-runtime-profile-multi-app-support">Step 3: Runtime
+      profile multi-app support</a></li>
+      <li><a href="#step-4-changesetrelease-visibility-for-apps"
+      id="toc-step-4-changesetrelease-visibility-for-apps">Step 4:
+      Changeset/release visibility for apps</a></li>
+      <li><a href="#step-5-auth-and-membership-alignment"
+      id="toc-step-5-auth-and-membership-alignment">Step 5: Auth and
+      membership alignment</a></li>
+      <li><a href="#step-6-test-and-docs-pass"
+      id="toc-step-6-test-and-docs-pass">Step 6: Test and docs
+      pass</a></li>
+      <li><a href="#practical-execution-checklist"
+      id="toc-practical-execution-checklist">Practical execution
+      checklist</a></li>
+      <li><a href="#notes-for-this-repo-right-now"
+      id="toc-notes-for-this-repo-right-now">Notes for this repo right
+      now</a></li>
+      <li><a href="#automated-acceptance-criteria"
+      id="toc-automated-acceptance-criteria">Automated acceptance
+      criteria</a>
+      <ul>
+      <li><a href="#acceptance-command-set"
+      id="toc-acceptance-command-set">Acceptance command set</a></li>
+      </ul></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">Team/Repo/App Implementation Plan</h1>
+      </header>
+      <h1 id="teamrepoapp-implementation-plan">Team/Repo/App
+      Implementation Plan</h1>
+      <h2 id="goal">Goal</h2>
+      <p>Implement the new domain direction:</p>
+      <ul>
+      <li><code>Team -&gt; Config Repository -&gt; App</code></li>
+      <li>Keep Git lifecycle repo-scoped
+      (<code>workspace -&gt; changeset -&gt; release -&gt; deploy</code>)</li>
+      <li>Add multi-app support for URLs/runtime profile context</li>
+      </ul>
+      <p>This plan is optimized for current reality: pre-production and
+      one active user.</p>
+      <h2 id="what-changes">What changes</h2>
+      <ol type="1">
+      <li>Current <code>App</code> becomes a repository concept in
+      practice.</li>
+      <li>Add first-class <code>Team</code>.</li>
+      <li>Add first-class <code>App</code> under each repository.</li>
+      <li>Keep <code>/api/repos</code> and <code>/api/teams</code> as
+      the canonical API endpoints.</li>
+      <li>Runtime profiles gain app endpoint mapping.</li>
+      </ol>
+      <h2 id="what-stays-the-same">What stays the same</h2>
+      <ul>
+      <li>Queue-first changesets/releases model.</li>
+      <li>One integration branch per repository.</li>
+      <li>Environment pipeline and deploy flow.</li>
+      <li>gitaly-rs integration boundary.</li>
+      </ul>
+      <h2 id="implementation-order-critical-path">Implementation order
+      (critical path)</h2>
+      <h2 id="step-1-domain--storage-model">Step 1: Domain + storage
+      model</h2>
+      <p>Crates/files:</p>
+      <ul>
+      <li><code>conman-core</code>: add <code>team.rs</code>,
+      <code>repo.rs</code>, <code>app.rs</code>.</li>
+      <li><code>conman-db</code>: add <code>team_repo.rs</code>,
+      <code>repo_repo.rs</code>, <code>app_repo.rs</code>.</li>
+      <li><code>conman-db/src/lib.rs</code>: export new repos and
+      include index bootstrap.</li>
+      </ul>
+      <p>Tasks:</p>
+      <ol type="1">
+      <li>Add domain structs:
+      <ul>
+      <li><code>Team { id, name, slug, created_at, updated_at }</code></li>
+      <li><code>App { id, repo_id, key, title, domains, branding?, roles?, created_at, updated_at }</code></li>
+      </ul></li>
+      <li>Extend existing app/repo model with <code>team_id</code>.</li>
+      <li>Add Mongo collections/indexes:
+      <ul>
+      <li><code>teams.slug</code> unique</li>
+      <li><code>apps (repo_id, key)</code> unique</li>
+      <li><code>apps.team_id</code> non-unique index Done when:</li>
+      </ul></li>
+      </ol>
+      <ul>
+      <li>service boots with new collections/indexes</li>
+      </ul>
+      <h2 id="step-2-api-endpoint-team--repo--app">Step 2: API endpoint
+      (team + repo + app)</h2>
+      <p>Crates/files:</p>
+      <ul>
+      <li><code>conman-api/src/handlers/teams.rs</code> (new)</li>
+      <li><code>conman-api/src/handlers/repos.rs</code> (repository
+      handlers)</li>
+      <li><code>conman-api/src/handlers/teams.rs</code> (team + app
+      handlers)</li>
+      <li>router wiring in <code>conman-api</code></li>
+      </ul>
+      <p>Tasks:</p>
+      <ol type="1">
+      <li>Add team endpoints:
+      <ul>
+      <li><code>POST /api/teams</code></li>
+      <li><code>GET /api/teams</code></li>
+      <li><code>GET /api/teams/:teamId</code></li>
+      </ul></li>
+      <li>Add repo endpoints:
+      <ul>
+      <li><code>POST /api/teams/:teamId/repos</code></li>
+      <li><code>GET /api/repos</code></li>
+      <li><code>GET /api/repos/:repoId</code></li>
+      </ul></li>
+      <li>Add app endpoints:
+      <ul>
+      <li><code>POST /api/repos/:repoId/apps</code></li>
+      <li><code>GET /api/repos/:repoId/apps</code></li>
+      <li><code>PATCH /api/repos/:repoId/apps/:appId</code></li>
+      </ul></li>
+      </ol>
+      <p>Done when:</p>
+      <ul>
+      <li>team/repo/app can be created and listed end-to-end</li>
+      </ul>
+      <h2 id="step-3-runtime-profile-multi-app-support">Step 3: Runtime
+      profile multi-app support</h2>
+      <p>Crates/files:</p>
+      <ul>
+      <li><code>conman-core/src/runtime_profile.rs</code></li>
+      <li><code>conman-db/src/runtime_profile_repo.rs</code></li>
+      <li>profile handlers under <code>conman-api</code></li>
+      </ul>
+      <p>Tasks:</p>
+      <ol type="1">
+      <li>Add <code>app_endpoints</code> to runtime profile:
+      <ul>
+      <li>shape: <code>HashMap&lt;String, String&gt;</code>
+      (<code>app_key -&gt; base_url</code>)</li>
+      </ul></li>
+      <li>Validate keys:
+      <ul>
+      <li>must match existing repo app keys</li>
+      </ul></li>
+      <li>Update temp env derivation logic so endpoint overrides can be
+      per-app.</li>
+      </ol>
+      <p>Done when:</p>
+      <ul>
+      <li>environment profile can define endpoints for multiple
+      apps</li>
+      <li>temp env creation keeps endpoint map and applies overrides
+      correctly</li>
+      </ul>
+      <h2 id="step-4-changesetrelease-visibility-for-apps">Step 4:
+      Changeset/release visibility for apps</h2>
+      <p>Crates/files:</p>
+      <ul>
+      <li><code>conman-core/src/changeset.rs</code></li>
+      <li><code>conman-core/src/release.rs</code></li>
+      <li><code>conman-api</code> changeset/release handlers</li>
+      </ul>
+      <p>Tasks:</p>
+      <ol type="1">
+      <li>Add <code>impacted_app_keys: Vec&lt;String&gt;</code> to
+      changeset metadata.</li>
+      <li>Populate it from:
+      <ul>
+      <li>changed file paths (first pass)</li>
+      <li>optional semantic diff enrichment (second pass)</li>
+      </ul></li>
+      <li>Propagate impact summary into release detail responses.</li>
+      </ol>
+      <p>Done when:</p>
+      <ul>
+      <li>review and release screens can show which apps are
+      affected</li>
+      </ul>
+      <h2 id="step-5-auth-and-membership-alignment">Step 5: Auth and
+      membership alignment</h2>
+      <p>Keep it simple for now:</p>
+      <ul>
+      <li>Membership remains repo-scoped (current behavior).</li>
+      <li><code>admin</code> remains the admin capability role.</li>
+      <li>Team-level admin model can be deferred.</li>
+      </ul>
+      <p>Tasks:</p>
+      <ol type="1">
+      <li>Ensure new team/repo/app endpoints enforce current RBAC
+      correctly.</li>
+      <li>Ensure invite/member flows still work with repo IDs
+      unchanged.</li>
+      </ol>
+      <p>Done when:</p>
+      <ul>
+      <li>no regression in login/invite/member assignment</li>
+      </ul>
+      <h2 id="step-6-test-and-docs-pass">Step 6: Test and docs pass</h2>
+      <p>Tasks:</p>
+      <ol type="1">
+      <li>Add/adjust unit and integration tests:
+      <ul>
+      <li>team/repo/app repos</li>
+      <li>new handlers</li>
+      <li>runtime profile endpoint map validation</li>
+      </ul></li>
+      <li>Update manual test guide with new setup sequence:
+      <ul>
+      <li>create team -&gt; create repo -&gt; create apps</li>
+      </ul></li>
+      <li>Keep OpenAPI docs aligned with the new endpoints.</li>
+      </ol>
+      <p>Done when:</p>
+      <ul>
+      <li><code>cargo test --workspace</code> passes</li>
+      <li>manual API sequence works cleanly with team/repo/app
+      model</li>
+      </ul>
+      <h2 id="practical-execution-checklist">Practical execution
+      checklist</h2>
+      <ol type="1">
+      <li>Implement Step 1 and Step 2 first (unblocks everything
+      else).</li>
+      <li>Then Step 3 (runtime profiles).</li>
+      <li>Then Step 4 (impacted app metadata).</li>
+      <li>Finish with Step 5 and Step 6 hardening.</li>
+      </ol>
+      <h2 id="notes-for-this-repo-right-now">Notes for this repo right
+      now</h2>
+      <ul>
+      <li>Existing code already treats <code>App</code> like a repo
+      (<code>repo_path</code>, <code>integration_branch</code>), so this
+      change is mostly additive + naming clarity.</li>
+      </ul>
+      <h2 id="automated-acceptance-criteria">Automated acceptance
+      criteria</h2>
+      <p>When implementation is complete, these checks must pass.</p>
+      <table>
+      <thead>
+      <tr>
+      <th>ID</th>
+      <th>Criteria</th>
+      <th>Automated check</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>TRS-AC-01</td>
+      <td>Team can be created and queried.</td>
+      <td><code>run_team_repo_app_acceptance.sh</code></td>
+      </tr>
+      <tr>
+      <td>TRS-AC-02</td>
+      <td>Repository can be created under a team and queried via
+      <code>/api/repos/:id</code>.</td>
+      <td><code>run_team_repo_app_acceptance.sh</code></td>
+      </tr>
+      <tr>
+      <td>TRS-AC-03</td>
+      <td>Two apps can be created and listed for one repo.</td>
+      <td><code>run_team_repo_app_acceptance.sh</code></td>
+      </tr>
+      <tr>
+      <td>TRS-AC-04</td>
+      <td>Runtime profile stores and returns
+      <code>app_endpoints</code>.</td>
+      <td><code>run_team_repo_app_acceptance.sh</code></td>
+      </tr>
+      <tr>
+      <td>TRS-AC-05</td>
+      <td>Environment configuration can reference runtime profiles after
+      model change.</td>
+      <td><code>run_team_repo_app_acceptance.sh</code></td>
+      </tr>
+      <tr>
+      <td>TRS-AC-06</td>
+      <td>Existing lifecycle smoke remains functional after model
+      change.</td>
+      <td><code>tests/e2e/run_full_staged_smoke.sh</code></td>
+      </tr>
+      </tbody>
+      </table>
+      <h3 id="acceptance-command-set">Acceptance command set</h3>
+      <ol type="1">
+      <li><code>CONMAN_BASE_URL=... CONMAN_LOGIN_EMAIL=... CONMAN_LOGIN_PASSWORD=... CONMAN_ACCEPTANCE_REPO_PATH=... ./tests/ops/run_team_repo_app_acceptance.sh --strict</code></li>
+      <li><code>./tests/e2e/run_full_staged_smoke.sh</code></li>
+      </ol>
+      <p>The first command validates the new model contracts. The second
+      command guards against regressions in the current
+      app/workspace/changeset/release/deploy flow.</p>
+    </main>
+  </div>
+</body>
+</html>

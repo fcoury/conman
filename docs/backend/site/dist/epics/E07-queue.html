@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>E07 Queue-First Orchestration +
+Revalidation — Conman Docs</title>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="../index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#e07-queue-first-orchestration--revalidation"
+      id="toc-e07-queue-first-orchestration--revalidation">E07
+      Queue-First Orchestration + Revalidation</a>
+      <ul>
+      <li><a href="#1-goal" id="toc-1-goal">1. Goal</a></li>
+      <li><a href="#2-dependencies" id="toc-2-dependencies">2.
+      Dependencies</a></li>
+      <li><a href="#3-rust-types" id="toc-3-rust-types">3. Rust
+      Types</a>
+      <ul>
+      <li><a href="#31-changeset-queue-fields"
+      id="toc-31-changeset-queue-fields">3.1 Changeset queue
+      fields</a></li>
+      <li><a href="#32-queueentry-view-struct"
+      id="toc-32-queueentry-view-struct">3.2 QueueEntry view
+      struct</a></li>
+      <li><a href="#33-reorderrequest" id="toc-33-reorderrequest">3.3
+      ReorderRequest</a></li>
+      <li><a href="#34-revalidationresult"
+      id="toc-34-revalidationresult">3.4 RevalidationResult</a></li>
+      <li><a href="#35-state-transition-extensions"
+      id="toc-35-state-transition-extensions">3.5 State transition
+      extensions</a></li>
+      </ul></li>
+      <li><a href="#4-database" id="toc-4-database">4. Database</a>
+      <ul>
+      <li><a href="#41-collection-updates"
+      id="toc-41-collection-updates">4.1 Collection updates</a></li>
+      <li><a href="#42-indexes" id="toc-42-indexes">4.2 Indexes</a></li>
+      </ul></li>
+      <li><a href="#5-api-endpoints" id="toc-5-api-endpoints">5. API
+      Endpoints</a>
+      <ul>
+      <li><a href="#51-post-apireposrepoidchangesetschangesetidqueue"
+      id="toc-51-post-apireposrepoidchangesetschangesetidqueue">5.1
+      <code>POST /api/repos/:repoId/changesets/:changesetId/queue</code></a></li>
+      <li><a href="#52-get-apireposrepoidqueuepagelimit"
+      id="toc-52-get-apireposrepoidqueuepagelimit">5.2
+      <code>GET /api/repos/:repoId/queue?page=&amp;limit=</code></a></li>
+      <li><a href="#53-post-apireposrepoidqueuereorder"
+      id="toc-53-post-apireposrepoidqueuereorder">5.3
+      <code>POST /api/repos/:repoId/queue/reorder</code></a></li>
+      <li><a
+      href="#54-post-apireposrepoidchangesetschangesetidmove-to-draft"
+      id="toc-54-post-apireposrepoidchangesetschangesetidmove-to-draft">5.4
+      <code>POST /api/repos/:repoId/changesets/:changesetId/move-to-draft</code></a></li>
+      </ul></li>
+      <li><a href="#6-business-logic" id="toc-6-business-logic">6.
+      Business Logic</a>
+      <ul>
+      <li><a href="#61-queue-transition-approved---queued"
+      id="toc-61-queue-transition-approved---queued">6.1 Queue
+      transition (Approved -&gt; Queued)</a></li>
+      <li><a href="#62-queue-reorder" id="toc-62-queue-reorder">6.2
+      Queue reorder</a></li>
+      <li><a href="#63-revalidation-trigger"
+      id="toc-63-revalidation-trigger">6.3 Revalidation trigger</a></li>
+      <li><a href="#64-revalidation-job-logic"
+      id="toc-64-revalidation-job-logic">6.4 Revalidation job
+      logic</a></li>
+      <li><a href="#65-move-to-draft" id="toc-65-move-to-draft">6.5
+      Move-to-draft</a></li>
+      <li><a href="#66-up-to-date-with-integration-branch-gate"
+      id="toc-66-up-to-date-with-integration-branch-gate">6.6
+      Up-to-date-with-integration branch gate</a></li>
+      </ul></li>
+      <li><a href="#7-gitaly-rs-integration"
+      id="toc-7-gitaly-rs-integration">7. Gitaly-rs Integration</a>
+      <ul>
+      <li><a href="#71-diffservicecommitdiff----conflict-detection"
+      id="toc-71-diffservicecommitdiff----conflict-detection">7.1
+      <code>DiffService.CommitDiff</code> -- conflict detection</a></li>
+      <li><a
+      href="#72-commitservicecommitisancestor----up-to-date-check"
+      id="toc-72-commitservicecommitisancestor----up-to-date-check">7.2
+      <code>CommitService.CommitIsAncestor</code> -- up-to-date
+      check</a></li>
+      <li><a
+      href="#73-commitservicefindcommit----resolve-integration-branch-head"
+      id="toc-73-commitservicefindcommit----resolve-integration-branch-head">7.3
+      <code>CommitService.FindCommit</code> -- resolve integration
+      branch HEAD</a></li>
+      </ul></li>
+      <li><a href="#8-implementation-checklist"
+      id="toc-8-implementation-checklist">8. Implementation
+      Checklist</a>
+      <ul>
+      <li><a href="#e07-01-queue-transition-approved---queued"
+      id="toc-e07-01-queue-transition-approved---queued">E07-01: Queue
+      transition (Approved -&gt; Queued)</a></li>
+      <li><a href="#e07-02-queue-listing-and-reorder"
+      id="toc-e07-02-queue-listing-and-reorder">E07-02: Queue listing
+      and reorder</a></li>
+      <li><a href="#e07-03-revalidation-trigger"
+      id="toc-e07-03-revalidation-trigger">E07-03: Revalidation
+      trigger</a></li>
+      <li><a href="#e07-04-revalidation-job-logic"
+      id="toc-e07-04-revalidation-job-logic">E07-04: Revalidation job
+      logic</a></li>
+      <li><a href="#e07-05-move-to-draft"
+      id="toc-e07-05-move-to-draft">E07-05: Move-to-draft</a></li>
+      </ul></li>
+      <li><a href="#9-test-cases" id="toc-9-test-cases">9. Test
+      Cases</a>
+      <ul>
+      <li><a href="#91-state-machine-unit-conman-core"
+      id="toc-91-state-machine-unit-conman-core">9.1 State machine
+      (unit, <code>conman-core</code>)</a></li>
+      <li><a href="#92-queue-position-assignment-unit-conman-db"
+      id="toc-92-queue-position-assignment-unit-conman-db">9.2 Queue
+      position assignment (unit, <code>conman-db</code>)</a></li>
+      <li><a href="#93-up-to-date-gate-integration-conman-git"
+      id="toc-93-up-to-date-gate-integration-conman-git">9.3 Up-to-date
+      gate (integration, <code>conman-git</code>)</a></li>
+      <li><a href="#94-reorder-integration-conman-api"
+      id="toc-94-reorder-integration-conman-api">9.4 Reorder
+      (integration, <code>conman-api</code>)</a></li>
+      <li><a href="#95-revalidation-integration-conman-jobs"
+      id="toc-95-revalidation-integration-conman-jobs">9.5 Revalidation
+      (integration, <code>conman-jobs</code>)</a></li>
+      <li><a href="#96-move-to-draft-integration-conman-api"
+      id="toc-96-move-to-draft-integration-conman-api">9.6 Move-to-draft
+      (integration, <code>conman-api</code>)</a></li>
+      <li><a href="#97-end-to-end-flow-integration"
+      id="toc-97-end-to-end-flow-integration">9.7 End-to-end flow
+      (integration)</a></li>
+      </ul></li>
+      <li><a href="#10-acceptance-criteria"
+      id="toc-10-acceptance-criteria">10. Acceptance Criteria</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">E07 Queue-First Orchestration +
+Revalidation</h1>
+      </header>
+      <h1 id="e07-queue-first-orchestration--revalidation">E07
+      Queue-First Orchestration + Revalidation</h1>
+      <h2 id="1-goal">1. Goal</h2>
+      <p>Move approved changesets into a managed queue with automatic
+      revalidation after each published release. The queue is the
+      staging area between review approval and release assembly: config
+      managers select a subset of queued changesets to include in each
+      release, while non-selected changesets remain queued and are
+      automatically revalidated to ensure they stay compatible with the
+      updated integration branch branch.</p>
+      <p>Key outcomes:</p>
+      <ul>
+      <li>Approved changesets transition to <code>Queued</code> with
+      deterministic ordering.</li>
+      <li>Config managers can manually reorder the queue (audited).</li>
+      <li>After every release publish, remaining queued changesets are
+      revalidated: conflict detection against updated integration
+      branch, followed by full msuite test run.</li>
+      <li>Changesets that fail revalidation transition to
+      <code>Conflicted</code> or <code>NeedsRevalidation</code> and can
+      be returned to <code>Draft</code> by the author or a privileged
+      user.</li>
+      <li>A changeset branch must be up to date with the integration
+      branch before it can enter the queue.</li>
+      <li>Queued changesets with conflicting runtime override keys are
+      marked <code>Conflicted</code> (later entry loses), except when
+      the overlapping key resolves to the same typed value.</li>
+      </ul>
+      <h2 id="2-dependencies">2. Dependencies</h2>
+      <table>
+      <thead>
+      <tr>
+      <th>Dependency</th>
+      <th>What it provides</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><strong>E05 Changesets</strong></td>
+      <td>Changeset domain types, <code>ChangesetState</code> enum,
+      state machine transitions through <code>Approved</code></td>
+      </tr>
+      <tr>
+      <td><strong>E06 Async Jobs</strong></td>
+      <td>Job framework, <code>revalidate_queued_changeset</code> job
+      type, msuite worker infrastructure</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Both E05 and E06 must be complete before E07 implementation
+      begins. E07 also assumes the gitaly-rs integration layer from E01
+      is available for conflict detection and ancestry checks.</p>
+      <h2 id="3-rust-types">3. Rust Types</h2>
+      <p>All types live in <code>conman-core</code> unless otherwise
+      noted.</p>
+      <h3 id="31-changeset-queue-fields">3.1 Changeset queue fields</h3>
+      <p>Extend the existing <code>Changeset</code> struct with
+      queue-specific metadata:</p>
+      <div class="sourceCode" id="cb1"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">// conman-core/src/changeset.rs</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">chrono::</span><span class="op">{</span>DateTime<span class="op">,</span> Utc<span class="op">};</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">/// Extended fields on the Changeset struct for queue orchestration.</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">/// These are None when the changeset is not in the Queued state.</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> Changeset <span class="op">{</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="co">// ... existing fields from E05 ...</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Position in the per-app queue. Assigned on Approved -&gt; Queued transition.</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Monotonically increasing within an app; gaps are allowed after reordering.</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> queue_position<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="dt">i64</span><span class="op">&gt;,</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Timestamp when the changeset entered the queue.</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> queued_at<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span>DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;&gt;,</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="32-queueentry-view-struct">3.2 QueueEntry view struct</h3>
+      <p>API-facing DTO returned by the queue listing endpoint. Lives in
+      <code>conman-api</code>:</p>
+      <div class="sourceCode" id="cb2"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">// conman-api/src/dto/queue.rs</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">chrono::</span><span class="op">{</span>DateTime<span class="op">,</span> Utc<span class="op">};</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">serde::</span>Serialize<span class="op">;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co">/// A single entry in the app queue, combining changeset summary data with its</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">/// queue position for ordered display.</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="bu">Clone</span><span class="op">,</span> Serialize<span class="at">)]</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> QueueEntry <span class="op">{</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> changeset_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> title<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> author_user_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> author_email<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> workspace_branch<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> head_sha<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> queue_position<span class="op">:</span> <span class="dt">i64</span><span class="op">,</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> queued_at<span class="op">:</span> DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;,</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> last_revalidation_status<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="dt">String</span><span class="op">&gt;,</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> last_revalidation_job_id<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="dt">String</span><span class="op">&gt;,</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="33-reorderrequest">3.3 ReorderRequest</h3>
+      <div class="sourceCode" id="cb3"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">// conman-api/src/dto/queue.rs</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">serde::</span>Deserialize<span class="op">;</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">/// Request body for the queue reorder endpoint. The caller provides the full</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">/// ordered list of changeset IDs representing the desired queue order. Every</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co">/// currently-queued changeset for the app must appear exactly once.</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="bu">Clone</span><span class="op">,</span> Deserialize<span class="at">)]</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> ReorderRequest <span class="op">{</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Ordered list of changeset IDs (hex ObjectId strings). Position 0 is</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// highest priority (will be considered first for next release assembly).</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> ordered_changeset_ids<span class="op">:</span> <span class="dt">Vec</span><span class="op">&lt;</span><span class="dt">String</span><span class="op">&gt;,</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="34-revalidationresult">3.4 RevalidationResult</h3>
+      <div class="sourceCode" id="cb4"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">// conman-core/src/revalidation.rs</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">/// Outcome of revalidating a single queued changeset against the updated integration branch</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">/// branch after a release publish.</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="bu">Clone</span><span class="at">)]</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">enum</span> RevalidationResult <span class="op">{</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Changeset branch merges cleanly with integration branch and msuite tests pass.</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// The changeset remains in the Queued state.</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    Valid<span class="op">,</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Changeset branch has merge conflicts with the updated integration branch.</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Includes the list of conflicting file paths.</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    Conflicted <span class="op">{</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>        files<span class="op">:</span> <span class="dt">Vec</span><span class="op">&lt;</span><span class="dt">String</span><span class="op">&gt;,</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    <span class="op">},</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Changeset branch merges cleanly but the msuite revalidation job failed.</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Includes the job ID for log retrieval.</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    TestFailed <span class="op">{</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>        job_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    <span class="op">},</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="35-state-transition-extensions">3.5 State transition
+      extensions</h3>
+      <p>Extend the <code>ChangesetState</code> enum and transition
+      logic from E05:</p>
+      <div class="sourceCode" id="cb5"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">// conman-core/src/changeset.rs</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co">/// All changeset states. Queue-related states added by E07 are marked below.</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="bu">Clone</span><span class="op">,</span> <span class="bu">Copy</span><span class="op">,</span> <span class="bu">PartialEq</span><span class="op">,</span> <span class="bu">Eq</span><span class="op">,</span> Serialize<span class="op">,</span> Deserialize<span class="at">)]</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>serde<span class="at">(</span>rename_all <span class="op">=</span> <span class="st">&quot;snake_case&quot;</span><span class="at">)]</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">enum</span> ChangesetState <span class="op">{</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    Draft<span class="op">,</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    Submitted<span class="op">,</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    InReview<span class="op">,</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    Approved<span class="op">,</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    Queued<span class="op">,</span>              <span class="co">// E07: entered via Approved -&gt; Queued</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    Conflicted<span class="op">,</span>          <span class="co">// E07: entered via Queued -&gt; Conflicted</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    NeedsRevalidation<span class="op">,</span>   <span class="co">// E07: entered via Queued -&gt; NeedsRevalidation</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    Released<span class="op">,</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    Rejected<span class="op">,</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> ChangesetState <span class="op">{</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Validate that a state transition is allowed. Returns ConmanError on</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// invalid transitions.</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">fn</span> validate_transition(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> to<span class="op">:</span> ChangesetState) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span>()<span class="op">,</span> ConmanError<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> valid <span class="op">=</span> <span class="pp">matches!</span>(</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>            (<span class="kw">self</span><span class="op">,</span> to)<span class="op">,</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>            <span class="co">// ... existing transitions from E05 ...</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>            <span class="co">// E07 transitions:</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>            (<span class="pp">ChangesetState::</span>Approved<span class="op">,</span> <span class="pp">ChangesetState::</span>Queued) <span class="op">|</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>            (<span class="pp">ChangesetState::</span>Queued<span class="op">,</span> <span class="pp">ChangesetState::</span>Conflicted) <span class="op">|</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>            (<span class="pp">ChangesetState::</span>Queued<span class="op">,</span> <span class="pp">ChangesetState::</span>NeedsRevalidation) <span class="op">|</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>            (<span class="pp">ChangesetState::</span>Queued<span class="op">,</span> <span class="pp">ChangesetState::</span>Released) <span class="op">|</span></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>            (<span class="pp">ChangesetState::</span>Conflicted<span class="op">,</span> <span class="pp">ChangesetState::</span>Draft) <span class="op">|</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>            (<span class="pp">ChangesetState::</span>NeedsRevalidation<span class="op">,</span> <span class="pp">ChangesetState::</span>Draft)</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>        )<span class="op">;</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="op">!</span>valid <span class="op">{</span></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="cn">Err</span>(<span class="pp">ConmanError::</span>InvalidTransition <span class="op">{</span></span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>                from<span class="op">:</span> <span class="pp">format!</span>(<span class="st">&quot;{:?}&quot;</span><span class="op">,</span> <span class="kw">self</span>)<span class="op">,</span></span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>                to<span class="op">:</span> <span class="pp">format!</span>(<span class="st">&quot;{:?}&quot;</span><span class="op">,</span> to)<span class="op">,</span></span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span>)<span class="op">;</span></span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>        <span class="cn">Ok</span>(())</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h2 id="4-database">4. Database</h2>
+      <h3 id="41-collection-updates">4.1 Collection updates</h3>
+      <p>Update the <code>changesets</code> collection schema with new
+      fields:</p>
+      <table>
+      <thead>
+      <tr>
+      <th>Field</th>
+      <th>Type</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>queue_position</code></td>
+      <td><code>i64</code> / <code>null</code></td>
+      <td><code>null</code></td>
+      <td>Position in queue. Set on queue entry, updated on reorder,
+      cleared on exit.</td>
+      </tr>
+      <tr>
+      <td><code>queued_at</code></td>
+      <td><code>DateTime</code> / <code>null</code></td>
+      <td><code>null</code></td>
+      <td>Timestamp of Approved -&gt; Queued transition. Cleared on exit
+      from queue.</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>These fields are nullable because they only have values while
+      <code>state == "queued"</code>.</p>
+      <h3 id="42-indexes">4.2 Indexes</h3>
+      <p>Add to <code>ChangesetRepo::ensure_indexes()</code>:</p>
+      <div class="sourceCode" id="cb6"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Compound index for ordered queue listing per app.</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co">// Supports: GET /api/repos/:repoId/queue (list queued changesets in order).</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="pp">IndexModel::</span>builder()</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="op">.</span>keys(<span class="pp">doc!</span> <span class="op">{</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;repo_id&quot;</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;state&quot;</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;queue_position&quot;</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span>)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">.</span>options(</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>        <span class="pp">IndexOptions::</span>builder()</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>name(<span class="st">&quot;idx_changesets_app_queue&quot;</span><span class="op">.</span>to_string())</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>partial_filter_expression(<span class="pp">doc!</span> <span class="op">{</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;state&quot;</span><span class="op">:</span> <span class="st">&quot;queued&quot;</span><span class="op">,</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;queue_position&quot;</span><span class="op">:</span> <span class="op">{</span> <span class="st">&quot;$exists&quot;</span><span class="op">:</span> <span class="cn">true</span> <span class="op">},</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span>)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>build()<span class="op">,</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    <span class="op">.</span>build()</span></code></pre></div>
+      <p>This partial index only includes documents in the
+      <code>queued</code> state, keeping it compact. Queries filter on
+      <code>repo_id</code> + <code>state: "queued"</code> and sort by
+      <code>queue_position: 1</code>.</p>
+      <h2 id="5-api-endpoints">5. API Endpoints</h2>
+      <h3 id="51-post-apireposrepoidchangesetschangesetidqueue">5.1
+      <code>POST /api/repos/:repoId/changesets/:changesetId/queue</code></h3>
+      <p>Move an approved changeset into the queue.</p>
+      <p><strong>Auth:</strong> changeset author (any role),
+      config_manager, or admin.</p>
+      <p><strong>Guards:</strong></p>
+      <ul>
+      <li>Changeset must be in <code>Approved</code> state.</li>
+      <li>Changeset branch must be up to date with the integration
+      branch (ancestry check).</li>
+      </ul>
+      <p><strong>Request body:</strong> none</p>
+      <p><strong>Response:</strong> <code>200 OK</code></p>
+      <div class="sourceCode" id="cb7"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;data&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;changeset_id&quot;</span><span class="fu">:</span> <span class="st">&quot;abc123&quot;</span><span class="fu">,</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;state&quot;</span><span class="fu">:</span> <span class="st">&quot;queued&quot;</span><span class="fu">,</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;queue_position&quot;</span><span class="fu">:</span> <span class="dv">5</span><span class="fu">,</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;queued_at&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-02-25T14:30:00Z&quot;</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <p><strong>Error cases:</strong></p>
+      <ul>
+      <li><code>409 Conflict</code> if state is not
+      <code>Approved</code>.</li>
+      <li><code>409 Conflict</code> if changeset branch is not up to
+      date with the integration branch.</li>
+      <li><code>404 Not Found</code> if changeset or app does not
+      exist.</li>
+      </ul>
+      <h3 id="52-get-apireposrepoidqueuepagelimit">5.2
+      <code>GET /api/repos/:repoId/queue?page=&amp;limit=</code></h3>
+      <p>List queued changesets in queue-position order. Convenience
+      endpoint that filters <code>state == queued</code> and sorts by
+      <code>queue_position ASC</code>.</p>
+      <p><strong>Auth:</strong> any app member.</p>
+      <p><strong>Response:</strong> <code>200 OK</code></p>
+      <div class="sourceCode" id="cb8"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;data&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;changeset_id&quot;</span><span class="fu">:</span> <span class="st">&quot;abc123&quot;</span><span class="fu">,</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;title&quot;</span><span class="fu">:</span> <span class="st">&quot;Add team configuration&quot;</span><span class="fu">,</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;author_user_id&quot;</span><span class="fu">:</span> <span class="st">&quot;user456&quot;</span><span class="fu">,</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;author_email&quot;</span><span class="fu">:</span> <span class="st">&quot;alice@example.com&quot;</span><span class="fu">,</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;workspace_branch&quot;</span><span class="fu">:</span> <span class="st">&quot;ws/alice/myapp&quot;</span><span class="fu">,</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;head_sha&quot;</span><span class="fu">:</span> <span class="st">&quot;d4e5f6...&quot;</span><span class="fu">,</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;queue_position&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;queued_at&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-02-24T10:00:00Z&quot;</span><span class="fu">,</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;last_revalidation_status&quot;</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;last_revalidation_job_id&quot;</span><span class="fu">:</span> <span class="kw">null</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;pagination&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;page&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span> <span class="dt">&quot;limit&quot;</span><span class="fu">:</span> <span class="dv">20</span><span class="fu">,</span> <span class="dt">&quot;total&quot;</span><span class="fu">:</span> <span class="dv">3</span> <span class="fu">}</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <h3 id="53-post-apireposrepoidqueuereorder">5.3
+      <code>POST /api/repos/:repoId/queue/reorder</code></h3>
+      <p>Reorder the entire queue for an app. The request must include
+      every currently-queued changeset ID exactly once, in the desired
+      new order.</p>
+      <p><strong>Auth:</strong> config_manager or admin.</p>
+      <p><strong>Request body:</strong></p>
+      <div class="sourceCode" id="cb9"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;ordered_changeset_ids&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;id3&quot;</span><span class="ot">,</span> <span class="st">&quot;id1&quot;</span><span class="ot">,</span> <span class="st">&quot;id2&quot;</span><span class="ot">]</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <p><strong>Response:</strong> <code>200 OK</code></p>
+      <div class="sourceCode" id="cb10"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;data&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;reordered_count&quot;</span><span class="fu">:</span> <span class="dv">3</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <p><strong>Error cases:</strong></p>
+      <ul>
+      <li><code>403 Forbidden</code> if caller lacks config_manager or
+      admin role.</li>
+      <li><code>400 Validation</code> if the provided IDs do not match
+      the current queued set exactly (missing IDs, extra IDs, or
+      duplicates).</li>
+      <li><code>409 Conflict</code> if the queue was modified
+      concurrently (optimistic check).</li>
+      </ul>
+      <p><strong>Audit:</strong> emits <code>queue_reordered</code>
+      audit event with before/after position maps.</p>
+      <h3
+      id="54-post-apireposrepoidchangesetschangesetidmove-to-draft">5.4
+      <code>POST /api/repos/:repoId/changesets/:changesetId/move-to-draft</code></h3>
+      <p>Return a conflicted or needs_revalidation changeset to draft
+      state so the author can address the issues.</p>
+      <p><strong>Auth:</strong></p>
+      <ul>
+      <li>Changeset author can move their own.</li>
+      <li>config_manager or admin can move any.</li>
+      </ul>
+      <p><strong>Guards:</strong></p>
+      <ul>
+      <li>Changeset must be in <code>Conflicted</code> or
+      <code>NeedsRevalidation</code> state.</li>
+      </ul>
+      <p><strong>Request body:</strong> none</p>
+      <p><strong>Response:</strong> <code>200 OK</code></p>
+      <div class="sourceCode" id="cb11"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;data&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;changeset_id&quot;</span><span class="fu">:</span> <span class="st">&quot;abc123&quot;</span><span class="fu">,</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;state&quot;</span><span class="fu">:</span> <span class="st">&quot;draft&quot;</span><span class="fu">,</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;queue_position&quot;</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;queued_at&quot;</span><span class="fu">:</span> <span class="kw">null</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <p><strong>Side effects:</strong></p>
+      <ul>
+      <li>Clears <code>queue_position</code> and
+      <code>queued_at</code>.</li>
+      <li>Resets <code>last_revalidation_status</code> and
+      <code>last_revalidation_job_id</code>.</li>
+      </ul>
+      <h2 id="6-business-logic">6. Business Logic</h2>
+      <h3 id="61-queue-transition-approved---queued">6.1 Queue
+      transition (Approved -&gt; Queued)</h3>
+      <ol type="1">
+      <li>Verify changeset is in <code>Approved</code> state.</li>
+      <li><strong>Up-to-date gate:</strong> call
+      <code>CommitIsAncestor</code> to confirm that current integration
+      branch HEAD is an ancestor of the changeset branch HEAD. If
+      integration branch has advanced past the changeset's base, the
+      author must sync their workspace first.</li>
+      <li>Assign <code>queue_position</code> as
+      <code>max(queue_position for app) + 1</code>. Use a
+      find-and-increment pattern to avoid gaps under concurrency. If the
+      queue is empty, start at position 1.</li>
+      <li>Set <code>queued_at</code> to <code>Utc::now()</code>.</li>
+      <li>Transition state to <code>Queued</code>.</li>
+      <li>Emit <code>changeset_queued</code> audit event and
+      notification.</li>
+      </ol>
+      <h3 id="62-queue-reorder">6.2 Queue reorder</h3>
+      <ol type="1">
+      <li>Verify caller has config_manager or admin role.</li>
+      <li>Load all changesets for the app where
+      <code>state == "queued"</code>, sorted by current
+      <code>queue_position</code>.</li>
+      <li>Validate that <code>ordered_changeset_ids</code> is a
+      permutation of the current queued set (same IDs, no additions, no
+      removals, no duplicates).</li>
+      <li>Assign new <code>queue_position</code> values: position
+      <code>i * 1000</code> for index <code>i</code> (using gaps to
+      allow future insertions without reorder).</li>
+      <li>Write all position updates in a single MongoDB
+      <code>bulkWrite</code> with ordered updates.</li>
+      <li>Emit <code>queue_reordered</code> audit event capturing the
+      before and after position maps for full traceability.</li>
+      </ol>
+      <h3 id="63-revalidation-trigger">6.3 Revalidation trigger</h3>
+      <p>After a release is published (by E08), the release publish
+      handler must trigger revalidation for all remaining queued
+      changesets in the same app. The flow:</p>
+      <ol type="1">
+      <li>Query all changesets for the app where
+      <code>state == "queued"</code>, ordered by
+      <code>queue_position</code>.</li>
+      <li>Resolve current integration branch HEAD via
+      <code>FindCommit</code> (integration branch has just been updated
+      by the release publish).</li>
+      <li>For each queued changeset, enqueue a
+      <code>revalidate_queued_changeset</code> job (from E06 job
+      framework). Jobs are enqueued in queue-position order so
+      higher-priority changesets are validated first.</li>
+      </ol>
+      <h3 id="64-revalidation-job-logic">6.4 Revalidation job logic</h3>
+      <p>Each <code>revalidate_queued_changeset</code> job executes the
+      following steps:</p>
+      <ol type="1">
+      <li><p><strong>Conflict detection:</strong> use
+      <code>DiffService.CommitDiff</code> to compute the diff between
+      the changeset's <code>head_sha</code> and updated integration
+      branch HEAD. If the diff reveals that both sides modified the same
+      files, check for actual merge conflicts by attempting a trial
+      merge via the git adapter. If conflicts exist:</p>
+      <ul>
+      <li>Transition changeset to <code>Conflicted</code>.</li>
+      <li>Record conflicting file paths in
+      <code>last_revalidation_status</code>.</li>
+      <li>Emit <code>changeset_conflicted</code> notification.</li>
+      <li>Job completes with
+      <code>RevalidationResult::Conflicted</code>.</li>
+      </ul></li>
+      <li><p><strong>Ancestry check:</strong> use
+      <code>CommitIsAncestor</code> to verify the changeset branch is
+      still based on (or ahead of) the new integration branch. If not,
+      treat as conflicted.</p></li>
+      <li><p><strong>msuite revalidation:</strong> if no conflicts,
+      trigger a full msuite test run (reuse the
+      <code>msuite_merge</code> worker from E06). Wait for the job to
+      complete.</p>
+      <ul>
+      <li>If msuite passes: changeset remains <code>Queued</code>.
+      Record <code>last_revalidation_status = "valid"</code>. Job
+      completes with <code>RevalidationResult::Valid</code>.</li>
+      <li>If msuite fails: transition changeset to
+      <code>NeedsRevalidation</code>. Record
+      <code>last_revalidation_status = "test_failed"</code> and
+      <code>last_revalidation_job_id</code>. Emit
+      <code>changeset_needs_revalidation</code> notification. Job
+      completes with <code>RevalidationResult::TestFailed</code>.</li>
+      </ul></li>
+      </ol>
+      <h3 id="65-move-to-draft">6.5 Move-to-draft</h3>
+      <ol type="1">
+      <li>Verify changeset is in <code>Conflicted</code> or
+      <code>NeedsRevalidation</code> state.</li>
+      <li>Verify caller is the changeset author, config_manager, or
+      admin.</li>
+      <li>Clear queue metadata: set <code>queue_position = None</code>,
+      <code>queued_at = None</code>.</li>
+      <li>Clear revalidation metadata:
+      <code>last_revalidation_status = None</code>,
+      <code>last_revalidation_job_id = None</code>.</li>
+      <li>Transition state to <code>Draft</code>.</li>
+      <li>Emit <code>changeset_moved_to_draft</code> audit event.</li>
+      </ol>
+      <p>The author can then fix their workspace (resolve conflicts,
+      update code), and re-submit through the normal changeset flow
+      (Draft -&gt; Submitted -&gt; InReview -&gt; Approved -&gt;
+      Queued).</p>
+      <h3 id="66-up-to-date-with-integration-branch-gate">6.6
+      Up-to-date-with-integration branch gate</h3>
+      <p>Before a changeset can be queued, its branch must contain all
+      commits from integration branch. This is enforced by checking:</p>
+      <pre><code>CommitIsAncestor(ancestor_id = main_HEAD, child_id = changeset_head_sha)</code></pre>
+      <p>If this returns <code>false</code>, the changeset branch is
+      behind integration branch and the queue transition is rejected
+      with a <code>409 Conflict</code> error instructing the user to
+      sync their workspace with integration branch first (via the
+      workspace sync-integration endpoint from E04).</p>
+      <h2 id="7-gitaly-rs-integration">7. Gitaly-rs Integration</h2>
+      <h3 id="71-diffservicecommitdiff----conflict-detection">7.1
+      <code>DiffService.CommitDiff</code> -- conflict detection</h3>
+      <p>Used to detect which files were modified on both the changeset
+      branch and integration branch since they diverged. If the same
+      file appears in both diffs, a merge conflict is likely.</p>
+      <p><strong>Service definition</strong> (from
+      <code>proto/diff.proto</code>):</p>
+      <div class="sourceCode" id="cb13"><pre
+      class="sourceCode protobuf"><code class="sourceCode protobuf"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">service</span> DiffService {</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// CommitDiff returns a diff between two different commits. The patch data is</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="co">// chunked across messages and get streamed back to the client.</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">rpc</span> CommitDiff(CommitDiffRequest) <span class="kw">returns</span> (stream CommitDiffResponse);</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="kw">message</span> CommitDiffRequest {</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// repository is the one from which to get the diff.</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  Repository repository <span class="op">=</span> <span class="dv">1</span>;</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// left_commit_id is the left commit ID in &lt;left commit&gt;..&lt;right commit&gt;.</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> left_commit_id <span class="op">=</span> <span class="dv">2</span>;</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">// right_commit_id is the right commit ID in &lt;left commit&gt;..&lt;right commit&gt;.</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> right_commit_id <span class="op">=</span> <span class="dv">3</span>;</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>  <span class="co">// paths is a list of paths that limits the diff to those specific paths.</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>  <span class="kw">repeated</span> <span class="dt">bytes</span> paths <span class="op">=</span> <span class="dv">5</span>;</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>  <span class="co">// collapse_diffs causes patches to be emptied after safe_max_files,</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// safe_max_lines, or safe_max_lines is reached.</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> collapse_diffs <span class="op">=</span> <span class="dv">6</span>;</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">// enforce_limits causes parsing of diffs to stop if max_files, max_lines,</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>  <span class="co">// or max_bytes is reached.</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> enforce_limits <span class="op">=</span> <span class="dv">7</span>;</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> max_files <span class="op">=</span> <span class="dv">8</span>;</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> max_lines <span class="op">=</span> <span class="dv">9</span>;</span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> max_bytes <span class="op">=</span> <span class="dv">10</span>;</span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> safe_max_files <span class="op">=</span> <span class="dv">11</span>;</span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> safe_max_lines <span class="op">=</span> <span class="dv">12</span>;</span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> safe_max_bytes <span class="op">=</span> <span class="dv">13</span>;</span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> max_patch_bytes <span class="op">=</span> <span class="dv">14</span>;</span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>  <span class="co">// collect_all_paths returns all file paths even when limits are hit.</span></span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> collect_all_paths <span class="op">=</span> <span class="dv">18</span>;</span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a><span class="kw">message</span> CommitDiffResponse {</span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bytes</span> from_path <span class="op">=</span> <span class="dv">1</span>;</span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bytes</span> to_path <span class="op">=</span> <span class="dv">2</span>;</span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> from_id <span class="op">=</span> <span class="dv">3</span>;</span>
+<span id="cb13-37"><a href="#cb13-37" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> to_id <span class="op">=</span> <span class="dv">4</span>;</span>
+<span id="cb13-38"><a href="#cb13-38" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> old_mode <span class="op">=</span> <span class="dv">5</span>;</span>
+<span id="cb13-39"><a href="#cb13-39" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> new_mode <span class="op">=</span> <span class="dv">6</span>;</span>
+<span id="cb13-40"><a href="#cb13-40" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> binary <span class="op">=</span> <span class="dv">7</span>;</span>
+<span id="cb13-41"><a href="#cb13-41" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bytes</span> raw_patch_data <span class="op">=</span> <span class="dv">9</span>;</span>
+<span id="cb13-42"><a href="#cb13-42" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> end_of_patch <span class="op">=</span> <span class="dv">10</span>;</span>
+<span id="cb13-43"><a href="#cb13-43" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> overflow_marker <span class="op">=</span> <span class="dv">11</span>;</span>
+<span id="cb13-44"><a href="#cb13-44" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> collapsed <span class="op">=</span> <span class="dv">12</span>;</span>
+<span id="cb13-45"><a href="#cb13-45" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> too_large <span class="op">=</span> <span class="dv">13</span>;</span>
+<span id="cb13-46"><a href="#cb13-46" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> lines_added <span class="op">=</span> <span class="dv">14</span>;</span>
+<span id="cb13-47"><a href="#cb13-47" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int32</span> lines_removed <span class="op">=</span> <span class="dv">15</span>;</span>
+<span id="cb13-48"><a href="#cb13-48" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+      <p><strong>Conman usage for conflict detection:</strong></p>
+      <div class="sourceCode" id="cb14"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co">// conman-git/src/conflict.rs</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> GitalyClient <span class="op">{</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Detect files that were modified on both sides since the merge base.</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Returns the list of file paths with overlapping changes.</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> detect_conflicting_files(</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>        <span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        repo<span class="op">:</span> <span class="op">&amp;</span><span class="pp">gitaly::</span>Repository<span class="op">,</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>        integration_head<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>        changeset_head<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    ) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span><span class="dt">Vec</span><span class="op">&lt;</span><span class="dt">String</span><span class="op">&gt;,</span> ConmanError<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Step 1: Get files changed on the integration branch since merge base.</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Use CommitDiff with left=merge_base, right=integration_head.</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Step 2: Get files changed on changeset branch since merge base.</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Use CommitDiff with left=merge_base, right=changeset_head.</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Step 3: Intersect the two file sets.</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Files appearing in both diffs are potential conflicts.</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>        <span class="co">//</span></span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>        <span class="co">// For revalidation, we set collect_all_paths=true and collapse_diffs=true</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>        <span class="co">// because we only need the file paths, not the patch content.</span></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="72-commitservicecommitisancestor----up-to-date-check">7.2
+      <code>CommitService.CommitIsAncestor</code> -- up-to-date
+      check</h3>
+      <p>Used to verify that the changeset branch includes all commits
+      from integration branch HEAD, which is the prerequisite for
+      entering the queue.</p>
+      <p><strong>Service definition</strong> (from
+      <code>proto/commit.proto</code>):</p>
+      <div class="sourceCode" id="cb15"><pre
+      class="sourceCode protobuf"><code class="sourceCode protobuf"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">service</span> CommitService {</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// CommitIsAncestor checks whether a provided commit is the ancestor of</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="co">// another commit.</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">rpc</span> CommitIsAncestor(CommitIsAncestorRequest) <span class="kw">returns</span> (CommitIsAncestorResponse);</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="kw">message</span> CommitIsAncestorRequest {</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// repository is the repository for which we need to check the ancestry.</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>  Repository repository <span class="op">=</span> <span class="dv">1</span>;</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// ancestor_id is the object ID of the commit which needs to be checked as ancestor.</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> ancestor_id <span class="op">=</span> <span class="dv">2</span>;</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">// child_id is the object ID of the commit whose ancestor needs to be confirmed.</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> child_id <span class="op">=</span> <span class="dv">3</span>;</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="kw">message</span> CommitIsAncestorResponse {</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// value denotes whether the provided commit is the ancestor or not.</span></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> value <span class="op">=</span> <span class="dv">1</span>;</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+      <p><strong>Conman usage for up-to-date gate:</strong></p>
+      <div class="sourceCode" id="cb16"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co">// conman-git/src/ancestry.rs</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> GitalyClient <span class="op">{</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Check if integration branch HEAD is an ancestor of the changeset HEAD. If true, the</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// changeset branch is up to date with the integration branch and can be queued.</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> is_up_to_date_with_integration(</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>        <span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>        repo<span class="op">:</span> <span class="op">&amp;</span><span class="pp">gitaly::</span>Repository<span class="op">,</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>        integration_head_sha<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>        changeset_head_sha<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    ) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span><span class="dt">bool</span><span class="op">,</span> ConmanError<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> request <span class="op">=</span> CommitIsAncestorRequest <span class="op">{</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>            repository<span class="op">:</span> <span class="cn">Some</span>(repo<span class="op">.</span>clone())<span class="op">,</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>            ancestor_id<span class="op">:</span> integration_head_sha<span class="op">.</span>to_string()<span class="op">,</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>            child_id<span class="op">:</span> changeset_head_sha<span class="op">.</span>to_string()<span class="op">,</span></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>        <span class="op">};</span></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> response <span class="op">=</span> <span class="kw">self</span></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>commit_service()</span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>commit_is_ancestor(request)</span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span><span class="kw">await</span></span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>map_err(<span class="op">|</span>e<span class="op">|</span> <span class="pp">ConmanError::</span>Git <span class="op">{</span></span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>                message<span class="op">:</span> <span class="pp">format!</span>(<span class="st">&quot;ancestry check failed: {}&quot;</span><span class="op">,</span> e)<span class="op">,</span></span>
+<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span>)<span class="op">?;</span></span>
+<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a>        <span class="cn">Ok</span>(response<span class="op">.</span>into_inner()<span class="op">.</span>value)</span>
+<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb16-28"><a href="#cb16-28" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3
+      id="73-commitservicefindcommit----resolve-integration-branch-head">7.3
+      <code>CommitService.FindCommit</code> -- resolve integration
+      branch HEAD</h3>
+      <p>Used to resolve the current integration branch HEAD SHA after a
+      release publish, so that revalidation jobs know what to compare
+      against.</p>
+      <p><strong>Service definition</strong> (from
+      <code>proto/commit.proto</code>):</p>
+      <div class="sourceCode" id="cb17"><pre
+      class="sourceCode protobuf"><code class="sourceCode protobuf"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">service</span> CommitService {</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="co">// FindCommit finds a commit for a given commitish. Returns nil if the</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="co">// commit is not found.</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">rpc</span> FindCommit(FindCommitRequest) <span class="kw">returns</span> (FindCommitResponse);</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="kw">message</span> FindCommitRequest {</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">// repository is the repository in which we want to find the commit.</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  Repository repository <span class="op">=</span> <span class="dv">1</span>;</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">// revision is a commitish which is to be resolved to a commit.</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bytes</span> revision <span class="op">=</span> <span class="dv">2</span>;</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>  <span class="co">// trailers if set, parses and adds the trailing information of the commit.</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> trailers <span class="op">=</span> <span class="dv">3</span>;</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a><span class="kw">message</span> FindCommitResponse {</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">// commit is the requested commit, it is nil when the commit was not found.</span></span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>  GitCommit commit <span class="op">=</span> <span class="dv">1</span>;</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a><span class="kw">message</span> GitCommit {</span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> id <span class="op">=</span> <span class="dv">1</span>;</span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bytes</span> subject <span class="op">=</span> <span class="dv">2</span>;</span>
+<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bytes</span> body <span class="op">=</span> <span class="dv">3</span>;</span>
+<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>  CommitAuthor author <span class="op">=</span> <span class="dv">4</span>;</span>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>  CommitAuthor committer <span class="op">=</span> <span class="dv">5</span>;</span>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>  <span class="kw">repeated</span> <span class="dt">string</span> parent_ids <span class="op">=</span> <span class="dv">6</span>;</span>
+<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int64</span> body_size <span class="op">=</span> <span class="dv">7</span>;</span>
+<span id="cb17-29"><a href="#cb17-29" aria-hidden="true" tabindex="-1"></a>  SignatureType signature_type <span class="op">=</span> <span class="dv">8</span>;</span>
+<span id="cb17-30"><a href="#cb17-30" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> tree_id <span class="op">=</span> <span class="dv">9</span>;</span>
+<span id="cb17-31"><a href="#cb17-31" aria-hidden="true" tabindex="-1"></a>  <span class="kw">repeated</span> CommitTrailer trailers <span class="op">=</span> <span class="dv">10</span>;</span>
+<span id="cb17-32"><a href="#cb17-32" aria-hidden="true" tabindex="-1"></a>  CommitStatInfo short_stats <span class="op">=</span> <span class="dv">11</span>;</span>
+<span id="cb17-33"><a href="#cb17-33" aria-hidden="true" tabindex="-1"></a>  <span class="kw">repeated</span> <span class="dt">bytes</span> referenced_by <span class="op">=</span> <span class="dv">12</span>;</span>
+<span id="cb17-34"><a href="#cb17-34" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> encoding <span class="op">=</span> <span class="dv">13</span>;</span>
+<span id="cb17-35"><a href="#cb17-35" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+      <p><strong>Conman usage for resolving integration branch
+      HEAD:</strong></p>
+      <div class="sourceCode" id="cb18"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co">// conman-git/src/refs.rs</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> GitalyClient <span class="op">{</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Resolve the current HEAD commit of the integration branch. Returns the full</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// GitCommit so callers can use the SHA and metadata.</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> resolve_integration_head(</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>        <span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>        repo<span class="op">:</span> <span class="op">&amp;</span><span class="pp">gitaly::</span>Repository<span class="op">,</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>    ) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span><span class="dt">String</span><span class="op">,</span> ConmanError<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> request <span class="op">=</span> FindCommitRequest <span class="op">{</span></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>            repository<span class="op">:</span> <span class="cn">Some</span>(repo<span class="op">.</span>clone())<span class="op">,</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>            revision<span class="op">:</span> <span class="st">b&quot;refs/heads/&lt;integration_branch&gt;&quot;</span><span class="op">.</span>to_vec()<span class="op">,</span></span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>            trailers<span class="op">:</span> <span class="cn">false</span><span class="op">,</span></span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>        <span class="op">};</span></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> response <span class="op">=</span> <span class="kw">self</span></span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>commit_service()</span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>find_commit(request)</span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span><span class="kw">await</span></span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>map_err(<span class="op">|</span>e<span class="op">|</span> <span class="pp">ConmanError::</span>Git <span class="op">{</span></span>
+<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>                message<span class="op">:</span> <span class="pp">format!</span>(<span class="st">&quot;failed to resolve integration branch HEAD: {}&quot;</span><span class="op">,</span> e)<span class="op">,</span></span>
+<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span>)<span class="op">?;</span></span>
+<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> commit <span class="op">=</span> response<span class="op">.</span>into_inner()<span class="op">.</span>commit<span class="op">.</span>ok_or_else(<span class="op">||</span> <span class="op">{</span></span>
+<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a>            <span class="pp">ConmanError::</span>Git <span class="op">{</span></span>
+<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a>                message<span class="op">:</span> <span class="st">&quot;integration branch HEAD not found&quot;</span><span class="op">.</span>to_string()<span class="op">,</span></span>
+<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span></span>
+<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span>)<span class="op">?;</span></span>
+<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>        <span class="cn">Ok</span>(commit<span class="op">.</span>id)</span>
+<span id="cb18-31"><a href="#cb18-31" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb18-32"><a href="#cb18-32" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <p><strong>Shared proto type <code>Repository</code></strong>
+      (from <code>proto/shared.proto</code>):</p>
+      <div class="sourceCode" id="cb19"><pre
+      class="sourceCode protobuf"><code class="sourceCode protobuf"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="kw">message</span> Repository {</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> storage_name <span class="op">=</span> <span class="dv">2</span>;</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> relative_path <span class="op">=</span> <span class="dv">3</span>;</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> git_object_directory <span class="op">=</span> <span class="dv">4</span>;</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">repeated</span> <span class="dt">string</span> git_alternate_object_directories <span class="op">=</span> <span class="dv">5</span>;</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> gl_repository <span class="op">=</span> <span class="dv">6</span>;</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> gl_project_path <span class="op">=</span> <span class="dv">8</span>;</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+      <h2 id="8-implementation-checklist">8. Implementation
+      Checklist</h2>
+      <h3 id="e07-01-queue-transition-approved---queued">E07-01: Queue
+      transition (Approved -&gt; Queued)</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Add
+      <code>queue_position: Option&lt;i64&gt;</code> and
+      <code>queued_at: Option&lt;DateTime&lt;Utc&gt;&gt;</code> fields
+      to <code>Changeset</code> struct in
+      <code>conman-core</code>.</label></li>
+      <li><label><input type="checkbox" />Add <code>Queued</code>,
+      <code>Conflicted</code>, <code>NeedsRevalidation</code> variants
+      to <code>ChangesetState</code> enum.</label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>validate_transition</code> for all E07 state
+      transitions.</label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>is_up_to_date_with_integration</code> in
+      <code>conman-git</code> using
+      <code>CommitIsAncestor</code>.</label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>resolve_integration_head</code> in <code>conman-git</code>
+      using <code>FindCommit</code>.</label></li>
+      <li><label><input type="checkbox" />Add queue-position assignment
+      logic in <code>conman-db</code> (atomic
+      find-max-and-increment).</label></li>
+      <li><label><input type="checkbox" />Create handler
+      <code>POST /api/repos/:repoId/changesets/:changesetId/queue</code>
+      in <code>conman-api</code>.</label></li>
+      <li><label><input type="checkbox" />Emit
+      <code>changeset_queued</code> audit event.</label></li>
+      <li><label><input type="checkbox" />Add queue index to
+      <code>ChangesetRepo::ensure_indexes()</code>.</label></li>
+      </ul>
+      <h3 id="e07-02-queue-listing-and-reorder">E07-02: Queue listing
+      and reorder</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Create <code>QueueEntry</code>
+      DTO in <code>conman-api</code>.</label></li>
+      <li><label><input type="checkbox" />Create
+      <code>ReorderRequest</code> DTO in
+      <code>conman-api</code>.</label></li>
+      <li><label><input type="checkbox" />Implement handler
+      <code>GET /api/repos/:repoId/queue</code> with
+      pagination.</label></li>
+      <li><label><input type="checkbox" />Implement handler
+      <code>POST /api/repos/:repoId/queue/reorder</code> with RBAC
+      (config_manager+).</label></li>
+      <li><label><input type="checkbox" />Validate reorder request:
+      exact permutation of current queue.</label></li>
+      <li><label><input type="checkbox" />Atomic bulk position update
+      via MongoDB <code>bulkWrite</code>.</label></li>
+      <li><label><input type="checkbox" />Emit
+      <code>queue_reordered</code> audit event with before/after
+      position maps.</label></li>
+      </ul>
+      <h3 id="e07-03-revalidation-trigger">E07-03: Revalidation
+      trigger</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Create
+      <code>RevalidationResult</code> enum in
+      <code>conman-core</code>.</label></li>
+      <li><label><input type="checkbox" />Add revalidation trigger hook
+      to release publish flow (called by E08).</label></li>
+      <li><label><input type="checkbox" />Implement function to enqueue
+      <code>revalidate_queued_changeset</code> jobs for all remaining
+      queued changesets after a release.</label></li>
+      <li><label><input type="checkbox" />Jobs enqueued in
+      queue-position order.</label></li>
+      </ul>
+      <h3 id="e07-04-revalidation-job-logic">E07-04: Revalidation job
+      logic</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Implement
+      <code>detect_conflicting_files</code> in <code>conman-git</code>
+      using <code>DiffService.CommitDiff</code>.</label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>revalidate_queued_changeset</code> job worker in
+      <code>conman-jobs</code>.</label></li>
+      <li><label><input type="checkbox" />Step 1: conflict detection via
+      diff + trial merge.</label></li>
+      <li><label><input type="checkbox" />Step 2: ancestry check via
+      <code>CommitIsAncestor</code>.</label></li>
+      <li><label><input type="checkbox" />Step 3: msuite revalidation
+      (reuse <code>msuite_merge</code> worker).</label></li>
+      <li><label><input type="checkbox" />On conflict: transition to
+      <code>Conflicted</code>, record file paths.</label></li>
+      <li><label><input type="checkbox" />On test failure: transition to
+      <code>NeedsRevalidation</code>, record job ID.</label></li>
+      <li><label><input type="checkbox" />On pass: remain
+      <code>Queued</code>, update
+      <code>last_revalidation_status</code>.</label></li>
+      <li><label><input type="checkbox" />Emit appropriate notifications
+      for each outcome.</label></li>
+      </ul>
+      <h3 id="e07-05-move-to-draft">E07-05: Move-to-draft</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Implement handler
+      <code>POST /api/repos/:repoId/changesets/:changesetId/move-to-draft</code>.</label></li>
+      <li><label><input type="checkbox" />RBAC: author can move own;
+      config_manager/admin can move any.</label></li>
+      <li><label><input type="checkbox" />Clear queue metadata
+      (<code>queue_position</code>,
+      <code>queued_at</code>).</label></li>
+      <li><label><input type="checkbox" />Clear revalidation
+      metadata.</label></li>
+      <li><label><input type="checkbox" />Transition state to
+      <code>Draft</code>.</label></li>
+      <li><label><input type="checkbox" />Emit
+      <code>changeset_moved_to_draft</code> audit event.</label></li>
+      </ul>
+      <h2 id="9-test-cases">9. Test Cases</h2>
+      <h3 id="91-state-machine-unit-conman-core">9.1 State machine
+      (unit, <code>conman-core</code>)</h3>
+      <ul>
+      <li><strong>Approved -&gt; Queued</strong> succeeds.</li>
+      <li><strong>Draft -&gt; Queued</strong> fails with
+      <code>InvalidTransition</code>.</li>
+      <li><strong>Submitted -&gt; Queued</strong> fails with
+      <code>InvalidTransition</code>.</li>
+      <li><strong>Queued -&gt; Conflicted</strong> succeeds.</li>
+      <li><strong>Queued -&gt; NeedsRevalidation</strong> succeeds.</li>
+      <li><strong>Queued -&gt; Released</strong> succeeds.</li>
+      <li><strong>Conflicted -&gt; Draft</strong> succeeds.</li>
+      <li><strong>NeedsRevalidation -&gt; Draft</strong> succeeds.</li>
+      <li><strong>Conflicted -&gt; Queued</strong> fails with
+      <code>InvalidTransition</code> (must go through Draft -&gt;
+      Submitted -&gt; ... -&gt; Approved -&gt; Queued).</li>
+      <li><strong>NeedsRevalidation -&gt; Queued</strong> fails with
+      <code>InvalidTransition</code>.</li>
+      </ul>
+      <h3 id="92-queue-position-assignment-unit-conman-db">9.2 Queue
+      position assignment (unit, <code>conman-db</code>)</h3>
+      <ul>
+      <li>First changeset queued in an empty app gets
+      <code>queue_position = 1</code>.</li>
+      <li>Second changeset gets <code>queue_position = 2</code>
+      (monotonic).</li>
+      <li>After removing a changeset from the queue, the next queued
+      changeset still gets <code>max + 1</code> (gaps are fine).</li>
+      </ul>
+      <h3 id="93-up-to-date-gate-integration-conman-git">9.3 Up-to-date
+      gate (integration, <code>conman-git</code>)</h3>
+      <ul>
+      <li>Changeset branch that includes integration branch HEAD passes
+      the ancestry check.</li>
+      <li>Changeset branch that is behind integration branch HEAD fails
+      the ancestry check.</li>
+      <li>Queue endpoint returns <code>409</code> when branch is not up
+      to date.</li>
+      </ul>
+      <h3 id="94-reorder-integration-conman-api">9.4 Reorder
+      (integration, <code>conman-api</code>)</h3>
+      <ul>
+      <li>Valid permutation reorder succeeds and positions are updated
+      atomically.</li>
+      <li>Reorder with missing changeset ID returns
+      <code>400</code>.</li>
+      <li>Reorder with extra changeset ID returns <code>400</code>.</li>
+      <li>Reorder with duplicate changeset ID returns
+      <code>400</code>.</li>
+      <li>Reorder by user with <code>user</code> role returns
+      <code>403</code>.</li>
+      <li>Reorder by user with <code>reviewer</code> role returns
+      <code>403</code>.</li>
+      <li>Reorder by user with <code>config_manager</code> role
+      succeeds.</li>
+      <li>Reorder emits audit event with correct before/after maps.</li>
+      </ul>
+      <h3 id="95-revalidation-integration-conman-jobs">9.5 Revalidation
+      (integration, <code>conman-jobs</code>)</h3>
+      <ul>
+      <li>After release publish, revalidation jobs are enqueued for all
+      remaining queued changesets.</li>
+      <li>Changeset with no conflicts and passing msuite remains
+      <code>Queued</code> with
+      <code>last_revalidation_status = "valid"</code>.</li>
+      <li>Changeset with file conflicts transitions to
+      <code>Conflicted</code> with conflicting file paths recorded.</li>
+      <li>Changeset with no conflicts but failing msuite transitions to
+      <code>NeedsRevalidation</code> with job ID recorded.</li>
+      <li>Revalidation processes changesets in queue-position
+      order.</li>
+      </ul>
+      <h3 id="96-move-to-draft-integration-conman-api">9.6 Move-to-draft
+      (integration, <code>conman-api</code>)</h3>
+      <ul>
+      <li>Author can move their own <code>Conflicted</code> changeset to
+      <code>Draft</code>.</li>
+      <li>Author can move their own <code>NeedsRevalidation</code>
+      changeset to <code>Draft</code>.</li>
+      <li>Author cannot move another user's conflicted changeset
+      (returns <code>403</code>).</li>
+      <li>config_manager can move any user's conflicted changeset to
+      <code>Draft</code>.</li>
+      <li>admin can move any user's needs_revalidation changeset to
+      <code>Draft</code>.</li>
+      <li>Move-to-draft clears <code>queue_position</code>,
+      <code>queued_at</code>, <code>last_revalidation_status</code>, and
+      <code>last_revalidation_job_id</code>.</li>
+      <li>Attempting move-to-draft on a <code>Queued</code> changeset
+      returns <code>409</code>.</li>
+      <li>Attempting move-to-draft on a <code>Draft</code> changeset
+      returns <code>409</code>.</li>
+      </ul>
+      <h3 id="97-end-to-end-flow-integration">9.7 End-to-end flow
+      (integration)</h3>
+      <ul>
+      <li>Full cycle: create changeset -&gt; submit -&gt; approve -&gt;
+      queue -&gt; release publish -&gt; revalidation passes for
+      remaining queued changeset -&gt; changeset stays queued.</li>
+      <li>Full cycle with conflict: create two changesets modifying the
+      same file -&gt; approve both -&gt; queue both -&gt; release first
+      -&gt; revalidation detects conflict on second -&gt; second
+      transitions to Conflicted -&gt; move to draft -&gt; fix and
+      re-submit.</li>
+      </ul>
+      <h2 id="10-acceptance-criteria">10. Acceptance Criteria</h2>
+      <ol type="1">
+      <li><p><strong>Queue entry:</strong> Approved changesets can
+      transition to Queued only when their branch is up to date with the
+      integration branch. Queue position is assigned
+      monotonically.</p></li>
+      <li><p><strong>Queue ordering:</strong> The
+      <code>GET /api/repos/:repoId/queue</code> endpoint returns
+      changesets sorted by <code>queue_position</code> in ascending
+      order.</p></li>
+      <li><p><strong>Reorder:</strong> Config managers and app admins
+      can reorder the queue. The reorder operation is atomic and
+      audited. Non-privileged users cannot reorder.</p></li>
+      <li><p><strong>Non-selected persistence:</strong> Queued
+      changesets not included in a release remain in the
+      <code>Queued</code> state with their positions preserved.</p></li>
+      <li><p><strong>Revalidation trigger:</strong> After every release
+      publish, revalidation jobs are enqueued for all remaining queued
+      changesets in the app.</p></li>
+      <li><p><strong>Conflict detection:</strong> Revalidation correctly
+      identifies changesets whose branches conflict with the updated
+      integration branch and transitions them to
+      <code>Conflicted</code>.</p></li>
+      <li><p><strong>msuite revalidation:</strong> Changesets that merge
+      cleanly but fail msuite tests transition to
+      <code>NeedsRevalidation</code>.</p></li>
+      <li><p><strong>Clean revalidation:</strong> Changesets that pass
+      both conflict detection and msuite revalidation remain in
+      <code>Queued</code> with updated status.</p></li>
+      <li><p><strong>Move-to-draft:</strong> Authors can return their
+      own conflicted or needs_revalidation changesets to draft. Config
+      managers and app admins can return any such changeset to
+      draft.</p></li>
+      <li><p><strong>Audit trail:</strong> All queue mutations (queue
+      entry, reorder, revalidation outcomes, move-to-draft) are captured
+      in the audit log with actor, timestamp, and before/after
+      state.</p></li>
+      <li><p><strong>Override-key conflict handling:</strong> If two
+      queued changesets override the same env var key for the same
+      target runtime profile, the later changeset transitions to
+      <code>Conflicted</code>. If both overrides resolve to the same
+      typed value, no conflict is raised.</p></li>
+      </ol>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multi-Agent Execution Plan — Conman Docs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#conman-v1-multi-agent-execution-plan"
+      id="toc-conman-v1-multi-agent-execution-plan">Conman V1
+      Multi-Agent Execution Plan</a>
+      <ul>
+      <li><a href="#1-objective" id="toc-1-objective">1)
+      Objective</a></li>
+      <li><a href="#2-agent-roles" id="toc-2-agent-roles">2) Agent
+      Roles</a></li>
+      <li><a href="#3-epic-ownership" id="toc-3-epic-ownership">3) Epic
+      Ownership</a></li>
+      <li><a href="#4-wave-plan" id="toc-4-wave-plan">4) Wave
+      Plan</a></li>
+      <li><a href="#wave-a-m1-foundation"
+      id="toc-wave-a-m1-foundation">Wave A (M1 foundation)</a></li>
+      <li><a href="#wave-b-m1-completion"
+      id="toc-wave-b-m1-completion">Wave B (M1 completion)</a></li>
+      <li><a href="#wave-c-m2" id="toc-wave-c-m2">Wave C (M2)</a></li>
+      <li><a href="#wave-d-m3" id="toc-wave-d-m3">Wave D (M3)</a></li>
+      <li><a href="#wave-e-m4" id="toc-wave-e-m4">Wave E (M4)</a></li>
+      <li><a href="#5-coordination-rules"
+      id="toc-5-coordination-rules">5) Coordination Rules</a></li>
+      <li><a href="#6-per-wave-validation-checklist"
+      id="toc-6-per-wave-validation-checklist">6) Per-Wave Validation
+      Checklist</a></li>
+      <li><a href="#7-milestone-mapping" id="toc-7-milestone-mapping">7)
+      Milestone Mapping</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">Multi-Agent Execution Plan</h1>
+      </header>
+      <h1 id="conman-v1-multi-agent-execution-plan">Conman V1
+      Multi-Agent Execution Plan</h1>
+      <p>Source: <a href="./IMPLEMENTATION.html">IMPLEMENTATION.md</a>
+      (<code>Epic Index</code>, <code>Critical path</code>,
+      <code>Milestone mapping</code>)</p>
+      <h2 id="1-objective">1) Objective</h2>
+      <p>Execute Conman v1 with parallel sub-agents while preserving
+      dependency order on the critical path:</p>
+      <p><code>E00 -&gt; E01 -&gt; E03 -&gt; E04 -&gt; E05 -&gt; E06 -&gt; E07 -&gt; E08 -&gt; E09</code></p>
+      <p>Parallelizable after E06:</p>
+      <ul>
+      <li>E08 can proceed with E10</li>
+      <li>E11 can run alongside E09/E10</li>
+      </ul>
+      <h2 id="2-agent-roles">2) Agent Roles</h2>
+      <ol type="1">
+      <li><strong>Orchestrator (primary)</strong>: dependency control,
+      integration decisions, cross-epic contract ownership, merge
+      sequencing.</li>
+      <li><strong>Explorer agents</strong>: fast, targeted reading of
+      epic specs and current code before each wave starts.</li>
+      <li><strong>Worker agents</strong>: implementation owners per
+      epic/file surface.</li>
+      <li><strong>Awaiter agent</strong>: all long-running
+      builds/tests/integration checks.</li>
+      </ol>
+      <h2 id="3-epic-ownership">3) Epic Ownership</h2>
+      <ol type="1">
+      <li><code>worker-platform</code>: E00 Platform Foundation</li>
+      <li><code>worker-git</code>: E01 Git Adapter</li>
+      <li><code>worker-auth</code>: E02 Auth &amp; RBAC</li>
+      <li><code>worker-app</code>: E03 Team/Repo Setup (teams/repos/apps
+      + settings/env/runtime profiles)</li>
+      <li><code>worker-workspace</code>: E04 Workspaces</li>
+      <li><code>worker-changeset</code>: E05 Changesets</li>
+      <li><code>worker-jobs</code>: E06 Async Jobs + gates</li>
+      <li><code>worker-queue-release</code>: E07 Queue + E08
+      Releases</li>
+      <li><code>worker-deploy</code>: E09 Deployments</li>
+      <li><code>worker-tempenv</code>: E10 Temp Environments</li>
+      <li><code>worker-observability</code>: E11
+      Notifications/Audit</li>
+      </ol>
+      <h2 id="4-wave-plan">4) Wave Plan</h2>
+      <h2 id="wave-a-m1-foundation">Wave A (M1 foundation)</h2>
+      <ul>
+      <li>Implement: E00</li>
+      <li>Parallel after E00: E01 + E02</li>
+      <li>Then: E03</li>
+      </ul>
+      <p>Gate A exit:</p>
+      <ul>
+      <li>Service boots with shared conventions (error envelope,
+      pagination, request-id UUIDv7).</li>
+      <li>Git adapter boundary in place.</li>
+      <li>Auth/RBAC active.</li>
+      <li>Team/repo/surface + environment/runtime-profile baseline APIs
+      available.</li>
+      </ul>
+      <h2 id="wave-b-m1-completion">Wave B (M1 completion)</h2>
+      <ul>
+      <li>Implement: E04 -&gt; E05 -&gt; E06</li>
+      </ul>
+      <p>Gate B exit:</p>
+      <ul>
+      <li>End-to-end authoring and review works.</li>
+      <li>Async jobs execute and enforce submit/release/deploy
+      gates.</li>
+      </ul>
+      <h2 id="wave-c-m2">Wave C (M2)</h2>
+      <ul>
+      <li>Implement: E07 -&gt; E08</li>
+      </ul>
+      <p>Gate C exit:</p>
+      <ul>
+      <li>Queue-first flow operational.</li>
+      <li>Config manager can assemble/publish subset-based
+      releases.</li>
+      </ul>
+      <h2 id="wave-d-m3">Wave D (M3)</h2>
+      <ul>
+      <li>Implement in parallel where valid:
+      <ul>
+      <li>E10 after E06</li>
+      <li>E09 after E08 (and E03/E06 prerequisites)</li>
+      </ul></li>
+      </ul>
+      <p>Gate D exit:</p>
+      <ul>
+      <li>Deploy/promote/rollback paths complete.</li>
+      <li>Temp environments provision/expire/cleanup with TTL+grace
+      behavior.</li>
+      </ul>
+      <h2 id="wave-e-m4">Wave E (M4)</h2>
+      <ul>
+      <li>Implement: E11</li>
+      </ul>
+      <p>Gate E exit:</p>
+      <ul>
+      <li>Notification and audit coverage complete.</li>
+      <li>Event fanout and user preference behavior validated.</li>
+      </ul>
+      <h2 id="5-coordination-rules">5) Coordination Rules</h2>
+      <ol type="1">
+      <li>Freeze shared contracts at each gate:
+      <ul>
+      <li><code>conman-core</code> domain/state machine contracts</li>
+      <li>repository traits</li>
+      <li>API response/error envelope</li>
+      </ul></li>
+      <li>Keep single-owner file surfaces per epic to minimize merge
+      conflicts.</li>
+      <li>Integrate by wave checkpoints, not only at milestone end.</li>
+      <li>Run long integration checks via awaiter agent at each
+      gate.</li>
+      <li>Track and resolve cross-epic blockers immediately (especially
+      E03/E06/E08 boundaries).</li>
+      </ol>
+      <h2 id="6-per-wave-validation-checklist">6) Per-Wave Validation
+      Checklist</h2>
+      <ol type="1">
+      <li>Compile/build green.</li>
+      <li>Contract tests for shared APIs/domain transitions green.</li>
+      <li>Role enforcement tests green.</li>
+      <li>Async job state machine and retry/timeout behavior
+      validated.</li>
+      <li>Audit events emitted for all required mutations in the
+      wave.</li>
+      <li>Documentation updated for any contract/state changes.</li>
+      </ol>
+      <h2 id="7-milestone-mapping">7) Milestone Mapping</h2>
+      <ol type="1">
+      <li><strong>M1: Authoring + Review</strong>: E00-E06</li>
+      <li><strong>M2: Queue + Release</strong>: E07-E08</li>
+      <li><strong>M3: Environments + Recovery</strong>: E09-E10</li>
+      <li><strong>M4: Notifications + Audit</strong>: E11</li>
+      </ol>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Team, Repo, and App Model — Conman Docs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#team-repo-and-app-model"
+      id="toc-team-repo-and-app-model">Team, Repo, and App Model</a>
+      <ul>
+      <li><a href="#1-why-this-change" id="toc-1-why-this-change">1) Why
+      this change</a></li>
+      <li><a href="#2-new-domain-model" id="toc-2-new-domain-model">2)
+      New domain model</a></li>
+      <li><a href="#3-scope-boundaries-important"
+      id="toc-3-scope-boundaries-important">3) Scope boundaries
+      (important)</a></li>
+      <li><a href="#4-runtime-profile-impact"
+      id="toc-4-runtime-profile-impact">4) Runtime profile
+      impact</a></li>
+      <li><a href="#5-api-and-naming-changes"
+      id="toc-5-api-and-naming-changes">5) API and naming
+      changes</a></li>
+      <li><a href="#6-data-model-changes-minimum"
+      id="toc-6-data-model-changes-minimum">6) Data model changes
+      (minimum)</a></li>
+      <li><a href="#7-releasedeploy-semantics"
+      id="toc-7-releasedeploy-semantics">7) Release/deploy
+      semantics</a></li>
+      <li><a href="#8-implementation-phases"
+      id="toc-8-implementation-phases">8) Implementation phases</a></li>
+      <li><a href="#9-decisions-captured"
+      id="toc-9-decisions-captured">9) Decisions captured</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">Team, Repo, and App Model</h1>
+      </header>
+      <h1 id="team-repo-and-app-model">Team, Repo, and App Model</h1>
+      <h2 id="1-why-this-change">1) Why this change</h2>
+      <p>Conman currently models one "App" as one Git repository.</p>
+      <p>That assumption breaks for real config repos like
+      <code>hepquant-config</code>, where one team has multiple
+      user-facing apps in the same repo, each with its own URL/domain
+      and access model.</p>
+      <p>Examples observed in current config repos:</p>
+      <ul>
+      <li>Team is top-level (<code>config/team.yml</code>).</li>
+      <li>Multiple apps are nested under team <code>app</code>.</li>
+      <li>Config files target surfaces using
+      <code>allowedApps</code>.</li>
+      <li>Environment settings include multiple base URLs for different
+      surfaces.</li>
+      </ul>
+      <h2 id="2-new-domain-model">2) New domain model</h2>
+      <p>Use three layers:</p>
+      <ul>
+      <li><strong>Team</strong>: customer/account boundary.</li>
+      <li><strong>Config Repository</strong>: Git boundary (workspace,
+      changeset, release, tag).</li>
+      <li><strong>App</strong>: user-facing app within a repo (domain,
+      branding, roles).</li>
+      </ul>
+      <p>Cardinality:</p>
+      <ul>
+      <li>Team <code>1..N</code> Config Repositories</li>
+      <li>Config Repository <code>1..N</code> Apps</li>
+      <li>App belongs to exactly one Config Repository</li>
+      </ul>
+      <h2 id="3-scope-boundaries-important">3) Scope boundaries
+      (important)</h2>
+      <p>Repo-scoped concerns stay repo-scoped:</p>
+      <ul>
+      <li>workspaces</li>
+      <li>changesets</li>
+      <li>queue/release assembly</li>
+      <li>integration branch + tags</li>
+      <li>git history and conflict handling</li>
+      </ul>
+      <p>App-scoped concerns move to app level:</p>
+      <ul>
+      <li>domains / URLs</li>
+      <li>branding metadata</li>
+      <li>role visibility where needed</li>
+      <li>"impacted surfaces" metadata for review/release
+      visibility</li>
+      </ul>
+      <p>This preserves atomic Git/release behavior while supporting
+      multi-app repos.</p>
+      <h2 id="4-runtime-profile-impact">4) Runtime profile impact</h2>
+      <p>Current runtime profile design assumes a single URL. We need
+      multi-surface routing in each profile.</p>
+      <p>Add per-profile surface routing config, for example:</p>
+      <ul>
+      <li><code>app_endpoints</code>: map of
+      <code>app_key -&gt; base_url</code></li>
+      </ul>
+      <p>Keep existing precedence model:</p>
+      <ul>
+      <li><code>app defaults &lt; environment profile &lt; temp overrides</code></li>
+      </ul>
+      <p>Apply precedence per app endpoint and per variable/secret.</p>
+      <h2 id="5-api-and-naming-changes">5) API and naming changes</h2>
+      <p>Current Conman "App" is effectively a repo object
+      (<code>repo_path</code>, <code>integration_branch</code>). To
+      reduce confusion:</p>
+      <ul>
+      <li>Domain rename in docs/spec: <strong>App -&gt; Config
+      Repository</strong>.</li>
+      <li>Introduce <strong>Team</strong> and <strong>App</strong>
+      resources.</li>
+      </ul>
+      <p>Canonical API shape:</p>
+      <ul>
+      <li><code>POST /api/teams</code></li>
+      <li><code>GET /api/teams/:teamId</code></li>
+      <li><code>POST /api/teams/:teamId/repos</code></li>
+      <li><code>GET /api/repos/:repoId</code></li>
+      <li><code>POST /api/repos/:repoId/apps</code></li>
+      <li><code>GET /api/repos/:repoId/apps</code></li>
+      </ul>
+      <p>API strategy for v1 implementation:</p>
+      <ul>
+      <li><code>/api/repos</code> is the repository surface.</li>
+      <li>Nested apps are managed through
+      <code>/api/repos/:repoId/apps</code>.</li>
+      </ul>
+      <h2 id="6-data-model-changes-minimum">6) Data model changes
+      (minimum)</h2>
+      <p>Add <code>teams</code> collection:</p>
+      <ul>
+      <li><code>id</code>, <code>name</code>, <code>slug</code>,
+      <code>created_at</code>, <code>updated_at</code></li>
+      </ul>
+      <p>Update app/repo document (currently <code>apps</code>):</p>
+      <ul>
+      <li>add <code>team_id</code></li>
+      <li>keep <code>repo_path</code>, <code>integration_branch</code>,
+      baseline settings</li>
+      </ul>
+      <p>Add <code>app_surfaces</code> collection:</p>
+      <ul>
+      <li><code>id</code>, <code>repo_id</code>, <code>key</code>,
+      <code>title</code></li>
+      <li><code>domains[]</code></li>
+      <li><code>branding</code> (optional)</li>
+      <li><code>roles[]</code> (optional surface-scoped role hints)</li>
+      <li><code>created_at</code>, <code>updated_at</code></li>
+      </ul>
+      <p>Update environments/runtime profiles:</p>
+      <ul>
+      <li>environment remains repo-scoped</li>
+      <li>runtime profile adds <code>app_endpoints</code></li>
+      </ul>
+      <h2 id="7-releasedeploy-semantics">7) Release/deploy
+      semantics</h2>
+      <p>No change to queue-first release model:</p>
+      <ul>
+      <li>releases are still repo artifacts</li>
+      <li>deployment remains per environment</li>
+      <li>a deployment updates all included surface config in that repo
+      commit</li>
+      </ul>
+      <p>Add visibility metadata:</p>
+      <ul>
+      <li>changeset/release should expose impacted surfaces (derived
+      from changed paths and/or config semantics)</li>
+      </ul>
+      <h2 id="8-implementation-phases">8) Implementation phases</h2>
+      <p>Phase 1:</p>
+      <ul>
+      <li>add <code>team_id</code> to repository docs</li>
+      <li>add <code>team_memberships</code> and
+      <code>app_surfaces</code></li>
+      <li>expose team and surface APIs</li>
+      </ul>
+      <p>Phase 2:</p>
+      <ul>
+      <li>add surface-aware runtime profile endpoints</li>
+      <li>add impacted-surface summaries to changeset/release APIs</li>
+      </ul>
+      <h2 id="9-decisions-captured">9) Decisions captured</h2>
+      <ul>
+      <li>Add top-level <strong>Team</strong> concept.</li>
+      <li>Keep one repo as the Git/release unit.</li>
+      <li>Support multiple user-facing apps inside one repo.</li>
+      <li>Do <strong>not</strong> split releases/workspaces by surface
+      in v1.</li>
+      <li>Keep one configurable integration branch per repo (no
+      per-environment Git branches).</li>
+      </ul>
+      <p>Implementation plan: <a
+      href="./team-repo-app-implementation-plan.html"><code>docs/team-repo-app-implementation-plan.md</code></a></p>
+    </main>
+  </div>
+</body>
+</html>

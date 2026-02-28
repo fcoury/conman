@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Conman Entity Relationship Diagram — Conman Docs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#conman-entity-relationship-diagram"
+      id="toc-conman-entity-relationship-diagram">Conman Entity
+      Relationship Diagram</a>
+      <ul>
+      <li><a href="#naming-note" id="toc-naming-note">Naming
+      note</a></li>
+      <li><a href="#primary-er-diagram"
+      id="toc-primary-er-diagram">Primary ER diagram</a></li>
+      <li><a href="#key-relationship-fields"
+      id="toc-key-relationship-fields">Key relationship fields</a></li>
+      <li><a href="#runtime-constraints-worth-remembering"
+      id="toc-runtime-constraints-worth-remembering">Runtime constraints
+      worth remembering</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">Conman Entity Relationship Diagram</h1>
+      </header>
+      <h1 id="conman-entity-relationship-diagram">Conman Entity
+      Relationship Diagram</h1>
+      <p>This document captures the entities currently implemented and
+      how they relate.</p>
+      <h2 id="naming-note">Naming note</h2>
+      <ul>
+      <li><code>Repo</code> is the managed configuration repository
+      (<code>/api/repos</code>).</li>
+      <li><code>App</code> is a user-facing application under a
+      repository (<code>/api/repos/:repoId/apps</code>).</li>
+      </ul>
+      <h2 id="primary-er-diagram">Primary ER diagram</h2>
+      <pre class="mermaid"><code>erDiagram
+    TEAM ||--o{ REPO : owns
+    USER ||--o{ TEAM_MEMBERSHIP : belongs_to
+    TEAM ||--o{ TEAM_MEMBERSHIP : has_members
+    TEAM ||--o{ INVITE : issues
+    USER ||--o{ PASSWORD_RESET_TOKEN : resets
+
+    REPO ||--o{ REPO_MEMBERSHIP : grants_roles
+    USER ||--o{ REPO_MEMBERSHIP : assigned
+    REPO ||--o{ APP : exposes
+
+    REPO ||--o{ ENVIRONMENT : defines
+    REPO ||--o{ RUNTIME_PROFILE : defines
+    ENVIRONMENT }o--|| RUNTIME_PROFILE : runtime_profile_id
+    RUNTIME_PROFILE }o--|| RUNTIME_PROFILE : base_profile_id
+
+    REPO ||--o{ WORKSPACE : has
+    USER ||--o{ WORKSPACE : owns
+
+    REPO ||--o{ CHANGESET : scopes
+    WORKSPACE ||--o{ CHANGESET : source
+    USER ||--o{ CHANGESET : authors
+    CHANGESET ||--o{ CHANGESET_COMMENT : has
+    USER ||--o{ CHANGESET_COMMENT : writes
+
+    CHANGESET ||--o{ CHANGESET_PROFILE_OVERRIDE : overrides
+    RUNTIME_PROFILE ||--o{ CHANGESET_PROFILE_OVERRIDE : targets
+
+    REPO ||--o{ RELEASE_BATCH : creates
+    RELEASE_BATCH }o--o{ CHANGESET : includes_ordered
+
+    RELEASE_BATCH ||--o{ DEPLOYMENT : deploys
+    ENVIRONMENT ||--o{ DEPLOYMENT : target
+    USER ||--o{ DEPLOYMENT : created_by
+
+    REPO ||--o{ TEMP_ENVIRONMENT : provisions
+    USER ||--o{ TEMP_ENVIRONMENT : owns
+    RUNTIME_PROFILE ||--o{ TEMP_ENVIRONMENT : runtime_profile
+    WORKSPACE ||--o{ TEMP_ENVIRONMENT : source_workspace
+    CHANGESET ||--o{ TEMP_ENVIRONMENT : source_changeset
+
+    REPO ||--o{ JOB : runs
+    JOB ||--o{ JOB_LOG_LINE : emits
+
+    USER ||--|| NOTIFICATION_PREFERENCE : has
+    USER ||--o{ NOTIFICATION_EVENT : receives
+    REPO ||--o{ NOTIFICATION_EVENT : optional_scope
+
+    USER ||--o{ AUDIT_EVENT : actor_optional
+    REPO ||--o{ AUDIT_EVENT : optional_scope</code></pre>
+      <h2 id="key-relationship-fields">Key relationship fields</h2>
+      <ul>
+      <li><code>Repo.team_id -&gt; Team.id</code></li>
+      <li><code>App.repo_id -&gt; Repo.id</code></li>
+      <li><code>TeamMembership.user_id -&gt; User.id</code></li>
+      <li><code>TeamMembership.team_id -&gt; Team.id</code></li>
+      <li><code>RepoMembership.user_id -&gt; User.id</code></li>
+      <li><code>RepoMembership.repo_id -&gt; Repo.id</code></li>
+      <li><code>Invite.team_id -&gt; Team.id</code></li>
+      <li><code>Workspace.repo_id -&gt; Repo.id</code></li>
+      <li><code>Workspace.owner_user_id -&gt; User.id</code></li>
+      <li><code>Changeset.repo_id -&gt; Repo.id</code></li>
+      <li><code>Changeset.workspace_id -&gt; Workspace.id</code></li>
+      <li><code>Changeset.author_user_id -&gt; User.id</code></li>
+      <li><code>ChangesetComment.changeset_id -&gt; Changeset.id</code></li>
+      <li><code>ChangesetProfileOverride.changeset_id -&gt; Changeset.id</code></li>
+      <li><code>ChangesetProfileOverride.target_profile_id -&gt; RuntimeProfile.id (optional)</code></li>
+      <li><code>Environment.repo_id -&gt; Repo.id</code></li>
+      <li><code>Environment.runtime_profile_id -&gt; RuntimeProfile.id (optional)</code></li>
+      <li><code>RuntimeProfile.repo_id -&gt; Repo.id</code></li>
+      <li><code>RuntimeProfile.base_profile_id -&gt; RuntimeProfile.id (optional)</code></li>
+      <li><code>ReleaseBatch.repo_id -&gt; Repo.id</code></li>
+      <li><code>ReleaseBatch.ordered_changeset_ids[] -&gt; Changeset.id</code></li>
+      <li><code>Deployment.repo_id -&gt; Repo.id</code></li>
+      <li><code>Deployment.environment_id -&gt; Environment.id</code></li>
+      <li><code>Deployment.release_id -&gt; ReleaseBatch.id</code></li>
+      <li><code>TempEnvironment.repo_id -&gt; Repo.id</code></li>
+      <li><code>TempEnvironment.owner_user_id -&gt; User.id</code></li>
+      <li><code>TempEnvironment.runtime_profile_id -&gt; RuntimeProfile.id (optional)</code></li>
+      <li><code>TempEnvironment.source_id -&gt; Workspace.id or Changeset.id (by kind)</code></li>
+      <li><code>Job.repo_id -&gt; Repo.id</code></li>
+      <li><code>JobLogLine.job_id -&gt; Job.id</code></li>
+      <li><code>NotificationPreference.user_id -&gt; User.id</code></li>
+      <li><code>NotificationEvent.user_id -&gt; User.id</code></li>
+      <li><code>NotificationEvent.repo_id -&gt; Repo.id (optional)</code></li>
+      <li><code>AuditEvent.actor_user_id -&gt; User.id (optional)</code></li>
+      <li><code>AuditEvent.repo_id -&gt; Repo.id (optional)</code></li>
+      </ul>
+      <h2 id="runtime-constraints-worth-remembering">Runtime constraints
+      worth remembering</h2>
+      <ul>
+      <li>One workspace can have many historical changesets, but only
+      one open changeset at a time.</li>
+      <li><code>ReleaseBatch</code> to <code>Changeset</code> is
+      represented by ordered IDs, not a separate join collection.</li>
+      <li><code>TempEnvironment.source_id</code> is polymorphic
+      (<code>workspace</code> or <code>changeset</code>) via
+      <code>kind</code>.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

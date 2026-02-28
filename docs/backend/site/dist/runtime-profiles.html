@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Runtime Profiles Draft — Conman Docs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#conman-runtime-profiles-draft"
+      id="toc-conman-runtime-profiles-draft">Conman Runtime Profiles
+      (Draft)</a>
+      <ul>
+      <li><a href="#1-problem-statement" id="toc-1-problem-statement">1)
+      Problem Statement</a></li>
+      <li><a href="#11-decisions-captured"
+      id="toc-11-decisions-captured">1.1) Decisions Captured</a></li>
+      <li><a href="#2-proposed-abstraction"
+      id="toc-2-proposed-abstraction">2) Proposed Abstraction</a>
+      <ul>
+      <li><a href="#runtime-profile" id="toc-runtime-profile">Runtime
+      Profile</a></li>
+      </ul></li>
+      <li><a href="#3-mapping-to-existing-model"
+      id="toc-3-mapping-to-existing-model">3) Mapping to Existing
+      Model</a></li>
+      <li><a href="#4-baseline-for-workspace-temp-dbs"
+      id="toc-4-baseline-for-workspace-temp-dbs">4) Baseline for
+      Workspace Temp DBs</a></li>
+      <li><a href="#5-suggested-v1-scope"
+      id="toc-5-suggested-v1-scope">5) Suggested V1 Scope</a></li>
+      <li><a href="#6-non-goals-initial-draft"
+      id="toc-6-non-goals-initial-draft">6) Non-Goals (Initial
+      Draft)</a></li>
+      <li><a href="#7-resolved-v1-policy"
+      id="toc-7-resolved-v1-policy">7) Resolved v1 Policy</a></li>
+      <li><a href="#8-implementation-direction-v1"
+      id="toc-8-implementation-direction-v1">8) Implementation Direction
+      (v1)</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">Runtime Profiles Draft</h1>
+      </header>
+      <h1 id="conman-runtime-profiles-draft">Conman Runtime Profiles
+      (Draft)</h1>
+      <h2 id="1-problem-statement">1) Problem Statement</h2>
+      <p>Conman currently models deployment environments and temporary
+      databases, but the real operational unit is broader than a
+      database:</p>
+      <ul>
+      <li>base URL and routing context</li>
+      <li>environment variables / secrets</li>
+      <li>database connection and provisioning behavior</li>
+      <li>seed/baseline data strategy</li>
+      <li>optional service endpoints and toggles</li>
+      </ul>
+      <p>This draft introduces a single abstraction to represent that
+      unit consistently for permanent environments and temporary
+      workspace/changeset environments.</p>
+      <h2 id="11-decisions-captured">1.1) Decisions Captured</h2>
+      <ul>
+      <li>Runtime profiles are versioned with releases.</li>
+      <li>Variable precedence is
+      <code>app defaults &lt; environment profile &lt; temp overrides</code>.</li>
+      <li>Temp profiles are derived from a base persistent environment
+      profile.</li>
+      <li>Temp environment URLs are auto-generated and should be
+      readable/shareable.</li>
+      <li>Environment profile changes for canonical user-facing env
+      require approval.</li>
+      <li><code>admin</code> can perform direct emergency
+      persistent-profile edits (fully audited).</li>
+      <li>Profile overrides can travel with a changeset/release.</li>
+      <li>Changeset submit auto-includes profile overrides and returns a
+      submit summary.</li>
+      <li>Validation (<code>msuite</code>) runs against both environment
+      and temp profiles, with configurable gates and command.</li>
+      <li>Deployment is blocked on runtime profile drift until
+      revalidation passes.</li>
+      <li>Database engine scope for v1 is MongoDB only.</li>
+      <li>Special base databases/profiles are managed by
+      <code>admin</code> only.</li>
+      <li>If two queued changesets override the same env var key, the
+      later one becomes <code>conflicted</code>.</li>
+      <li>If both queued changesets set the same env var key to the same
+      typed value, it is not treated as a conflict.</li>
+      <li>Canonical env profile approval policy is configurable:
+      <code>same_as_changeset</code> or
+      <code>stricter_two_approvals</code> (default).</li>
+      <li>Drift includes env vars, secrets, URL, DB settings, and
+      migration set changes.</li>
+      <li>Secret key rotation is manual in v1.</li>
+      <li>Secrets can be revealed in plaintext by <code>admin</code>
+      only; other roles see masked previews.</li>
+      <li>Secret reveal does not require re-auth/audit reason in
+      v1.</li>
+      <li>MongoDB clone strategy defaults to snapshot clone, fallback to
+      dump/restore.</li>
+      <li>Temp URL pattern omits <code>conman</code> branding in
+      hostname.</li>
+      <li>Env vars are typed in v1:
+      <code>string | number | boolean | json</code>.</li>
+      <li>Runtime profile schema is strict typed in v1 (no arbitrary
+      custom top-level fields).</li>
+      <li>Changeset profile overrides are stored in a separate
+      <code>changeset_profile_overrides</code> collection.</li>
+      <li>Applied migration metadata is tracked in Conman DB for
+      drift/revalidation.</li>
+      <li>Temp profile base selection priority is app default base
+      profile first, then user override at temp-env creation.</li>
+      <li>Temp URLs are unique per temp-env instance (not
+      workspace-stable).</li>
+      <li>Deploy drift remediation should offer "create drift-fix
+      changeset".</li>
+      <li>Validation defaults:
+      <ul>
+      <li>submit: temp profile only</li>
+      <li>release publish: environment profiles only</li>
+      <li>deploy: target environment profile only</li>
+      </ul></li>
+      </ul>
+      <h2 id="2-proposed-abstraction">2) Proposed Abstraction</h2>
+      <h3 id="runtime-profile">Runtime Profile</h3>
+      <p>A <strong>Runtime Profile</strong> is the full runtime
+      configuration required to execute and validate an app
+      build/release.</p>
+      <p>Suggested shape:</p>
+      <ul>
+      <li><code>name</code></li>
+      <li><code>kind</code>:
+      <code>persistent_env | temp_workspace | temp_changeset</code></li>
+      <li><code>base_url</code></li>
+      <li><code>env_vars</code> (typed:
+      <code>string | number | boolean | json</code>)</li>
+      <li><code>secrets</code> (encrypted at rest; optional external
+      secret refs later)</li>
+      <li><code>database</code>:
+      <ul>
+      <li><code>engine</code> (<code>mongodb</code>)</li>
+      <li><code>connection_ref</code></li>
+      <li><code>provisioning_mode</code>
+      (<code>existing | clone_from_base | snapshot_restore | empty</code>)</li>
+      <li><code>base_profile_id?</code></li>
+      </ul></li>
+      <li><code>migrations</code>:
+      <ul>
+      <li><code>repo_paths[]</code></li>
+      <li><code>command_ref</code></li>
+      <li><code>applied_state_ref</code></li>
+      </ul></li>
+      <li><code>data_strategy</code>:
+      <ul>
+      <li><code>seed_mode</code>
+      (<code>none | baseline | snapshot</code>)</li>
+      <li><code>seed_source_ref?</code></li>
+      </ul></li>
+      <li><code>lifecycle</code>:
+      <ul>
+      <li><code>ttl_idle_hours?</code></li>
+      <li><code>grace_hours?</code></li>
+      <li><code>auto_cleanup</code></li>
+      </ul></li>
+      </ul>
+      <h2 id="3-mapping-to-existing-model">3) Mapping to Existing
+      Model</h2>
+      <ul>
+      <li>Existing <code>Environment</code> keeps pipeline order,
+      approvals, and promotion logic.</li>
+      <li>New <code>RuntimeProfile</code> is attached to each
+      environment (<code>environment.profile_id</code>).</li>
+      <li>Temp env creation produces a temp runtime profile derived from
+      either:
+      <ul>
+      <li>workspace + selected base persistent profile, or</li>
+      <li>changeset + selected base persistent profile.</li>
+      </ul></li>
+      </ul>
+      <h2 id="4-baseline-for-workspace-temp-dbs">4) Baseline for
+      Workspace Temp DBs</h2>
+      <p>Candidate default for v1:</p>
+      <ul>
+      <li>Temp workspace profile clones from the
+      <code>Development</code> environment runtime profile by default
+      (configurable per app).</li>
+      <li>A special app-defined base profile is also supported (for
+      curated test data).</li>
+      <li>Override allowed at creation time.</li>
+      </ul>
+      <p>Rationale:</p>
+      <ul>
+      <li>closer to day-to-day iteration data</li>
+      <li>avoids production-sensitive data coupling</li>
+      <li>predictable for msuite and reviewer flows</li>
+      </ul>
+      <h2 id="5-suggested-v1-scope">5) Suggested V1 Scope</h2>
+      <ol type="1">
+      <li>Add runtime profile storage and references.</li>
+      <li>Allow per-environment env vars + URL + DB config.</li>
+      <li>Temp env provisioning chooses a base profile and clone
+      strategy.</li>
+      <li>Persist profile revisions (append-only) for auditability.</li>
+      <li>Encrypt secrets at rest in Conman (no external dependency
+      required for v1).</li>
+      <li>Support changeset-bound profile overrides that can be
+      released/promoted.</li>
+      <li>Enforce override-key conflict detection during queue/release
+      composition.</li>
+      <li>Track applied migration metadata in Conman for drift and
+      gating decisions.</li>
+      <li>Support app-admin direct profile edits with audit and
+      drift-triggered revalidation requirements.</li>
+      <li>Support secret masking/reveal policy (<code>admin</code>
+      plaintext only).</li>
+      </ol>
+      <h2 id="6-non-goals-initial-draft">6) Non-Goals (Initial
+      Draft)</h2>
+      <ul>
+      <li>Full external secret manager integration in v1.</li>
+      <li>Arbitrary cross-app profile sharing.</li>
+      <li>Runtime profile templating language.</li>
+      <li>Arbitrary custom runtime-profile top-level schema fields.</li>
+      <li>Multiple baseline dataset variants (single baseline path in
+      v1).</li>
+      </ul>
+      <h2 id="7-resolved-v1-policy">7) Resolved v1 Policy</h2>
+      <ol type="1">
+      <li>Secret encryption model:
+      <ul>
+      <li>Envelope encryption in-app.</li>
+      <li>Service master key in config, manual key rollover in v1.</li>
+      </ul></li>
+      <li>Database clone strategy (MongoDB):
+      <ul>
+      <li>Snapshot clone by default, dump/restore fallback.</li>
+      </ul></li>
+      <li>URL generation:
+      <ul>
+      <li>Host pattern uses readable short IDs:
+      <code>{app}-{kind}-{word}.&lt;domain&gt;</code>.</li>
+      </ul></li>
+      <li>Changeset-coupled profile overrides:
+      <ul>
+      <li>Stored in <code>changeset_profile_overrides</code>.</li>
+      <li>Auto-included on submit with submit summary.</li>
+      </ul></li>
+      <li>Validation gates:
+      <ul>
+      <li>submit: temp profile only.</li>
+      <li>release publish: environment profiles only.</li>
+      <li>deploy: target environment profile only.</li>
+      </ul></li>
+      <li>Secret visibility:
+      <ul>
+      <li><code>admin</code> can reveal plaintext.</li>
+      <li>Other roles see masked values.</li>
+      <li>Masking policy:
+      <ul>
+      <li>length &lt;= 8: show last 4 characters only.</li>
+      <li>length &gt; 8: show first 4 and last 4.</li>
+      </ul></li>
+      </ul></li>
+      <li>Drift remediation:
+      <ul>
+      <li>Deployment remains blocked until revalidation passes.</li>
+      <li>UX offers creation of a drift-fix changeset.</li>
+      </ul></li>
+      </ol>
+      <h2 id="8-implementation-direction-v1">8) Implementation Direction
+      (v1)</h2>
+      <ul>
+      <li>Secrets encryption: use envelope encryption in-app with Rust
+      crates <code>aes-gcm</code>, <code>rand</code>, and
+      <code>zeroize</code> (no external secret manager dependency).</li>
+      <li>URL short IDs: use human-readable word IDs (for example from a
+      wordlist or a petname-style generator) instead of opaque UUID-only
+      hostnames.</li>
+      <li>If opaque UUIDs are used anywhere in runtime-profile
+      tooling/metadata, use UUIDv7.</li>
+      <li>Use a typed env var value enum and validate per-key type at
+      write-time.</li>
+      <li>Persist applied migration metadata
+      (<code>migration_executions</code>) keyed by app/env/ runtime
+      profile revision.</li>
+      </ul>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>E06 Async Jobs + msuite Pipeline — Conman Docs</title>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <nav id="TOC" role="doc-toc">
+      <div class="home-link"><a href="../index.html">&larr; All Docs</a></div>
+      <h2 class="toc-title">Contents</h2>
+      <ul>
+      <li><a href="#e06-async-jobs--msuite-pipeline"
+      id="toc-e06-async-jobs--msuite-pipeline">E06 Async Jobs + msuite
+      Pipeline</a>
+      <ul>
+      <li><a href="#1-goal" id="toc-1-goal">1. Goal</a></li>
+      <li><a href="#2-dependencies" id="toc-2-dependencies">2.
+      Dependencies</a></li>
+      <li><a href="#3-rust-types" id="toc-3-rust-types">3. Rust
+      Types</a>
+      <ul>
+      <li><a href="#conman-core-types"
+      id="toc-conman-core-types">conman-core types</a></li>
+      <li><a href="#conman-jobs-types"
+      id="toc-conman-jobs-types">conman-jobs types</a></li>
+      <li><a href="#conman-api-types"
+      id="toc-conman-api-types">conman-api types</a></li>
+      </ul></li>
+      <li><a href="#4-database" id="toc-4-database">4. Database</a>
+      <ul>
+      <li><a href="#jobs-collection"
+      id="toc-jobs-collection"><code>jobs</code> collection</a></li>
+      <li><a href="#job_logs-collection"
+      id="toc-job_logs-collection"><code>job_logs</code>
+      collection</a></li>
+      </ul></li>
+      <li><a href="#5-api-endpoints" id="toc-5-api-endpoints">5. API
+      Endpoints</a>
+      <ul>
+      <li><a href="#get-apireposrepoidjobsjobid"
+      id="toc-get-apireposrepoidjobsjobid"><code>GET /api/repos/:repoId/jobs/:jobId</code></a></li>
+      <li><a href="#get-apireposrepoidjobspagelimittypestate"
+      id="toc-get-apireposrepoidjobspagelimittypestate"><code>GET /api/repos/:repoId/jobs?page=&amp;limit=&amp;type=&amp;state=</code></a></li>
+      </ul></li>
+      <li><a href="#6-business-logic" id="toc-6-business-logic">6.
+      Business Logic</a>
+      <ul>
+      <li><a href="#job-runner-polling-loop"
+      id="toc-job-runner-polling-loop">Job runner polling loop</a></li>
+      <li><a href="#claim-mechanism" id="toc-claim-mechanism">Claim
+      mechanism</a></li>
+      <li><a href="#timeout" id="toc-timeout">Timeout</a></li>
+      <li><a href="#retry" id="toc-retry">Retry</a></li>
+      <li><a href="#gate-hooks" id="toc-gate-hooks">Gate hooks</a></li>
+      <li><a href="#structured-logging"
+      id="toc-structured-logging">Structured logging</a></li>
+      <li><a href="#msuite-workers" id="toc-msuite-workers">msuite
+      workers</a></li>
+      </ul></li>
+      <li><a href="#7-gitaly-rs-integration"
+      id="toc-7-gitaly-rs-integration">7. Gitaly-rs Integration</a></li>
+      <li><a href="#8-implementation-checklist"
+      id="toc-8-implementation-checklist">8. Implementation
+      Checklist</a>
+      <ul>
+      <li><a href="#e06-01-generic-jobs-framework"
+      id="toc-e06-01-generic-jobs-framework">E06-01: Generic jobs
+      framework</a></li>
+      <li><a href="#e06-02-job-repositories-and-runner"
+      id="toc-e06-02-job-repositories-and-runner">E06-02: Job
+      repositories and runner</a></li>
+      <li><a href="#e06-03-msuite-placeholder-workers"
+      id="toc-e06-03-msuite-placeholder-workers">E06-03: msuite
+      placeholder workers</a></li>
+      <li><a href="#e06-04-api-endpoints"
+      id="toc-e06-04-api-endpoints">E06-04: API endpoints</a></li>
+      <li><a href="#e06-05-gate-hooks"
+      id="toc-e06-05-gate-hooks">E06-05: Gate hooks</a></li>
+      <li><a href="#e06-06-retry-and-timeout-policies"
+      id="toc-e06-06-retry-and-timeout-policies">E06-06: Retry and
+      timeout policies</a></li>
+      </ul></li>
+      <li><a href="#9-test-cases" id="toc-9-test-cases">9. Test
+      Cases</a>
+      <ul>
+      <li><a href="#unit-tests-conman-core-conman-jobs"
+      id="toc-unit-tests-conman-core-conman-jobs">Unit tests
+      (conman-core, conman-jobs)</a></li>
+      <li><a href="#integration-tests-require-mongodb"
+      id="toc-integration-tests-require-mongodb">Integration tests
+      (require MongoDB)</a></li>
+      </ul></li>
+      <li><a href="#10-acceptance-criteria"
+      id="toc-10-acceptance-criteria">10. Acceptance Criteria</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+    <main>
+      <header class="doc-header">
+        <h1 class="title">E06 Async Jobs + msuite Pipeline</h1>
+      </header>
+      <h1 id="e06-async-jobs--msuite-pipeline">E06 Async Jobs + msuite
+      Pipeline</h1>
+      <h2 id="1-goal">1. Goal</h2>
+      <p>Provide a generic asynchronous job framework that runs
+      mandatory checks and long-running operations (msuite validation,
+      release assembly, deployment, revalidation, runtime-profile drift
+      checks, temp-env provisioning) with state tracking, structured
+      logs, retry/timeout policies, and gate hooks that block workflow
+      transitions on job outcomes. After this epic, every flow that
+      requires an external or long-running operation uses the jobs
+      subsystem rather than inlining work in the HTTP request cycle.</p>
+      <hr />
+      <h2 id="2-dependencies">2. Dependencies</h2>
+      <table>
+      <thead>
+      <tr>
+      <th>Dependency</th>
+      <th>Reason</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><strong>E00 Platform Foundation</strong></td>
+      <td>MongoDB connection, error types, config, pagination</td>
+      </tr>
+      <tr>
+      <td><strong>E05 Changesets</strong></td>
+      <td>Submit and queue flows trigger msuite jobs; gate hooks read
+      job results</td>
+      </tr>
+      <tr>
+      <td><strong>E03 App Setup</strong></td>
+      <td>Runtime profile configuration and validation gate
+      defaults</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Soft consumers (not blocked, but will call into the
+      framework):</p>
+      <ul>
+      <li>E07 Queue Orchestration (revalidation jobs)</li>
+      <li>E08 Releases (release assembly job)</li>
+      <li>E09 Deployments (deploy release job)</li>
+      <li>E10 Temp Environments (provision/expire jobs)</li>
+      </ul>
+      <hr />
+      <h2 id="3-rust-types">3. Rust Types</h2>
+      <h3 id="conman-core-types">conman-core types</h3>
+      <div class="sourceCode" id="cb1"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">chrono::</span><span class="op">{</span>DateTime<span class="op">,</span> Utc<span class="op">};</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">serde::</span><span class="op">{</span>Deserialize<span class="op">,</span> Serialize<span class="op">};</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">// ── Job Type ────────────────────────────────────────────────────────────</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">/// Discriminator for the kind of work a job performs.</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="bu">Clone</span><span class="op">,</span> <span class="bu">Copy</span><span class="op">,</span> <span class="bu">PartialEq</span><span class="op">,</span> <span class="bu">Eq</span><span class="op">,</span> Serialize<span class="op">,</span> Deserialize<span class="at">)]</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>serde<span class="at">(</span>rename_all <span class="op">=</span> <span class="st">&quot;snake_case&quot;</span><span class="at">)]</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">enum</span> JobType <span class="op">{</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    MsuiteSubmit<span class="op">,</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    MsuiteMerge<span class="op">,</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    MsuiteDeploy<span class="op">,</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    RevalidateQueuedChangeset<span class="op">,</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    ReleaseAssemble<span class="op">,</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    DeployRelease<span class="op">,</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    RuntimeProfileDriftCheck<span class="op">,</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    TempEnvProvision<span class="op">,</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    TempEnvExpire<span class="op">,</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="co">// ── Job State ───────────────────────────────────────────────────────────</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="co">/// Lifecycle states for an async job.</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="bu">Clone</span><span class="op">,</span> <span class="bu">Copy</span><span class="op">,</span> <span class="bu">PartialEq</span><span class="op">,</span> <span class="bu">Eq</span><span class="op">,</span> Serialize<span class="op">,</span> Deserialize<span class="at">)]</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>serde<span class="at">(</span>rename_all <span class="op">=</span> <span class="st">&quot;snake_case&quot;</span><span class="at">)]</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">enum</span> JobState <span class="op">{</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    Queued<span class="op">,</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    Running<span class="op">,</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    Succeeded<span class="op">,</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    Failed<span class="op">,</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    Canceled<span class="op">,</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> JobState <span class="op">{</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Returns `true` for terminal states that will never transition again.</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">fn</span> is_terminal(<span class="op">&amp;</span><span class="kw">self</span>) <span class="op">-&gt;</span> <span class="dt">bool</span> <span class="op">{</span></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>        <span class="pp">matches!</span>(<span class="kw">self</span><span class="op">,</span> <span class="dt">Self</span><span class="pp">::</span>Succeeded <span class="op">|</span> <span class="dt">Self</span><span class="pp">::</span>Failed <span class="op">|</span> <span class="dt">Self</span><span class="pp">::</span>Canceled)</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="co">// ── Job ─────────────────────────────────────────────────────────────────</span></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="co">/// A unit of asynchronous work tracked in MongoDB.</span></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="bu">Clone</span><span class="op">,</span> Serialize<span class="op">,</span> Deserialize<span class="at">)]</span></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> Job <span class="op">{</span></span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Unique identifier (MongoDB ObjectId hex).</span></span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// App this job belongs to.</span></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> repo_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// What kind of work this job performs.</span></span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> job_type<span class="op">:</span> JobType<span class="op">,</span></span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Current lifecycle state.</span></span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> state<span class="op">:</span> JobState<span class="op">,</span></span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// The domain entity type this job acts on (e.g. &quot;changeset&quot;, &quot;release&quot;,</span></span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// &quot;deployment&quot;, &quot;temp_environment&quot;).</span></span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> entity_type<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// The domain entity id this job acts on.</span></span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> entity_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Opaque input payload for the worker (contents vary by job_type).</span></span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> payload<span class="op">:</span> <span class="pp">serde_json::</span>Value<span class="op">,</span></span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Terminal result payload set by the worker on success.</span></span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> result<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">&gt;,</span></span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Human-readable error message set on failure.</span></span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> error_message<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="dt">String</span><span class="op">&gt;,</span></span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// How many times this job has been attempted so far.</span></span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> retry_count<span class="op">:</span> <span class="dt">u32</span><span class="op">,</span></span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Maximum retries before the job stays Failed permanently.</span></span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> max_retries<span class="op">:</span> <span class="dt">u32</span><span class="op">,</span></span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Maximum wall-clock time (ms) before the runner cancels the job.</span></span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> timeout_ms<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span></span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// When the job was created (enqueued).</span></span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> created_at<span class="op">:</span> DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;,</span></span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// When the runner picked up the job (set to Running).</span></span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> started_at<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span>DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;&gt;,</span></span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// When the job reached a terminal state.</span></span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> completed_at<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span>DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;&gt;,</span></span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a><span class="co">// ── Log Level ───────────────────────────────────────────────────────────</span></span>
+<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a><span class="co">/// Severity level for structured job log entries.</span></span>
+<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="bu">Clone</span><span class="op">,</span> <span class="bu">Copy</span><span class="op">,</span> <span class="bu">PartialEq</span><span class="op">,</span> <span class="bu">Eq</span><span class="op">,</span> Serialize<span class="op">,</span> Deserialize<span class="at">)]</span></span>
+<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>serde<span class="at">(</span>rename_all <span class="op">=</span> <span class="st">&quot;snake_case&quot;</span><span class="at">)]</span></span>
+<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">enum</span> LogLevel <span class="op">{</span></span>
+<span id="cb1-99"><a href="#cb1-99" aria-hidden="true" tabindex="-1"></a>    Info<span class="op">,</span></span>
+<span id="cb1-100"><a href="#cb1-100" aria-hidden="true" tabindex="-1"></a>    Warn<span class="op">,</span></span>
+<span id="cb1-101"><a href="#cb1-101" aria-hidden="true" tabindex="-1"></a>    <span class="bu">Error</span><span class="op">,</span></span>
+<span id="cb1-102"><a href="#cb1-102" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb1-103"><a href="#cb1-103" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-104"><a href="#cb1-104" aria-hidden="true" tabindex="-1"></a><span class="co">// ── Job Log ─────────────────────────────────────────────────────────────</span></span>
+<span id="cb1-105"><a href="#cb1-105" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-106"><a href="#cb1-106" aria-hidden="true" tabindex="-1"></a><span class="co">/// A single structured log line emitted by a worker during execution.</span></span>
+<span id="cb1-107"><a href="#cb1-107" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> <span class="bu">Clone</span><span class="op">,</span> Serialize<span class="op">,</span> Deserialize<span class="at">)]</span></span>
+<span id="cb1-108"><a href="#cb1-108" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> JobLog <span class="op">{</span></span>
+<span id="cb1-109"><a href="#cb1-109" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Unique identifier (MongoDB ObjectId hex).</span></span>
+<span id="cb1-110"><a href="#cb1-110" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb1-111"><a href="#cb1-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-112"><a href="#cb1-112" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// The job this log belongs to.</span></span>
+<span id="cb1-113"><a href="#cb1-113" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> job_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb1-114"><a href="#cb1-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-115"><a href="#cb1-115" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Severity level.</span></span>
+<span id="cb1-116"><a href="#cb1-116" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> level<span class="op">:</span> LogLevel<span class="op">,</span></span>
+<span id="cb1-117"><a href="#cb1-117" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-118"><a href="#cb1-118" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Human-readable log message.</span></span>
+<span id="cb1-119"><a href="#cb1-119" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> message<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb1-120"><a href="#cb1-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-121"><a href="#cb1-121" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Optional structured data attached to the log entry.</span></span>
+<span id="cb1-122"><a href="#cb1-122" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> data<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">&gt;,</span></span>
+<span id="cb1-123"><a href="#cb1-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-124"><a href="#cb1-124" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// When the log was written.</span></span>
+<span id="cb1-125"><a href="#cb1-125" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> timestamp<span class="op">:</span> DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;,</span></span>
+<span id="cb1-126"><a href="#cb1-126" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="conman-jobs-types">conman-jobs types</h3>
+      <div class="sourceCode" id="cb2"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">async_trait::</span>async_trait<span class="op">;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">conman_core::</span><span class="op">{</span>Job<span class="op">,</span> ConmanError<span class="op">};</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">// ── Job Worker Trait ────────────────────────────────────────────────────</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">/// Implemented by each job type to perform the actual work.</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">///</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">/// Workers receive an immutable reference to the Job (including payload) and</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co">/// return a result payload on success. Workers write structured logs during</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">/// execution via the `JobLogger` passed at construction time.</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>async_trait<span class="at">]</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">trait</span> JobWorker<span class="op">:</span> <span class="bu">Send</span> <span class="op">+</span> <span class="bu">Sync</span> <span class="op">{</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Execute the job&#39;s work. On success, return a JSON result payload that</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// will be persisted on the Job document. On failure, return a</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// `ConmanError` whose message becomes the job&#39;s `error_message`.</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">async</span> <span class="kw">fn</span> execute(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> job<span class="op">:</span> <span class="op">&amp;</span>Job) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">,</span> ConmanError<span class="op">&gt;;</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co">// ── Job Logger ──────────────────────────────────────────────────────────</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="co">/// Handle passed to workers so they can emit structured log entries that are</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co">/// persisted to the `job_logs` collection in real time.</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Clone</span><span class="at">)]</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> JobLogger <span class="op">{</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    job_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    log_repo<span class="op">:</span> JobLogRepo<span class="op">,</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> JobLogger <span class="op">{</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">fn</span> new(job_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span> log_repo<span class="op">:</span> JobLogRepo) <span class="op">-&gt;</span> <span class="dt">Self</span> <span class="op">{</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="dt">Self</span> <span class="op">{</span> job_id<span class="op">,</span> log_repo <span class="op">}</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> info(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> message<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span> data<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">&gt;</span>) <span class="op">{</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="kw">self</span><span class="op">.</span>write(<span class="pp">LogLevel::</span>Info<span class="op">,</span> message<span class="op">,</span> data)<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> warn(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> message<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span> data<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">&gt;</span>) <span class="op">{</span></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="kw">self</span><span class="op">.</span>write(<span class="pp">LogLevel::</span>Warn<span class="op">,</span> message<span class="op">,</span> data)<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> error(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> message<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span> data<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">&gt;</span>) <span class="op">{</span></span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        <span class="kw">self</span><span class="op">.</span>write(<span class="pp">LogLevel::</span><span class="bu">Error</span><span class="op">,</span> message<span class="op">,</span> data)<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Fire-and-forget write. Errors are traced but never propagated.</span></span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    <span class="kw">async</span> <span class="kw">fn</span> write(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> level<span class="op">:</span> LogLevel<span class="op">,</span> message<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span> data<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">&gt;</span>) <span class="op">{</span></span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> log <span class="op">=</span> JobLog <span class="op">{</span></span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>            id<span class="op">:</span> <span class="pp">ObjectId::</span>new()<span class="op">.</span>to_hex()<span class="op">,</span></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>            job_id<span class="op">:</span> <span class="kw">self</span><span class="op">.</span>job_id<span class="op">.</span>clone()<span class="op">,</span></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>            level<span class="op">,</span></span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>            message<span class="op">:</span> message<span class="op">.</span>to_string()<span class="op">,</span></span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>            data<span class="op">,</span></span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>            timestamp<span class="op">:</span> <span class="pp">Utc::</span>now()<span class="op">,</span></span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="op">};</span></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">let</span> <span class="cn">Err</span>(e) <span class="op">=</span> <span class="kw">self</span><span class="op">.</span>log_repo<span class="op">.</span>insert(<span class="op">&amp;</span>log)<span class="op">.</span><span class="kw">await</span> <span class="op">{</span></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>            <span class="pp">tracing::warn!</span>(job_id <span class="op">=</span> <span class="op">%</span><span class="kw">self</span><span class="op">.</span>job_id<span class="op">,</span> error <span class="op">=</span> <span class="op">%</span>e<span class="op">,</span> <span class="st">&quot;failed to write job log&quot;</span>)<span class="op">;</span></span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a><span class="co">// ── Job Runner ──────────────────────────────────────────────────────────</span></span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a><span class="co">/// The background polling loop that claims Queued jobs and dispatches them to</span></span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a><span class="co">/// the appropriate `JobWorker` implementation.</span></span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> JobRunner <span class="op">{</span></span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// MongoDB repository for the `jobs` collection.</span></span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>    job_repo<span class="op">:</span> JobRepo<span class="op">,</span></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// MongoDB repository for the `job_logs` collection.</span></span>
+<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>    log_repo<span class="op">:</span> JobLogRepo<span class="op">,</span></span>
+<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Registry mapping JobType -&gt; Box&lt;dyn JobWorker&gt;.</span></span>
+<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>    workers<span class="op">:</span> HashMap<span class="op">&lt;</span>JobType<span class="op">,</span> <span class="dt">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> JobWorker<span class="op">&gt;&gt;,</span></span>
+<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// How often (ms) the runner polls for new work when idle.</span></span>
+<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>    poll_interval_ms<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span></span>
+<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Shutdown signal receiver.</span></span>
+<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>    shutdown<span class="op">:</span> <span class="pp">tokio::sync::watch::</span>Receiver<span class="op">&lt;</span><span class="dt">bool</span><span class="op">&gt;,</span></span>
+<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> JobRunner <span class="op">{</span></span>
+<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">fn</span> new(</span>
+<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>        job_repo<span class="op">:</span> JobRepo<span class="op">,</span></span>
+<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>        log_repo<span class="op">:</span> JobLogRepo<span class="op">,</span></span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>        workers<span class="op">:</span> HashMap<span class="op">&lt;</span>JobType<span class="op">,</span> <span class="dt">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> JobWorker<span class="op">&gt;&gt;,</span></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>        poll_interval_ms<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a>        shutdown<span class="op">:</span> <span class="pp">tokio::sync::watch::</span>Receiver<span class="op">&lt;</span><span class="dt">bool</span><span class="op">&gt;,</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a>    ) <span class="op">-&gt;</span> <span class="dt">Self</span> <span class="op">{</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a>        <span class="dt">Self</span> <span class="op">{</span> job_repo<span class="op">,</span> log_repo<span class="op">,</span> workers<span class="op">,</span> poll_interval_ms<span class="op">,</span> shutdown <span class="op">}</span></span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Main loop: poll for the oldest Queued job, claim it atomically, execute</span></span>
+<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// the matching worker, and transition to Succeeded or Failed.</span></span>
+<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> run(<span class="op">&amp;</span><span class="kw">self</span>) <span class="op">{</span></span>
+<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>        <span class="cf">loop</span> <span class="op">{</span></span>
+<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>            <span class="co">// Check for graceful shutdown signal</span></span>
+<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="op">*</span><span class="kw">self</span><span class="op">.</span>shutdown<span class="op">.</span>borrow() <span class="op">{</span></span>
+<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>                <span class="pp">tracing::info!</span>(<span class="st">&quot;job runner shutting down&quot;</span>)<span class="op">;</span></span>
+<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>                <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span></span>
+<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>            <span class="co">// Attempt to claim and execute one job</span></span>
+<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a>            <span class="cf">match</span> <span class="kw">self</span><span class="op">.</span>poll_and_execute()<span class="op">.</span><span class="kw">await</span> <span class="op">{</span></span>
+<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a>                <span class="cn">Ok</span>(<span class="cn">true</span>) <span class="op">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a>                    <span class="co">// Executed a job — immediately poll for the next one</span></span>
+<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">continue</span><span class="op">;</span></span>
+<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>                <span class="op">}</span></span>
+<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a>                <span class="cn">Ok</span>(<span class="cn">false</span>) <span class="op">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>                    <span class="co">// No jobs available — sleep before next poll</span></span>
+<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>                <span class="op">}</span></span>
+<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>                <span class="cn">Err</span>(e) <span class="op">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a>                    <span class="pp">tracing::error!</span>(error <span class="op">=</span> <span class="op">%</span>e<span class="op">,</span> <span class="st">&quot;job runner poll error&quot;</span>)<span class="op">;</span></span>
+<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a>                <span class="op">}</span></span>
+<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span></span>
+<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>            <span class="pp">tokio::time::</span>sleep(</span>
+<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>                <span class="pp">std::time::Duration::</span>from_millis(<span class="kw">self</span><span class="op">.</span>poll_interval_ms)</span>
+<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a>            )<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Claim the oldest Queued job via atomic findOneAndUpdate, execute the</span></span>
+<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// worker, and transition the job to its terminal state.</span></span>
+<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Returns `Ok(true)` if a job was processed, `Ok(false)` if none available.</span></span>
+<span id="cb2-128"><a href="#cb2-128" aria-hidden="true" tabindex="-1"></a>    <span class="kw">async</span> <span class="kw">fn</span> poll_and_execute(<span class="op">&amp;</span><span class="kw">self</span>) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span><span class="dt">bool</span><span class="op">,</span> ConmanError<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb2-129"><a href="#cb2-129" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Atomic claim: state=Queued -&gt; Running, set started_at</span></span>
+<span id="cb2-130"><a href="#cb2-130" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> <span class="cn">Some</span>(<span class="kw">mut</span> job) <span class="op">=</span> <span class="kw">self</span><span class="op">.</span>job_repo<span class="op">.</span>claim_next()<span class="op">.</span><span class="kw">await</span><span class="op">?</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb2-131"><a href="#cb2-131" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="cn">Ok</span>(<span class="cn">false</span>)<span class="op">;</span></span>
+<span id="cb2-132"><a href="#cb2-132" aria-hidden="true" tabindex="-1"></a>        <span class="op">};</span></span>
+<span id="cb2-133"><a href="#cb2-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-134"><a href="#cb2-134" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> logger <span class="op">=</span> <span class="pp">JobLogger::</span>new(job<span class="op">.</span>id<span class="op">.</span>clone()<span class="op">,</span> <span class="kw">self</span><span class="op">.</span>log_repo<span class="op">.</span>clone())<span class="op">;</span></span>
+<span id="cb2-135"><a href="#cb2-135" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-136"><a href="#cb2-136" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> <span class="cn">Some</span>(worker) <span class="op">=</span> <span class="kw">self</span><span class="op">.</span>workers<span class="op">.</span>get(<span class="op">&amp;</span>job<span class="op">.</span>job_type) <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb2-137"><a href="#cb2-137" aria-hidden="true" tabindex="-1"></a>            <span class="co">// No registered worker — mark failed</span></span>
+<span id="cb2-138"><a href="#cb2-138" aria-hidden="true" tabindex="-1"></a>            <span class="kw">self</span><span class="op">.</span>job_repo<span class="op">.</span>mark_failed(</span>
+<span id="cb2-139"><a href="#cb2-139" aria-hidden="true" tabindex="-1"></a>                <span class="op">&amp;</span>job<span class="op">.</span>id<span class="op">,</span></span>
+<span id="cb2-140"><a href="#cb2-140" aria-hidden="true" tabindex="-1"></a>                <span class="op">&amp;</span><span class="pp">format!</span>(<span class="st">&quot;no worker registered for job type {:?}&quot;</span><span class="op">,</span> job<span class="op">.</span>job_type)<span class="op">,</span></span>
+<span id="cb2-141"><a href="#cb2-141" aria-hidden="true" tabindex="-1"></a>            )<span class="op">.</span><span class="kw">await</span><span class="op">?;</span></span>
+<span id="cb2-142"><a href="#cb2-142" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="cn">Ok</span>(<span class="cn">true</span>)<span class="op">;</span></span>
+<span id="cb2-143"><a href="#cb2-143" aria-hidden="true" tabindex="-1"></a>        <span class="op">};</span></span>
+<span id="cb2-144"><a href="#cb2-144" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-145"><a href="#cb2-145" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Execute with timeout</span></span>
+<span id="cb2-146"><a href="#cb2-146" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> timeout <span class="op">=</span> <span class="pp">std::time::Duration::</span>from_millis(job<span class="op">.</span>timeout_ms)<span class="op">;</span></span>
+<span id="cb2-147"><a href="#cb2-147" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> result <span class="op">=</span> <span class="pp">tokio::time::</span>timeout(timeout<span class="op">,</span> worker<span class="op">.</span>execute(<span class="op">&amp;</span>job))<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb2-148"><a href="#cb2-148" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-149"><a href="#cb2-149" aria-hidden="true" tabindex="-1"></a>        <span class="cf">match</span> result <span class="op">{</span></span>
+<span id="cb2-150"><a href="#cb2-150" aria-hidden="true" tabindex="-1"></a>            <span class="co">// Worker completed within timeout</span></span>
+<span id="cb2-151"><a href="#cb2-151" aria-hidden="true" tabindex="-1"></a>            <span class="cn">Ok</span>(<span class="cn">Ok</span>(result_payload)) <span class="op">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-152"><a href="#cb2-152" aria-hidden="true" tabindex="-1"></a>                <span class="kw">self</span><span class="op">.</span>job_repo<span class="op">.</span>mark_succeeded(<span class="op">&amp;</span>job<span class="op">.</span>id<span class="op">,</span> result_payload)<span class="op">.</span><span class="kw">await</span><span class="op">?;</span></span>
+<span id="cb2-153"><a href="#cb2-153" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span></span>
+<span id="cb2-154"><a href="#cb2-154" aria-hidden="true" tabindex="-1"></a>            <span class="co">// Worker returned an error</span></span>
+<span id="cb2-155"><a href="#cb2-155" aria-hidden="true" tabindex="-1"></a>            <span class="cn">Ok</span>(<span class="cn">Err</span>(e)) <span class="op">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-156"><a href="#cb2-156" aria-hidden="true" tabindex="-1"></a>                <span class="kw">self</span><span class="op">.</span>handle_failure(<span class="op">&amp;</span><span class="kw">mut</span> job<span class="op">,</span> <span class="op">&amp;</span>e<span class="op">.</span>to_string())<span class="op">.</span><span class="kw">await</span><span class="op">?;</span></span>
+<span id="cb2-157"><a href="#cb2-157" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span></span>
+<span id="cb2-158"><a href="#cb2-158" aria-hidden="true" tabindex="-1"></a>            <span class="co">// Timeout elapsed</span></span>
+<span id="cb2-159"><a href="#cb2-159" aria-hidden="true" tabindex="-1"></a>            <span class="cn">Err</span>(_) <span class="op">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-160"><a href="#cb2-160" aria-hidden="true" tabindex="-1"></a>                <span class="kw">self</span><span class="op">.</span>job_repo<span class="op">.</span>mark_canceled(<span class="op">&amp;</span>job<span class="op">.</span>id<span class="op">,</span> <span class="st">&quot;timeout exceeded&quot;</span>)<span class="op">.</span><span class="kw">await</span><span class="op">?;</span></span>
+<span id="cb2-161"><a href="#cb2-161" aria-hidden="true" tabindex="-1"></a>                logger<span class="op">.</span>error(</span>
+<span id="cb2-162"><a href="#cb2-162" aria-hidden="true" tabindex="-1"></a>                    <span class="op">&amp;</span><span class="pp">format!</span>(<span class="st">&quot;job timed out after {}ms&quot;</span><span class="op">,</span> job<span class="op">.</span>timeout_ms)<span class="op">,</span></span>
+<span id="cb2-163"><a href="#cb2-163" aria-hidden="true" tabindex="-1"></a>                    <span class="cn">None</span><span class="op">,</span></span>
+<span id="cb2-164"><a href="#cb2-164" aria-hidden="true" tabindex="-1"></a>                )<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb2-165"><a href="#cb2-165" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span></span>
+<span id="cb2-166"><a href="#cb2-166" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb2-167"><a href="#cb2-167" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-168"><a href="#cb2-168" aria-hidden="true" tabindex="-1"></a>        <span class="cn">Ok</span>(<span class="cn">true</span>)</span>
+<span id="cb2-169"><a href="#cb2-169" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-170"><a href="#cb2-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-171"><a href="#cb2-171" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// On failure: if retries remain, re-queue with incremented count.</span></span>
+<span id="cb2-172"><a href="#cb2-172" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Otherwise stay Failed.</span></span>
+<span id="cb2-173"><a href="#cb2-173" aria-hidden="true" tabindex="-1"></a>    <span class="kw">async</span> <span class="kw">fn</span> handle_failure(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> job<span class="op">:</span> <span class="op">&amp;</span><span class="kw">mut</span> Job<span class="op">,</span> error_msg<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span>) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span>()<span class="op">,</span> ConmanError<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb2-174"><a href="#cb2-174" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> job<span class="op">.</span>retry_count <span class="op">&lt;</span> job<span class="op">.</span>max_retries <span class="op">{</span></span>
+<span id="cb2-175"><a href="#cb2-175" aria-hidden="true" tabindex="-1"></a>            <span class="kw">self</span><span class="op">.</span>job_repo<span class="op">.</span>requeue_for_retry(<span class="op">&amp;</span>job<span class="op">.</span>id<span class="op">,</span> job<span class="op">.</span>retry_count <span class="op">+</span> <span class="dv">1</span>)<span class="op">.</span><span class="kw">await</span><span class="op">?;</span></span>
+<span id="cb2-176"><a href="#cb2-176" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb2-177"><a href="#cb2-177" aria-hidden="true" tabindex="-1"></a>            <span class="kw">self</span><span class="op">.</span>job_repo<span class="op">.</span>mark_failed(<span class="op">&amp;</span>job<span class="op">.</span>id<span class="op">,</span> error_msg)<span class="op">.</span><span class="kw">await</span><span class="op">?;</span></span>
+<span id="cb2-178"><a href="#cb2-178" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb2-179"><a href="#cb2-179" aria-hidden="true" tabindex="-1"></a>        <span class="cn">Ok</span>(())</span>
+<span id="cb2-180"><a href="#cb2-180" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb2-181"><a href="#cb2-181" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <h3 id="conman-api-types">conman-api types</h3>
+      <div class="sourceCode" id="cb3"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">chrono::</span><span class="op">{</span>DateTime<span class="op">,</span> Utc<span class="op">};</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">serde::</span><span class="op">{</span>Deserialize<span class="op">,</span> Serialize<span class="op">};</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">conman_core::</span><span class="op">{</span>JobType<span class="op">,</span> JobState<span class="op">,</span> LogLevel<span class="op">};</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">// ── API Response DTOs ───────────────────────────────────────────────────</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co">/// GET /api/repos/:repoId/jobs/:jobId response body.</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> Serialize<span class="at">)]</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> JobResponse <span class="op">{</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> repo_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> job_type<span class="op">:</span> JobType<span class="op">,</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> state<span class="op">:</span> JobState<span class="op">,</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> entity_type<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> entity_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> payload<span class="op">:</span> <span class="pp">serde_json::</span>Value<span class="op">,</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> result<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">&gt;,</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> error_message<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="dt">String</span><span class="op">&gt;,</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> retry_count<span class="op">:</span> <span class="dt">u32</span><span class="op">,</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> max_retries<span class="op">:</span> <span class="dt">u32</span><span class="op">,</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> timeout_ms<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> created_at<span class="op">:</span> DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;,</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> started_at<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span>DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;&gt;,</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> completed_at<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span>DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;&gt;,</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="co">/// Individual log entry within a job response or log listing.</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> Serialize<span class="at">)]</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> JobLogResponse <span class="op">{</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> job_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> level<span class="op">:</span> LogLevel<span class="op">,</span></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> message<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> data<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">&gt;,</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> timestamp<span class="op">:</span> DateTime<span class="op">&lt;</span>Utc<span class="op">&gt;,</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a><span class="co">/// Query parameters for GET /api/repos/:repoId/jobs</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> Deserialize<span class="at">)]</span></span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> ListJobsQuery <span class="op">{</span></span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>serde<span class="at">(</span><span class="kw">default</span> <span class="op">=</span> <span class="st">&quot;default_page&quot;</span><span class="at">)]</span></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> page<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>serde<span class="at">(</span><span class="kw">default</span> <span class="op">=</span> <span class="st">&quot;default_limit&quot;</span><span class="at">)]</span></span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> limit<span class="op">:</span> <span class="dt">u64</span><span class="op">,</span></span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Filter by job type (optional).</span></span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>serde<span class="at">(</span>rename <span class="op">=</span> <span class="st">&quot;type&quot;</span><span class="at">)]</span></span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> job_type<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span>JobType<span class="op">&gt;,</span></span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// Filter by job state (optional).</span></span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>    <span class="kw">pub</span> state<span class="op">:</span> <span class="dt">Option</span><span class="op">&lt;</span>JobState<span class="op">&gt;,</span></span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> default_page() <span class="op">-&gt;</span> <span class="dt">u64</span> <span class="op">{</span> <span class="dv">1</span> <span class="op">}</span></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> default_limit() <span class="op">-&gt;</span> <span class="dt">u64</span> <span class="op">{</span> <span class="dv">20</span> <span class="op">}</span></span></code></pre></div>
+      <hr />
+      <h2 id="4-database">4. Database</h2>
+      <h3 id="jobs-collection"><code>jobs</code> collection</h3>
+      <p><strong>Fields:</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Field</th>
+      <th>Type</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>_id</code></td>
+      <td><code>ObjectId</code></td>
+      <td>Primary key</td>
+      </tr>
+      <tr>
+      <td><code>repo_id</code></td>
+      <td><code>ObjectId</code></td>
+      <td>Owning app</td>
+      </tr>
+      <tr>
+      <td><code>job_type</code></td>
+      <td><code>String</code></td>
+      <td>Enum discriminator (snake_case)</td>
+      </tr>
+      <tr>
+      <td><code>state</code></td>
+      <td><code>String</code></td>
+      <td>Lifecycle state (snake_case)</td>
+      </tr>
+      <tr>
+      <td><code>entity_type</code></td>
+      <td><code>String</code></td>
+      <td>Domain entity type acted upon</td>
+      </tr>
+      <tr>
+      <td><code>entity_id</code></td>
+      <td><code>ObjectId</code></td>
+      <td>Domain entity id acted upon</td>
+      </tr>
+      <tr>
+      <td><code>payload</code></td>
+      <td><code>Document</code></td>
+      <td>Opaque input for the worker</td>
+      </tr>
+      <tr>
+      <td><code>result</code></td>
+      <td><code>Document?</code></td>
+      <td>Terminal success payload</td>
+      </tr>
+      <tr>
+      <td><code>error_message</code></td>
+      <td><code>String?</code></td>
+      <td>Failure reason</td>
+      </tr>
+      <tr>
+      <td><code>retry_count</code></td>
+      <td><code>i32</code></td>
+      <td>Current attempt number</td>
+      </tr>
+      <tr>
+      <td><code>max_retries</code></td>
+      <td><code>i32</code></td>
+      <td>Retry ceiling</td>
+      </tr>
+      <tr>
+      <td><code>timeout_ms</code></td>
+      <td><code>i64</code></td>
+      <td>Wall-clock timeout</td>
+      </tr>
+      <tr>
+      <td><code>created_at</code></td>
+      <td><code>DateTime</code></td>
+      <td>Enqueue time</td>
+      </tr>
+      <tr>
+      <td><code>started_at</code></td>
+      <td><code>DateTime?</code></td>
+      <td>Claim time</td>
+      </tr>
+      <tr>
+      <td><code>completed_at</code></td>
+      <td><code>DateTime?</code></td>
+      <td>Terminal state time</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Indexes:</strong></p>
+      <div class="sourceCode" id="cb4"><pre
+      class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Polling: claim the oldest Queued job efficiently</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>{ <span class="st">&quot;state&quot;</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span> <span class="st">&quot;created_at&quot;</span><span class="op">:</span> <span class="dv">1</span> }</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">// Look up jobs for a specific entity (e.g. all jobs for a changeset)</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>{ <span class="st">&quot;repo_id&quot;</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span> <span class="st">&quot;entity_type&quot;</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span> <span class="st">&quot;entity_id&quot;</span><span class="op">:</span> <span class="dv">1</span> }</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co">// Gate hook: find the latest job of a given type+state for an entity</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>{ <span class="st">&quot;repo_id&quot;</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span> <span class="st">&quot;job_type&quot;</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span> <span class="st">&quot;state&quot;</span><span class="op">:</span> <span class="dv">1</span> }</span></code></pre></div>
+      <p><strong>Example document:</strong></p>
+      <div class="sourceCode" id="cb5"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;_id&quot;</span><span class="fu">:</span> <span class="er">ObjectId(</span><span class="st">&quot;665a1b2c3d4e5f6a7b8c9d0e&quot;</span><span class="er">)</span><span class="fu">,</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;repo_id&quot;</span><span class="fu">:</span> <span class="er">ObjectId(</span><span class="st">&quot;665a0001aabbccddee000001&quot;</span><span class="er">)</span><span class="fu">,</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;job_type&quot;</span><span class="fu">:</span> <span class="st">&quot;msuite_submit&quot;</span><span class="fu">,</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;state&quot;</span><span class="fu">:</span> <span class="st">&quot;queued&quot;</span><span class="fu">,</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;entity_type&quot;</span><span class="fu">:</span> <span class="st">&quot;changeset&quot;</span><span class="fu">,</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;entity_id&quot;</span><span class="fu">:</span> <span class="er">ObjectId(</span><span class="st">&quot;665a0002aabbccddee000002&quot;</span><span class="er">)</span><span class="fu">,</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;payload&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;changeset_id&quot;</span><span class="fu">:</span> <span class="st">&quot;665a0002aabbccddee000002&quot;</span><span class="fu">,</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;head_sha&quot;</span><span class="fu">:</span> <span class="st">&quot;abc123def456&quot;</span><span class="fu">,</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;base_sha&quot;</span><span class="fu">:</span> <span class="st">&quot;789012fed345&quot;</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;result&quot;</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;error_message&quot;</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;retry_count&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;max_retries&quot;</span><span class="fu">:</span> <span class="dv">3</span><span class="fu">,</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;timeout_ms&quot;</span><span class="fu">:</span> <span class="dv">300000</span><span class="fu">,</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;created_at&quot;</span><span class="fu">:</span> <span class="er">ISODate(</span><span class="st">&quot;2025-06-01T12:00:00Z&quot;</span><span class="er">)</span><span class="fu">,</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;started_at&quot;</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;completed_at&quot;</span><span class="fu">:</span> <span class="kw">null</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <h3 id="job_logs-collection"><code>job_logs</code> collection</h3>
+      <p><strong>Fields:</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Field</th>
+      <th>Type</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>_id</code></td>
+      <td><code>ObjectId</code></td>
+      <td>Primary key</td>
+      </tr>
+      <tr>
+      <td><code>job_id</code></td>
+      <td><code>ObjectId</code></td>
+      <td>Parent job</td>
+      </tr>
+      <tr>
+      <td><code>level</code></td>
+      <td><code>String</code></td>
+      <td><code>info</code>, <code>warn</code>, or
+      <code>error</code></td>
+      </tr>
+      <tr>
+      <td><code>message</code></td>
+      <td><code>String</code></td>
+      <td>Human-readable log line</td>
+      </tr>
+      <tr>
+      <td><code>data</code></td>
+      <td><code>Document?</code></td>
+      <td>Optional structured data</td>
+      </tr>
+      <tr>
+      <td><code>timestamp</code></td>
+      <td><code>DateTime</code></td>
+      <td>When the log was written</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Indexes:</strong></p>
+      <div class="sourceCode" id="cb6"><pre
+      class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Fetch logs for a job in chronological order</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>{ <span class="st">&quot;job_id&quot;</span><span class="op">:</span> <span class="dv">1</span><span class="op">,</span> <span class="st">&quot;timestamp&quot;</span><span class="op">:</span> <span class="dv">1</span> }</span></code></pre></div>
+      <p><strong>Example document:</strong></p>
+      <div class="sourceCode" id="cb7"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;_id&quot;</span><span class="fu">:</span> <span class="er">ObjectId(</span><span class="st">&quot;665a1c001122334455667788&quot;</span><span class="er">)</span><span class="fu">,</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;job_id&quot;</span><span class="fu">:</span> <span class="er">ObjectId(</span><span class="st">&quot;665a1b2c3d4e5f6a7b8c9d0e&quot;</span><span class="er">)</span><span class="fu">,</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;level&quot;</span><span class="fu">:</span> <span class="st">&quot;info&quot;</span><span class="fu">,</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;message&quot;</span><span class="fu">:</span> <span class="st">&quot;msuite test suite started&quot;</span><span class="fu">,</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;data&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;suite&quot;</span><span class="fu">:</span> <span class="st">&quot;config_validation&quot;</span><span class="fu">,</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;test_count&quot;</span><span class="fu">:</span> <span class="dv">42</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;timestamp&quot;</span><span class="fu">:</span> <span class="er">ISODate(</span><span class="st">&quot;2025-06-01T12:00:05Z&quot;</span><span class="er">)</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <hr />
+      <h2 id="5-api-endpoints">5. API Endpoints</h2>
+      <h3
+      id="get-apireposrepoidjobsjobid"><code>GET /api/repos/:repoId/jobs/:jobId</code></h3>
+      <p>Retrieve a single job by ID, including its current state,
+      result, and error.</p>
+      <p><strong>Auth:</strong> Any app member (user, reviewer,
+      config_manager, admin).</p>
+      <p><strong>Path params:</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Param</th>
+      <th>Type</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>repoId</code></td>
+      <td><code>ObjectId</code> hex</td>
+      <td>App scope</td>
+      </tr>
+      <tr>
+      <td><code>jobId</code></td>
+      <td><code>ObjectId</code> hex</td>
+      <td>Job to retrieve</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Response:</strong> <code>200 OK</code></p>
+      <div class="sourceCode" id="cb8"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;data&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;665a1b2c3d4e5f6a7b8c9d0e&quot;</span><span class="fu">,</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;repo_id&quot;</span><span class="fu">:</span> <span class="st">&quot;665a0001aabbccddee000001&quot;</span><span class="fu">,</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;job_type&quot;</span><span class="fu">:</span> <span class="st">&quot;msuite_submit&quot;</span><span class="fu">,</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;state&quot;</span><span class="fu">:</span> <span class="st">&quot;succeeded&quot;</span><span class="fu">,</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;entity_type&quot;</span><span class="fu">:</span> <span class="st">&quot;changeset&quot;</span><span class="fu">,</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;entity_id&quot;</span><span class="fu">:</span> <span class="st">&quot;665a0002aabbccddee000002&quot;</span><span class="fu">,</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;payload&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;changeset_id&quot;</span><span class="fu">:</span> <span class="st">&quot;665a0002aabbccddee000002&quot;</span><span class="fu">,</span> <span class="dt">&quot;head_sha&quot;</span><span class="fu">:</span> <span class="st">&quot;abc123&quot;</span> <span class="fu">},</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;result&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;passed&quot;</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span> <span class="dt">&quot;test_count&quot;</span><span class="fu">:</span> <span class="dv">42</span><span class="fu">,</span> <span class="dt">&quot;failures&quot;</span><span class="fu">:</span> <span class="ot">[]</span> <span class="fu">},</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;error_message&quot;</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;retry_count&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;max_retries&quot;</span><span class="fu">:</span> <span class="dv">3</span><span class="fu">,</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;timeout_ms&quot;</span><span class="fu">:</span> <span class="dv">300000</span><span class="fu">,</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;created_at&quot;</span><span class="fu">:</span> <span class="st">&quot;2025-06-01T12:00:00Z&quot;</span><span class="fu">,</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;started_at&quot;</span><span class="fu">:</span> <span class="st">&quot;2025-06-01T12:00:02Z&quot;</span><span class="fu">,</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;completed_at&quot;</span><span class="fu">:</span> <span class="st">&quot;2025-06-01T12:01:30Z&quot;</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <p><strong>Errors:</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Status</th>
+      <th>Code</th>
+      <th>When</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>404</td>
+      <td><code>not_found</code></td>
+      <td>Job does not exist or belongs to a different app</td>
+      </tr>
+      <tr>
+      <td>403</td>
+      <td><code>forbidden</code></td>
+      <td>User is not a member of the app</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3
+      id="get-apireposrepoidjobspagelimittypestate"><code>GET /api/repos/:repoId/jobs?page=&amp;limit=&amp;type=&amp;state=</code></h3>
+      <p>List jobs for an app with optional filters and pagination.</p>
+      <p><strong>Auth:</strong> Any app member.</p>
+      <p><strong>Query params:</strong></p>
+      <table>
+      <thead>
+      <tr>
+      <th>Param</th>
+      <th>Type</th>
+      <th>Default</th>
+      <th>Description</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>page</code></td>
+      <td><code>u64</code></td>
+      <td><code>1</code></td>
+      <td>1-based page number</td>
+      </tr>
+      <tr>
+      <td><code>limit</code></td>
+      <td><code>u64</code></td>
+      <td><code>20</code></td>
+      <td>Results per page (max 100)</td>
+      </tr>
+      <tr>
+      <td><code>type</code></td>
+      <td><code>JobType?</code></td>
+      <td>none</td>
+      <td>Filter by job type</td>
+      </tr>
+      <tr>
+      <td><code>state</code></td>
+      <td><code>JobState?</code></td>
+      <td>none</td>
+      <td>Filter by job state</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><strong>Response:</strong> <code>200 OK</code></p>
+      <div class="sourceCode" id="cb9"><pre
+      class="sourceCode json"><code class="sourceCode json"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;data&quot;</span><span class="fu">:</span> <span class="ot">[</span> <span class="er">/*</span> <span class="er">array</span> <span class="er">of</span> <span class="er">JobResponse</span> <span class="er">*/</span> <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;pagination&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;page&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span> <span class="dt">&quot;limit&quot;</span><span class="fu">:</span> <span class="dv">20</span><span class="fu">,</span> <span class="dt">&quot;total&quot;</span><span class="fu">:</span> <span class="dv">5</span> <span class="fu">}</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+      <hr />
+      <h2 id="6-business-logic">6. Business Logic</h2>
+      <h3 id="job-runner-polling-loop">Job runner polling loop</h3>
+      <p>The <code>JobRunner</code> runs as a
+      <code>tokio::spawn</code>ed task started in <code>main.rs</code>.
+      It continuously polls for work:</p>
+      <ol type="1">
+      <li>Query <code>jobs</code> collection for the oldest document
+      with <code>state = "queued"</code>, ordered by
+      <code>created_at</code> ascending.</li>
+      <li>Atomically transition the document from <code>Queued</code> to
+      <code>Running</code> via <code>findOneAndUpdate</code> with a
+      filter that includes <code>state: "queued"</code>. This is the
+      <strong>claim mechanism</strong> -- if two runners race, only one
+      succeeds; the loser's update matches zero documents and retries on
+      the next poll.</li>
+      <li>Set <code>started_at</code> to <code>Utc::now()</code>.</li>
+      <li>Look up the registered <code>JobWorker</code> for the job's
+      <code>job_type</code>.</li>
+      <li>Execute the worker inside a <code>tokio::time::timeout</code>
+      bounded by <code>timeout_ms</code>.</li>
+      <li>On success: set <code>state = "succeeded"</code>,
+      <code>result = worker_output</code>,
+      <code>completed_at = now</code>.</li>
+      <li>On worker error: invoke retry logic (see below).</li>
+      <li>On timeout: set <code>state = "canceled"</code>,
+      <code>error_message = "timeout exceeded"</code>,
+      <code>completed_at = now</code>.</li>
+      </ol>
+      <p>When no jobs are available, the runner sleeps for
+      <code>poll_interval_ms</code> (configurable, default 1000ms)
+      before polling again. A <code>tokio::sync::watch</code> channel
+      carries the shutdown signal so the runner exits cleanly.</p>
+      <h3 id="claim-mechanism">Claim mechanism</h3>
+      <p>The atomic claim prevents double-processing when multiple
+      runner instances exist (horizontal scaling). The MongoDB update
+      uses:</p>
+      <div class="sourceCode" id="cb10"><pre
+      class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>db<span class="op">.</span><span class="at">jobs</span><span class="op">.</span><span class="fu">findOneAndUpdate</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  { <span class="dt">state</span><span class="op">:</span> <span class="st">&quot;queued&quot;</span> }<span class="op">,</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  { <span class="dt">$set</span><span class="op">:</span> { <span class="dt">state</span><span class="op">:</span> <span class="st">&quot;running&quot;</span><span class="op">,</span> <span class="dt">started_at</span><span class="op">:</span> <span class="fu">ISODate</span>() } }<span class="op">,</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  { <span class="dt">sort</span><span class="op">:</span> { <span class="dt">created_at</span><span class="op">:</span> <span class="dv">1</span> }<span class="op">,</span> <span class="dt">returnDocument</span><span class="op">:</span> <span class="st">&quot;after&quot;</span> }</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+      <p>If the result is <code>null</code>, no job was available. Two
+      concurrent callers will never both receive the same document
+      because <code>findOneAndUpdate</code> is atomic.</p>
+      <h3 id="timeout">Timeout</h3>
+      <p>If a worker exceeds its <code>timeout_ms</code>, the
+      <code>tokio::time::timeout</code> wrapper resolves to
+      <code>Err</code>. The runner then:</p>
+      <ol type="1">
+      <li>Sets the job to <code>Canceled</code> with
+      <code>error_message = "timeout exceeded"</code>.</li>
+      <li>Writes an error-level job log entry.</li>
+      <li>Does <strong>not</strong> retry on timeout -- timeouts
+      indicate a systemic issue, not a transient failure.</li>
+      </ol>
+      <h3 id="retry">Retry</h3>
+      <p>When a worker returns an error:</p>
+      <ol type="1">
+      <li>If <code>retry_count &lt; max_retries</code>, the runner
+      atomically updates the job:
+      <ul>
+      <li><code>state</code> back to <code>Queued</code></li>
+      <li><code>retry_count</code> incremented by 1</li>
+      <li><code>started_at</code> cleared to <code>None</code> The job
+      re-enters the queue and will be picked up on a subsequent
+      poll.</li>
+      </ul></li>
+      <li>If <code>retry_count &gt;= max_retries</code>, the job stays
+      <code>Failed</code>:
+      <ul>
+      <li><code>state = "failed"</code></li>
+      <li><code>error_message</code> set to the worker's error
+      string</li>
+      <li><code>completed_at = now</code></li>
+      </ul></li>
+      </ol>
+      <p>Default retry/timeout values per job type:</p>
+      <table>
+      <thead>
+      <tr>
+      <th>Job Type</th>
+      <th><code>max_retries</code></th>
+      <th><code>timeout_ms</code></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>msuite_submit</code></td>
+      <td>3</td>
+      <td>300000 (5 min)</td>
+      </tr>
+      <tr>
+      <td><code>msuite_merge</code></td>
+      <td>3</td>
+      <td>300000 (5 min)</td>
+      </tr>
+      <tr>
+      <td><code>msuite_deploy</code></td>
+      <td>2</td>
+      <td>600000 (10 min)</td>
+      </tr>
+      <tr>
+      <td><code>revalidate_queued_changeset</code></td>
+      <td>3</td>
+      <td>300000 (5 min)</td>
+      </tr>
+      <tr>
+      <td><code>release_assemble</code></td>
+      <td>2</td>
+      <td>600000 (10 min)</td>
+      </tr>
+      <tr>
+      <td><code>deploy_release</code></td>
+      <td>1</td>
+      <td>900000 (15 min)</td>
+      </tr>
+      <tr>
+      <td><code>temp_env_provision</code></td>
+      <td>2</td>
+      <td>300000 (5 min)</td>
+      </tr>
+      <tr>
+      <td><code>temp_env_expire</code></td>
+      <td>3</td>
+      <td>60000 (1 min)</td>
+      </tr>
+      </tbody>
+      </table>
+      <h3 id="gate-hooks">Gate hooks</h3>
+      <p>Gate hooks are synchronous checks called from request handlers
+      (submit, queue, release, deploy) to verify that a required
+      asynchronous job completed successfully before allowing the
+      workflow transition.</p>
+      <div class="sourceCode" id="cb11"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co">/// Checks whether a successful job of the given type exists for the entity.</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co">/// Returns Ok(()) if the gate passes, or ConmanError::Conflict if the</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co">/// required job has not succeeded.</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> require_job_success(</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    job_repo<span class="op">:</span> <span class="op">&amp;</span>JobRepo<span class="op">,</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    repo_id<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    entity_type<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    entity_id<span class="op">:</span> <span class="op">&amp;</span><span class="dt">str</span><span class="op">,</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    job_type<span class="op">:</span> JobType<span class="op">,</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span>()<span class="op">,</span> ConmanError<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> filter <span class="op">=</span> <span class="pp">doc!</span> <span class="op">{</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;repo_id&quot;</span><span class="op">:</span> <span class="pp">ObjectId::</span>parse_str(repo_id)<span class="op">?,</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;entity_type&quot;</span><span class="op">:</span> entity_type<span class="op">,</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;entity_id&quot;</span><span class="op">:</span> <span class="pp">ObjectId::</span>parse_str(entity_id)<span class="op">?,</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;job_type&quot;</span><span class="op">:</span> job_type<span class="op">.</span>as_str()<span class="op">,</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;state&quot;</span><span class="op">:</span> <span class="st">&quot;succeeded&quot;</span><span class="op">,</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    <span class="op">};</span></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> exists <span class="op">=</span> job_repo<span class="op">.</span>collection<span class="op">.</span>count_documents(filter)<span class="op">.</span><span class="kw">await</span><span class="op">?</span> <span class="op">&gt;</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">!</span>exists <span class="op">{</span></span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="cn">Err</span>(<span class="pp">ConmanError::</span>Conflict <span class="op">{</span></span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>            message<span class="op">:</span> <span class="pp">format!</span>(</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;required {} job has not succeeded for {} {}&quot;</span><span class="op">,</span></span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>                job_type<span class="op">.</span>as_str()<span class="op">,</span> entity_type<span class="op">,</span> entity_id<span class="op">,</span></span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>            )<span class="op">,</span></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span>)<span class="op">;</span></span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>    <span class="cn">Ok</span>(())</span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <p>Gate hook integration points:</p>
+      <table>
+      <thead>
+      <tr>
+      <th>Flow</th>
+      <th>Gate check</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Changeset submit</td>
+      <td><code>require_job_success(repo_id, "changeset", changeset_id, MsuiteSubmit)</code></td>
+      </tr>
+      <tr>
+      <td>Changeset queue</td>
+      <td><code>require_job_success(repo_id, "changeset", changeset_id, MsuiteSubmit)</code></td>
+      </tr>
+      <tr>
+      <td>Release publish</td>
+      <td><code>require_job_success(repo_id, "release", release_id, MsuiteMerge)</code></td>
+      </tr>
+      <tr>
+      <td>Deploy release</td>
+      <td><code>require_job_success(repo_id, "deployment", deployment_id, MsuiteDeploy)</code></td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Note: The submit handler first <em>creates</em> the
+      <code>MsuiteSubmit</code> job. The gate hook is checked on the
+      <em>next</em> transition (e.g. moving from <code>submitted</code>
+      to <code>in_review</code> or from <code>approved</code> to
+      <code>queued</code>), ensuring the msuite job has completed before
+      the changeset advances.</p>
+      <h3 id="structured-logging">Structured logging</h3>
+      <p>Workers receive a <code>JobLogger</code> and call
+      <code>logger.info(msg, data)</code>,
+      <code>logger.warn(msg, data)</code>, or
+      <code>logger.error(msg, data)</code> during execution. Each call
+      inserts a document into <code>job_logs</code> immediately
+      (fire-and-forget -- insertion failures are traced but never block
+      the worker). This gives operators real-time visibility into job
+      progress.</p>
+      <h3 id="msuite-workers">msuite workers</h3>
+      <p>The three msuite workers (<code>MsuiteSubmit</code>,
+      <code>MsuiteMerge</code>, <code>MsuiteDeploy</code>) are
+      placeholder implementations in v1. They simulate the external
+      msuite test runner with configurable pass/fail behavior:</p>
+      <div class="sourceCode" id="cb12"><pre
+      class="sourceCode rust"><code class="sourceCode rust"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">pub</span> <span class="kw">struct</span> MsuiteSubmitWorker <span class="op">{</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    logger<span class="op">:</span> JobLogger<span class="op">,</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>async_trait<span class="at">]</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> JobWorker <span class="cf">for</span> MsuiteSubmitWorker <span class="op">{</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">async</span> <span class="kw">fn</span> execute(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> job<span class="op">:</span> <span class="op">&amp;</span>Job) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span><span class="pp">serde_json::</span>Value<span class="op">,</span> ConmanError<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>        <span class="kw">self</span><span class="op">.</span>logger<span class="op">.</span>info(<span class="st">&quot;starting msuite submit validation&quot;</span><span class="op">,</span> <span class="cn">None</span>)<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Placeholder: simulate test execution</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Real implementation will call external msuite service</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> changeset_id <span class="op">=</span> job<span class="op">.</span>payload<span class="op">.</span>get(<span class="st">&quot;changeset_id&quot;</span>)</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>and_then(<span class="op">|</span>v<span class="op">|</span> v<span class="op">.</span>as_str())</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>ok_or_else(<span class="op">||</span> <span class="pp">ConmanError::</span>Validation <span class="op">{</span></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>                message<span class="op">:</span> <span class="st">&quot;missing changeset_id in payload&quot;</span><span class="op">.</span>to_string()<span class="op">,</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span>)<span class="op">?;</span></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>        <span class="kw">self</span><span class="op">.</span>logger<span class="op">.</span>info(</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>            <span class="op">&amp;</span><span class="pp">format!</span>(<span class="st">&quot;running validation for changeset {}&quot;</span><span class="op">,</span> changeset_id)<span class="op">,</span></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>            <span class="cn">Some</span>(<span class="pp">serde_json::json!</span>(<span class="op">{</span> <span class="st">&quot;changeset_id&quot;</span><span class="op">:</span> changeset_id <span class="op">}</span>))<span class="op">,</span></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>        )<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>        <span class="co">// Simulate success</span></span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> result <span class="op">=</span> <span class="pp">serde_json::json!</span>(<span class="op">{</span></span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;passed&quot;</span><span class="op">:</span> <span class="cn">true</span><span class="op">,</span></span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;test_count&quot;</span><span class="op">:</span> <span class="dv">0</span><span class="op">,</span></span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;failures&quot;</span><span class="op">:</span> []<span class="op">,</span></span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;simulated&quot;</span><span class="op">:</span> <span class="cn">true</span><span class="op">,</span></span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span>)<span class="op">;</span></span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>        <span class="kw">self</span><span class="op">.</span>logger<span class="op">.</span>info(<span class="st">&quot;msuite submit validation complete&quot;</span><span class="op">,</span> <span class="cn">Some</span>(result<span class="op">.</span>clone()))<span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>        <span class="cn">Ok</span>(result)</span>
+<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+      <p><code>MsuiteMergeWorker</code> and
+      <code>MsuiteDeployWorker</code> follow the same pattern with their
+      respective payload expectations.</p>
+      <hr />
+      <h2 id="7-gitaly-rs-integration">7. Gitaly-rs Integration</h2>
+      <p>N/A for the job framework itself. Individual workers (msuite,
+      release assembly, deployment) may need gitaly access, but that is
+      handled by those workers calling into <code>conman-git</code> and
+      is specified in their respective epics (E08, E09).</p>
+      <hr />
+      <h2 id="8-implementation-checklist">8. Implementation
+      Checklist</h2>
+      <h3 id="e06-01-generic-jobs-framework">E06-01: Generic jobs
+      framework</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Add <code>JobType</code>,
+      <code>JobState</code>, <code>LogLevel</code> enums to
+      <code>conman-core</code></label></li>
+      <li><label><input type="checkbox" />Add <code>Job</code>,
+      <code>JobLog</code> domain structs to
+      <code>conman-core</code></label></li>
+      <li><label><input type="checkbox" />Add
+      <code>JobState::is_terminal()</code> helper</label></li>
+      <li><label><input type="checkbox" />Implement <code>Display</code>
+      / <code>as_str()</code> for enums (needed for MongoDB string
+      storage)</label></li>
+      <li><label><input type="checkbox" />Add <code>conman-jobs</code>
+      crate to workspace <code>Cargo.toml</code></label></li>
+      <li><label><input type="checkbox" />Define <code>JobWorker</code>
+      trait in <code>conman-jobs</code></label></li>
+      <li><label><input type="checkbox" />Define <code>JobLogger</code>
+      struct in <code>conman-jobs</code></label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>JobLogger::info</code>, <code>warn</code>,
+      <code>error</code>, and internal <code>write</code></label></li>
+      <li><label><input type="checkbox" />Unit tests for
+      <code>JobState::is_terminal()</code></label></li>
+      <li><label><input type="checkbox" />Unit tests for enum
+      serialization round-trips</label></li>
+      </ul>
+      <h3 id="e06-02-job-repositories-and-runner">E06-02: Job
+      repositories and runner</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Implement <code>JobRepo</code>
+      in <code>conman-db</code> with CRUD operations</label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>JobRepo::claim_next()</code> using atomic
+      <code>findOneAndUpdate</code></label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>JobRepo::mark_succeeded()</code>,
+      <code>mark_failed()</code>,
+      <code>mark_canceled()</code></label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>JobRepo::requeue_for_retry()</code></label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>JobLogRepo</code> in <code>conman-db</code> with insert +
+      query by job_id</label></li>
+      <li><label><input type="checkbox" />Create indexes on
+      <code>jobs</code> collection in
+      <code>ensure_indexes()</code></label></li>
+      <li><label><input type="checkbox" />Create indexes on
+      <code>job_logs</code> collection in
+      <code>ensure_indexes()</code></label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>JobRunner</code> polling loop in
+      <code>conman-jobs</code></label></li>
+      <li><label><input type="checkbox" />Wire shutdown signal via
+      <code>tokio::sync::watch</code></label></li>
+      <li><label><input type="checkbox" />Add
+      <code>CONMAN_JOB_POLL_INTERVAL_MS</code> config (default
+      1000)</label></li>
+      <li><label><input type="checkbox" />Integration test: runner
+      claims and executes a queued job</label></li>
+      <li><label><input type="checkbox" />Integration test: runner
+      handles empty queue gracefully</label></li>
+      </ul>
+      <h3 id="e06-03-msuite-placeholder-workers">E06-03: msuite
+      placeholder workers</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Implement
+      <code>MsuiteSubmitWorker</code> with structured
+      logging</label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>MsuiteMergeWorker</code> with structured
+      logging</label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>MsuiteDeployWorker</code> with structured
+      logging</label></li>
+      <li><label><input type="checkbox" />Register workers in
+      <code>JobRunner</code> worker map</label></li>
+      <li><label><input type="checkbox" />Wire <code>JobRunner</code>
+      startup in <code>main.rs</code> with
+      <code>tokio::spawn</code></label></li>
+      <li><label><input type="checkbox" />Integration test:
+      msuite_submit worker produces expected result payload</label></li>
+      <li><label><input type="checkbox" />Integration test: worker
+      failure is captured as job error</label></li>
+      </ul>
+      <h3 id="e06-04-api-endpoints">E06-04: API endpoints</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Add <code>JobResponse</code>,
+      <code>JobLogResponse</code>, <code>ListJobsQuery</code> to
+      <code>conman-api</code></label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>GET /api/repos/:repoId/jobs/:jobId</code>
+      handler</label></li>
+      <li><label><input type="checkbox" />Implement
+      <code>GET /api/repos/:repoId/jobs</code> handler with filters +
+      pagination</label></li>
+      <li><label><input type="checkbox" />Add routes to Axum
+      router</label></li>
+      <li><label><input type="checkbox" />Integration test: get job by
+      id returns correct response</label></li>
+      <li><label><input type="checkbox" />Integration test: list jobs
+      with type/state filters</label></li>
+      <li><label><input type="checkbox" />Integration test: pagination
+      returns correct total and pages</label></li>
+      </ul>
+      <h3 id="e06-05-gate-hooks">E06-05: Gate hooks</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Implement
+      <code>require_job_success()</code> in
+      <code>conman-jobs</code></label></li>
+      <li><label><input type="checkbox" />Integrate gate hook into
+      changeset submit flow (E05 handler)</label></li>
+      <li><label><input type="checkbox" />Integrate gate hook into
+      changeset queue flow (E07 handler, stubbed)</label></li>
+      <li><label><input type="checkbox" />Integrate gate hook into
+      release publish flow (E08 handler, stubbed)</label></li>
+      <li><label><input type="checkbox" />Integrate gate hook into
+      deploy flow (E09 handler, stubbed)</label></li>
+      <li><label><input type="checkbox" />Unit test: gate passes when
+      successful job exists</label></li>
+      <li><label><input type="checkbox" />Unit test: gate fails when no
+      successful job exists</label></li>
+      <li><label><input type="checkbox" />Unit test: gate fails when
+      only failed/running/queued jobs exist</label></li>
+      </ul>
+      <h3 id="e06-06-retry-and-timeout-policies">E06-06: Retry and
+      timeout policies</h3>
+      <ul class="task-list">
+      <li><label><input type="checkbox" />Implement timeout handling in
+      <code>JobRunner::poll_and_execute</code></label></li>
+      <li><label><input type="checkbox" />Implement retry logic in
+      <code>JobRunner::handle_failure</code></label></li>
+      <li><label><input type="checkbox" />Add default retry/timeout
+      constants per <code>JobType</code></label></li>
+      <li><label><input type="checkbox" />Integration test: failed job
+      with retries remaining is re-queued</label></li>
+      <li><label><input type="checkbox" />Integration test: failed job
+      with max retries stays Failed</label></li>
+      <li><label><input type="checkbox" />Integration test: timed-out
+      job is Canceled</label></li>
+      <li><label><input type="checkbox" />Integration test: re-queued
+      job is picked up and retried</label></li>
+      </ul>
+      <hr />
+      <h2 id="9-test-cases">9. Test Cases</h2>
+      <h3 id="unit-tests-conman-core-conman-jobs">Unit tests
+      (conman-core, conman-jobs)</h3>
+      <ol type="1">
+      <li><p><strong>Job creation sets state to Queued.</strong> Create
+      a <code>Job</code> with <code>JobState::Queued</code> and verify
+      all default fields are set correctly
+      (<code>retry_count = 0</code>, <code>result = None</code>,
+      <code>started_at = None</code>,
+      <code>completed_at = None</code>).</p></li>
+      <li><p><strong>JobState::is_terminal returns correct
+      values.</strong> Verify that <code>Succeeded</code>,
+      <code>Failed</code>, and <code>Canceled</code> return
+      <code>true</code>; <code>Queued</code> and <code>Running</code>
+      return <code>false</code>.</p></li>
+      <li><p><strong>Enum serialization round-trips.</strong> Serialize
+      each <code>JobType</code>, <code>JobState</code>, and
+      <code>LogLevel</code> variant to JSON and deserialize back,
+      verifying equality.</p></li>
+      <li><p><strong>Gate hook passes when successful job
+      exists.</strong> Given a <code>JobRepo</code> containing a
+      <code>Succeeded</code> job matching
+      <code>(repo_id, entity_type, entity_id, job_type)</code>,
+      <code>require_job_success</code> returns
+      <code>Ok(())</code>.</p></li>
+      <li><p><strong>Gate hook fails when no successful job
+      exists.</strong> Given an empty collection (or only
+      <code>Failed</code>/<code>Running</code>/<code>Queued</code>
+      jobs), <code>require_job_success</code> returns
+      <code>Err(ConmanError::Conflict)</code>.</p></li>
+      <li><p><strong>Gate hook fails with only non-succeeded
+      jobs.</strong> Insert <code>Failed</code>, <code>Running</code>,
+      and <code>Queued</code> jobs for the same entity. Verify the gate
+      still returns <code>Err(ConmanError::Conflict)</code>.</p></li>
+      </ol>
+      <h3 id="integration-tests-require-mongodb">Integration tests
+      (require MongoDB)</h3>
+      <ol start="7" type="1">
+      <li><p><strong>Runner picks up oldest queued job.</strong> Insert
+      two Queued jobs with different <code>created_at</code> values.
+      Start the runner. Verify the older job is claimed first
+      (transitions to <code>Running</code> before the newer
+      one).</p></li>
+      <li><p><strong>Successful execution transitions to Succeeded with
+      result.</strong> Create a Queued job and register a worker that
+      returns <code>Ok(json!({"ok": true}))</code>. After runner
+      processes it, verify <code>state = Succeeded</code>,
+      <code>result</code> matches, <code>completed_at</code> is
+      set.</p></li>
+      <li><p><strong>Failed execution transitions to Failed with
+      error.</strong> Create a Queued job and register a worker that
+      returns <code>Err(...)</code>. With <code>max_retries = 0</code>,
+      verify <code>state = Failed</code>, <code>error_message</code> is
+      set, <code>completed_at</code> is set.</p></li>
+      <li><p><strong>Retry re-queues with incremented count.</strong>
+      Create a Queued job with <code>max_retries = 2</code>. Register a
+      failing worker. After first execution, verify
+      <code>state = Queued</code>, <code>retry_count = 1</code>,
+      <code>started_at = None</code>.</p></li>
+      <li><p><strong>Max retries exceeded stays Failed.</strong> Create
+      a Queued job with <code>max_retries = 1</code>,
+      <code>retry_count = 1</code>. Register a failing worker. After
+      execution, verify <code>state = Failed</code> (not
+      re-queued).</p></li>
+      <li><p><strong>Timeout cancels running job.</strong> Create a
+      Queued job with <code>timeout_ms = 50</code>. Register a worker
+      that sleeps for 200ms. After runner processes it, verify
+      <code>state = Canceled</code>, <code>error_message</code> contains
+      "timeout".</p></li>
+      <li><p><strong>Concurrent runners don't double-process (claim
+      mechanism).</strong> Insert one Queued job. Spawn two runner
+      instances. Verify that exactly one succeeds in claiming (the other
+      gets <code>None</code> from <code>findOneAndUpdate</code>). Verify
+      the job is processed exactly once.</p></li>
+      <li><p><strong>Job logs are queryable by job_id.</strong> Create a
+      job, execute a worker that writes 3 log entries via
+      <code>JobLogger</code>. Query <code>job_logs</code> by
+      <code>job_id</code>. Verify 3 entries returned in chronological
+      order with correct levels and messages.</p></li>
+      <li><p><strong>API: get job returns 404 for wrong app.</strong>
+      Create a job under <code>app_a</code>. Request
+      <code>GET /api/repos/:app_b/jobs/:jobId</code>. Verify
+      404.</p></li>
+      <li><p><strong>API: list jobs with type filter.</strong> Create 3
+      jobs (2 MsuiteSubmit, 1 DeployRelease). Request
+      <code>GET /api/repos/:repoId/jobs?type=msuite_submit</code>.
+      Verify 2 results.</p></li>
+      <li><p><strong>API: list jobs with state filter.</strong> Create 3
+      jobs (1 Queued, 1 Running, 1 Succeeded). Request
+      <code>GET /api/repos/:repoId/jobs?state=queued</code>. Verify 1
+      result.</p></li>
+      <li><p><strong>API: list jobs pagination.</strong> Create 25 jobs.
+      Request with <code>page=2&amp;limit=10</code>. Verify 10 results
+      on page 2, <code>total = 25</code>.</p></li>
+      </ol>
+      <hr />
+      <h2 id="10-acceptance-criteria">10. Acceptance Criteria</h2>
+      <ol type="1">
+      <li><p><strong>Async execution.</strong> All msuite checks,
+      revalidation, assembly, deployment, and temp-env operations run as
+      background jobs -- never inline in HTTP handlers.</p></li>
+      <li><p><strong>State tracking.</strong> Every job transitions
+      through
+      <code>Queued -&gt; Running -&gt; Succeeded | Failed | Canceled</code>.
+      No job gets stuck in an intermediate state indefinitely (timeout
+      ensures forward progress).</p></li>
+      <li><p><strong>Gate enforcement.</strong> Submit, queue,
+      release-publish, and deploy handlers call
+      <code>require_job_success</code> and return
+      <code>409 Conflict</code> when the required job has not succeeded.
+      Workflow transitions are blocked until the mandatory check
+      passes.</p></li>
+      <li><p><strong>Pollable status.</strong> Clients can poll
+      <code>GET /api/repos/:repoId/jobs/:jobId</code> to observe job
+      progress and retrieve the terminal result/error.</p></li>
+      <li><p><strong>Structured logs.</strong> Workers emit real-time
+      log entries to <code>job_logs</code>. Operators can query logs by
+      <code>job_id</code> in chronological order for debugging.</p></li>
+      <li><p><strong>Retry resilience.</strong> Transient failures are
+      retried up to <code>max_retries</code> without manual
+      intervention. Permanent failures surface a clear
+      <code>error_message</code>.</p></li>
+      <li><p><strong>Timeout safety.</strong> Jobs that exceed
+      <code>timeout_ms</code> are automatically canceled, preventing
+      resource exhaustion from hung workers.</p></li>
+      <li><p><strong>No double-processing.</strong> The atomic claim
+      mechanism guarantees that concurrent runner instances never
+      execute the same job twice.</p></li>
+      <li><p><strong>Clean shutdown.</strong> The job runner exits its
+      polling loop gracefully on receiving the shutdown signal, allowing
+      in-flight jobs to complete before the process terminates.</p></li>
+      <li><p><strong>Horizontal scalability.</strong> Multiple
+      <code>JobRunner</code> instances can run in parallel (e.g. across
+      pods) with correctness guaranteed by the atomic claim. No external
+      coordination service is required.</p></li>
+      <li><p><strong>Profile-aware gate defaults.</strong> Gate
+      configuration supports: submit -&gt; temp profile only, release
+      publish -&gt; environment profiles only, deploy -&gt; target
+      environment profile only.</p></li>
+      <li><p><strong>Migration execution metadata is persisted.</strong>
+      Jobs that execute migration commands record applied migration
+      identifiers/status into Conman metadata for downstream drift
+      detection and deploy gating.</p></li>
+      </ol>
+    </main>
+  </div>
+</body>
+</html>
