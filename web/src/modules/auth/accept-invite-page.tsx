@@ -16,8 +16,8 @@ export function AcceptInvitePage(): React.ReactElement {
   const navigate = useNavigate();
   const { setToken } = useAuth();
   const [token, setInviteToken] = useState("");
-  const [name, setName] = useState("Reviewer User");
-  const [password, setPassword] = useState("ReviewerPassw0rd!!");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {

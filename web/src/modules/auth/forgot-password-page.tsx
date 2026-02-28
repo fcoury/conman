@@ -11,7 +11,7 @@ interface ForgotResponse {
 }
 
 export function ForgotPasswordPage(): React.ReactElement {
-  const [email, setEmail] = useState("admin@example.com");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [tokenPreview, setTokenPreview] = useState<string | null>(null);

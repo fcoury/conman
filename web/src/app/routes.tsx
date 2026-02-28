@@ -43,7 +43,7 @@ function ProtectedAppLayout(): React.ReactElement {
 
   if (contextQuery.isLoading) {
     return (
-      <div className="p-4">
+      <div className="flex h-screen items-center justify-center bg-background">
         <LoadingPanel label="Loading repo context..." />
       </div>
     );
@@ -93,8 +93,10 @@ export function AppRoutes(): React.ReactElement {
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
       <Route element={<RequireAuth />}>
+        {/* Setup wizard renders full-screen, outside app shell */}
+        <Route path="/setup" element={<SetupPage />} />
+
         <Route element={<ProtectedAppLayout />}>
-          <Route path="/setup" element={<SetupPage />} />
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/changesets" element={<ChangesetsPage />} />
           <Route path="/releases" element={<ReleasesPage />} />

@@ -11,7 +11,7 @@ interface MessageResponse {
 
 export function ResetPasswordPage(): React.ReactElement {
   const [token, setToken] = useState("");
-  const [newPassword, setNewPassword] = useState("AdminPassw0rd!!");
+  const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 

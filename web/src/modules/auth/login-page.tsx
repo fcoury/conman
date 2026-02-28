@@ -15,8 +15,8 @@ interface LoginResponse {
 export function LoginPage(): React.ReactElement {
   const navigate = useNavigate();
   const { setToken } = useAuth();
-  const [email, setEmail] = useState("admin@example.com");
-  const [password, setPassword] = useState("AdminPassw0rd!!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
