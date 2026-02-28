@@ -122,11 +122,15 @@
     - reviewer navigation constraints,
     - config-manager navigation visibility,
     - member access-denied checks for release routes.
+  - Added a dedicated reviewer route and navigation focus:
+    - `/review` now opens a reviewer-focused queue view,
+    - sidebar includes role-aware `Review Queue` entry for reviewer+ roles,
+    - reviewer flow copy in app shell is role-adapted.
   - Updated Playwright config with `webServer` startup to make `test:e2e` self-contained.
 
 ## Verification
 - `cargo check` (workspace): ✅
-- `pnpm --dir web lint`: ✅ (warnings only)
+- `pnpm --dir web lint`: ✅
 - `pnpm --dir web test`: ✅
 - `pnpm --dir web build`: ✅
 - `GET /` serves login shell with built assets from `web/dist`: ✅
@@ -149,18 +153,17 @@
   - Sidebar now emphasizes main author path (`Draft Changes` -> `Changesets`).
   - Role visibility + route access validated with reviewer/config-manager sessions.
 - M11 Phase 1 checks:
-  - `pnpm --dir web lint`: ✅ (existing warning remains in setup step dependencies)
+  - `pnpm --dir web lint`: ✅
   - `pnpm --dir web test -- --run`: ✅
   - `pnpm --dir web build`: ✅
 - M11 Phase 2-4 checks:
-  - `pnpm --dir web lint`: ✅ (same existing setup warning)
+  - `pnpm --dir web lint`: ✅
   - `pnpm --dir web test -- --run`: ✅ (5 files, 8 tests)
   - `pnpm --dir web build`: ✅
-  - `pnpm --dir web test:e2e`: ✅ (4 tests passing)
+  - `pnpm --dir web test:e2e`: ✅ (8 tests passing)
 
 ## Notes
 - `.aidocs` is locally ignored via global gitignore; this progress log is intentionally local unless ignore rules change.
-- Current ESLint output includes 1 non-blocking `react-hooks/exhaustive-deps` warning in setup memo dependencies.
 - Scope update applied after implementation feedback: web app now mounts at `/`
   instead of `/app`; backend preserves `/api/*` behavior and 404 semantics.
 - Realignment planning docs added:

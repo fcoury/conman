@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   Bell,
   Cog,
+  Eye,
   FlaskConical,
   GitBranch,
   GitPullRequest,
@@ -38,6 +39,10 @@ const navGroups: NavGroup[] = [
       { to: "/changesets", label: "Changesets", icon: GitPullRequest },
       { to: "/temp-envs", label: "Preview Envs", icon: FlaskConical },
     ],
+  },
+  {
+    label: "Review",
+    items: [{ to: "/review", label: "Review Queue", icon: Eye, minRole: "reviewer" }],
   },
   {
     label: "Release",

@@ -25,18 +25,23 @@ import type { Changeset, Workspace } from "@/types/api";
 const reviewActions = ["approve", "request_changes", "reject"] as const;
 type ReviewAction = (typeof reviewActions)[number];
 
-export function ChangesetsPage(): React.ReactElement {
+interface ChangesetsPageProps {
+  mode?: "all" | "review";
+}
+
+export function ChangesetsPage({ mode = "all" }: ChangesetsPageProps): React.ReactElement {
   const api = useApi();
   const queryClient = useQueryClient();
   const context = useRepoContext();
   const repoId = context?.repo?.id;
   const role = context?.role;
+  const reviewMode = mode === "review";
 
   const [workspaceId, setWorkspaceId] = useState("");
   const [title, setTitle] = useState("Update config");
   const [description, setDescription] = useState("Change request from UI");
   const [selectedChangesetId, setSelectedChangesetId] = useState("");
-  const [filterState, setFilterState] = useState<ChangesetFilterState>("all");
+  const [filterState, setFilterState] = useState<ChangesetFilterState>(reviewMode ? "review" : "all");
   const [reviewAction, setReviewAction] = useState<ReviewAction>("approve");
   const [submitOverridesJson, setSubmitOverridesJson] = useState("[]");
   const [commentBody, setCommentBody] = useState("looks good");
@@ -48,6 +53,10 @@ export function ChangesetsPage(): React.ReactElement {
 
   const canReview = canReviewChangesets(role);
   const canQueue = canManageReleases(role);
+
+  useEffect(() => {
+    setFilterState(reviewMode ? "review" : "all");
+  }, [reviewMode]);
 
   const workspacesQuery = useQuery({
     queryKey: ["changesets", "workspaces", repoId],
@@ -154,8 +163,12 @@ export function ChangesetsPage(): React.ReactElement {
 
   return (
     <Page
-      title="Changesets"
-      description="Submit workspace edits for review, assess semantic impact, and move approved work into release queue."
+      title={reviewMode ? "Review Queue" : "Changesets"}
+      description={
+        reviewMode
+          ? "Focus on in-review changesets, inspect semantic impact, and submit review outcomes."
+          : "Submit workspace edits for review, assess semantic impact, and move approved work into release queue."
+      }
     >
       {error ? <Card className="border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</Card> : null}
       {status ? (
@@ -167,53 +180,62 @@ export function ChangesetsPage(): React.ReactElement {
       <Card>
         <CardTitle>Role Scope</CardTitle>
         <CardDescription>
-          You are signed in as {formatRoleLabel(role)}. Members submit changesets, reviewers decide outcomes, and config
-          managers queue approved changes.
+          You are signed in as {formatRoleLabel(role)}.{" "}
+          {reviewMode
+            ? "Reviewers decide outcomes here, while config managers queue approved work."
+            : "Members submit changesets, reviewers decide outcomes, and config managers queue approved changes."}
         </CardDescription>
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
         <Card className="space-y-4">
-          <div className="space-y-2">
-            <CardTitle>Create Changeset</CardTitle>
-            <CardDescription>Open a changeset from a workspace branch.</CardDescription>
-            <form className="space-y-2" onSubmit={(event) => void createChangeset(event)}>
-              <label className="text-xs text-muted-foreground" htmlFor="changeset-workspace-select">
-                Workspace
-              </label>
-              <Select
-                id="changeset-workspace-select"
-                value={workspaceId}
-                onChange={(event) => setWorkspaceId(event.target.value)}
-              >
-                <option value="">Select workspace</option>
-                {(workspacesQuery.data ?? []).map((workspace) => (
-                  <option key={workspace.id} value={workspace.id}>
-                    {workspace.title || workspace.branch_name}
-                  </option>
-                ))}
-              </Select>
-              <label className="text-xs text-muted-foreground" htmlFor="changeset-title-input">
-                Title
-              </label>
-              <Input id="changeset-title-input" value={title} onChange={(event) => setTitle(event.target.value)} required />
-              <label className="text-xs text-muted-foreground" htmlFor="changeset-description-input">
-                Description
-              </label>
-              <Textarea
-                id="changeset-description-input"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="Describe intent and impact"
-              />
-              <Button type="submit" disabled={!workspaceId}>
-                Create changeset
-              </Button>
-            </form>
-          </div>
+          {!reviewMode ? (
+            <div className="space-y-2">
+              <CardTitle>Create Changeset</CardTitle>
+              <CardDescription>Open a changeset from a workspace branch.</CardDescription>
+              <form className="space-y-2" onSubmit={(event) => void createChangeset(event)}>
+                <label className="text-xs text-muted-foreground" htmlFor="changeset-workspace-select">
+                  Workspace
+                </label>
+                <Select
+                  id="changeset-workspace-select"
+                  value={workspaceId}
+                  onChange={(event) => setWorkspaceId(event.target.value)}
+                >
+                  <option value="">Select workspace</option>
+                  {(workspacesQuery.data ?? []).map((workspace) => (
+                    <option key={workspace.id} value={workspace.id}>
+                      {workspace.title || workspace.branch_name}
+                    </option>
+                  ))}
+                </Select>
+                <label className="text-xs text-muted-foreground" htmlFor="changeset-title-input">
+                  Title
+                </label>
+                <Input id="changeset-title-input" value={title} onChange={(event) => setTitle(event.target.value)} required />
+                <label className="text-xs text-muted-foreground" htmlFor="changeset-description-input">
+                  Description
+                </label>
+                <Textarea
+                  id="changeset-description-input"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Describe intent and impact"
+                />
+                <Button type="submit" disabled={!workspaceId}>
+                  Create changeset
+                </Button>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <CardTitle>Reviewer Focus</CardTitle>
+              <CardDescription>Start from In Review items, then move to approved queue validation.</CardDescription>
+            </div>
+          )}
 
           <div className="space-y-2">
-            <CardTitle>Review Queue</CardTitle>
+            <CardTitle>{reviewMode ? "Queue Filters" : "Review Queue"}</CardTitle>
             <div className="flex flex-wrap gap-2 text-xs">
               {([
                 ["all", `All (${counts.all})`],

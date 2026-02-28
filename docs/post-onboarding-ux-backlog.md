@@ -131,4 +131,5 @@ Legend:
 ## Current Sprint (Now)
 
 1. Backlog execution completed for E1-E6 in this branch.
-2. Next recommended sprint: role-specific Playwright journey tests and visual polish.
+2. Role-specific Playwright journey tests and reviewer-flow polish are now completed.
+3. Next recommended sprint: performance cleanup for polling-heavy pages and final visual consistency pass.

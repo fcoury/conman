@@ -5,11 +5,12 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { Separator } from "@/components/ui/separator";
 import { Logo } from "@/components/ui/logo";
 import { useRepoContext } from "@/hooks/use-repo-context";
-import { formatRoleLabel } from "@/lib/rbac";
+import { formatRoleLabel, hasMinimumRole } from "@/lib/rbac";
 
 export function AppShell({ children }: { children: React.ReactNode }): React.ReactElement {
   const context = useRepoContext();
   const isBound = context?.status === "bound";
+  const isReviewer = hasMinimumRole(context?.role, "reviewer");
 
   return (
     <div className="flex h-screen">
@@ -23,8 +24,17 @@ export function AppShell({ children }: { children: React.ReactNode }): React.Rea
             <>
               <SidebarNav />
               <div className="mt-4 px-4 text-xs text-muted-foreground">
-                Primary flow: Draft changes in <Link className="text-primary underline" to="/workspaces">Draft Changes</Link>,
-                then submit in <Link className="text-primary underline" to="/changesets">Changesets</Link>.
+                {isReviewer ? (
+                  <>
+                    Primary flow: review in <Link className="text-primary underline" to="/review">Review Queue</Link>,
+                    then hand off approved work to release planning.
+                  </>
+                ) : (
+                  <>
+                    Primary flow: draft in <Link className="text-primary underline" to="/workspaces">Draft Changes</Link>,
+                    then submit in <Link className="text-primary underline" to="/changesets">Changesets</Link>.
+                  </>
+                )}
               </div>
             </>
           ) : (

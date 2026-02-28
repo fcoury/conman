@@ -119,6 +119,14 @@ export function AppRoutes(): React.ReactElement {
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/changesets" element={<ChangesetsPage />} />
           <Route
+            path="/review"
+            element={
+              <RequireRole minimum="reviewer">
+                <ChangesetsPage mode="review" />
+              </RequireRole>
+            }
+          />
+          <Route
             path="/releases"
             element={
               <RequireRole minimum="config_manager">

@@ -88,7 +88,7 @@ async function setupApiMock(page: Page, options?: { role?: MockRole; canRebind?:
       workspace_id: "ws-2",
       title: "Hotfix route rules",
       description: "Routing update",
-      state: "queued",
+      state: "in_review",
       author_user_id: "reviewer-1",
       head_sha: "def",
       revision: 1,
@@ -384,10 +384,23 @@ test("reviewer nav and access excludes release and admin sections", async ({ pag
   await expect(page.getByRole("heading", { name: "Draft Changes" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Draft Changes" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Changesets" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Review Queue" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Preview Envs" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Releases" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Deployments" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Members" })).toHaveCount(0);
+});
+
+test("review route focuses reviewer workflow", async ({ page }) => {
+  await setupApiMock(page, { role: "reviewer", canRebind: false });
+  await authenticate(page);
+  await page.goto("/review");
+
+  await expect(page.getByRole("heading", { name: "Review Queue" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reviewer Focus" })).toBeVisible();
+  await expect(page.getByLabel("Workspace")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Hotfix route rules/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Update app config/i })).toHaveCount(0);
 });
 
 test("config manager nav includes release and operations but excludes admin", async ({ page }) => {
@@ -397,6 +410,7 @@ test("config manager nav includes release and operations but excludes admin", as
 
   const nav = page.getByRole("navigation");
 
+  await expect(nav.getByRole("link", { name: "Review Queue" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Releases" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Deployments" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Runtime" })).toBeVisible();
@@ -411,4 +425,8 @@ test("member cannot open release routes", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
   await expect(page.getByText("requires config_manager role or higher")).toBeVisible();
+
+  await page.goto("/review");
+  await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
+  await expect(page.getByText("requires reviewer role or higher")).toBeVisible();
 });
