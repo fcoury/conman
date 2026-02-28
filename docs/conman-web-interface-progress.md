@@ -64,6 +64,23 @@
   - This unblocks invited reviewers/config managers from being forced into setup or blocked by another user's binding.
   - `PATCH /api/repo` now requires `member` access on target repo (instead of `admin`) for per-user binding.
 
+### M11 Post-onboarding product realignment (in progress)
+- Added delivery docs for scope and execution tracking:
+  - `docs/post-onboarding-ux-plan.md`
+  - `docs/post-onboarding-ux-backlog.md`
+- Implemented Phase 1 first pass on core author/reviewer screens:
+  - `Draft Changes` rewritten as a guided task flow:
+    1) select/create workspace, 2) edit files, 3) create changeset.
+  - Added inline changeset creation from selected workspace (without switching pages first).
+  - Improved editor state feedback (`Unsaved changes` vs `Saved`) and action success states.
+  - Moved raw payload inspection behind explicit `Advanced payload` disclosure.
+  - `Changesets` rewritten with list/detail workflow:
+    - status filter chips with counts,
+    - selected changeset detail panel,
+    - context-aware primary actions (submit/resubmit/queue/move-to-draft),
+    - reviewer action panel + semantic-first diff loading.
+  - Added page-level status feedback cards for action outcomes.
+
 ## Verification
 - `cargo check` (workspace): ✅
 - `pnpm --dir web lint`: ✅ (warnings only)
@@ -88,6 +105,10 @@
   - All dashboard routes render with role-scope guidance and simplified sections.
   - Sidebar now emphasizes main author path (`Draft Changes` -> `Changesets`).
   - Role visibility + route access validated with reviewer/config-manager sessions.
+- M11 Phase 1 checks:
+  - `pnpm --dir web lint`: ✅ (existing warning remains in setup step dependencies)
+  - `pnpm --dir web test -- --run`: ✅
+  - `pnpm --dir web build`: ✅
 
 ## Notes
 - `.aidocs` is locally ignored via global gitignore; this progress log is intentionally local unless ignore rules change.
