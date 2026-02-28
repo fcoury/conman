@@ -11,6 +11,7 @@
 - [x] M8 Setup wizard hardening (explicit selection, scoped repo selection, post-bind redirect)
 - [x] M9 Explicit onboarding flow (`instance` first) with `<app>--<instance>.dxflow-app.com`
 - [x] M10 Role-first dashboard UX sweep (author/reviewer/release/admin flows)
+- [ ] M11 Post-onboarding product realignment (task-first UX for build/review/release)
 
 ## Completed
 ### M1 Backend foundation for single-repo UI context
@@ -93,3 +94,7 @@
 - Current ESLint output includes 2 non-blocking `react-hooks/exhaustive-deps` warnings in setup page memo helpers.
 - Scope update applied after implementation feedback: web app now mounts at `/`
   instead of `/app`; backend preserves `/api/*` behavior and 404 semantics.
+- Realignment planning docs added:
+  - `docs/post-onboarding-ux-plan.md`
+  - `docs/post-onboarding-ux-backlog.md`
+  - Current execution focus is Phase 1: Draft Changes + Changesets.
