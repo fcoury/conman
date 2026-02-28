@@ -41,6 +41,7 @@ use crate::handlers::temp_envs::{
     create_temp_env, delete_temp_env, extend_temp_env, list_temp_envs, undo_expire_temp_env,
 };
 use crate::handlers::ui::{get_bound_repo, update_bound_repo};
+use crate::handlers::web::{serve_app_asset, serve_app_index};
 use crate::handlers::workspaces::{
     create_workspace, create_workspace_checkpoint, delete_workspace_file, get_workspace,
     get_workspace_file_or_tree, list_workspaces, reset_workspace, sync_workspace_integration,
@@ -53,6 +54,8 @@ use crate::state::AppState;
 
 pub fn build_router(state: AppState) -> Router {
     Router::new()
+        .route("/app", get(serve_app_index))
+        .route("/app/{*path}", get(serve_app_asset))
         .route("/api/health", get(health_check))
         .route("/api/metrics", get(scrape_metrics))
         .route("/api/openapi.json", get(openapi_json))
