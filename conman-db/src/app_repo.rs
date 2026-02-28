@@ -201,6 +201,24 @@ impl AppRepo {
 #[async_trait::async_trait]
 impl EnsureIndexes for AppRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
+        let existing_indexes =
+            self.collection
+                .list_index_names()
+                .await
+                .map_err(|e| ConmanError::Internal {
+                    message: format!("failed to list app indexes: {e}"),
+                })?;
+        for legacy in ["apps_name_unique", "apps_repo_path_unique", "apps_tenant_id_idx"] {
+            if existing_indexes.iter().any(|name| name == legacy) {
+                self.collection
+                    .drop_index(legacy)
+                    .await
+                    .map_err(|e| ConmanError::Internal {
+                        message: format!("failed to drop legacy app index `{legacy}`: {e}"),
+                    })?;
+            }
+        }
+
         let repo_key_unique = IndexModel::builder()
             .keys(doc! {"repo_id": 1, "key": 1})
             .options(

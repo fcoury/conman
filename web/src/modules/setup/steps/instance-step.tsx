@@ -29,6 +29,24 @@ function slugify(value: string): string {
     .slice(0, 63);
 }
 
+function bumpDisplayName(value: string): string {
+  const trimmed = value.trim() || "My Instance";
+  const match = trimmed.match(/^(.*)\s+(\d+)$/);
+  if (match) {
+    return `${match[1]} ${Number(match[2]) + 1}`;
+  }
+  return `${trimmed} 2`;
+}
+
+function bumpSlug(value: string): string {
+  const normalized = slugify(value) || "instance";
+  const match = normalized.match(/^(.*)-(\d+)$/);
+  if (match) {
+    return `${match[1]}-${Number(match[2]) + 1}`;
+  }
+  return `${normalized}-2`;
+}
+
 export function InstanceStep({ onCreated }: InstanceStepProps): React.ReactElement {
   const api = useApi();
   const [instanceName, setInstanceName] = useState("My Instance");
@@ -88,7 +106,28 @@ export function InstanceStep({ onCreated }: InstanceStepProps): React.ReactEleme
         instanceSlug: response.instance_slug,
       });
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : "Failed to create instance");
+      if (cause instanceof ApiError) {
+        const message = cause.message.toLowerCase();
+        if (message.includes("instance_name is already in use")) {
+          const suggestedName = bumpDisplayName(instanceName);
+          setInstanceName(suggestedName);
+          if (!slugCustomized) {
+            setInstanceSlug(slugify(suggestedName));
+          }
+          setError(`Instance name is already in use. Suggested: ${suggestedName}`);
+          return;
+        }
+        if (message.includes("instance_slug is already in use")) {
+          const suggestedSlug = bumpSlug(instanceSlug);
+          setInstanceSlug(suggestedSlug);
+          setSlugCustomized(true);
+          setError(`Instance URL key is already in use. Suggested: ${suggestedSlug}`);
+          return;
+        }
+        setError(cause.message);
+        return;
+      }
+      setError("Failed to create instance");
     } finally {
       setLoading(false);
     }
