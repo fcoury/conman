@@ -64,7 +64,7 @@ export function InstanceStep({ onCreated }: InstanceStepProps): React.ReactEleme
     },
   });
 
-  const teams = teamsQuery.data ?? [];
+  const teams = useMemo(() => teamsQuery.data ?? [], [teamsQuery.data]);
 
   useEffect(() => {
     if (!slugCustomized) {

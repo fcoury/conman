@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 type JsonValue = Record<string, unknown> | unknown[];
+type MockRole = "member" | "reviewer" | "config_manager" | "admin" | "owner";
 
 function ok(data: JsonValue, pagination?: { page: number; limit: number; total: number }) {
   return { data, ...(pagination ? { pagination } : {}) };
@@ -14,7 +15,9 @@ async function json(route: Route, status: number, body: unknown) {
   });
 }
 
-async function setupApiMock(page: Page): Promise<void> {
+async function setupApiMock(page: Page, options?: { role?: MockRole; canRebind?: boolean }): Promise<void> {
+  const role = options?.role ?? "owner";
+  const canRebind = options?.canRebind ?? (role === "admin" || role === "owner");
   let invites = [
     {
       id: "inv-1",
@@ -180,8 +183,8 @@ async function setupApiMock(page: Page): Promise<void> {
           },
           team: { id: "team-1", name: "Team One", slug: "team-one" },
           apps: [],
-          role: "owner",
-          can_rebind: true,
+          role,
+          can_rebind: canRebind,
         }),
       );
     }
@@ -352,7 +355,7 @@ test("deployments history supports state filtering and detail selection", async 
 });
 
 test("members and settings pages use guided admin flows", async ({ page }) => {
-  await setupApiMock(page);
+  await setupApiMock(page, { role: "owner" });
   await authenticate(page);
 
   await page.goto("/members");
@@ -369,4 +372,43 @@ test("members and settings pages use guided admin flows", async ({ page }) => {
   await expect(page.getByLabel("Instance")).toBeVisible();
   await page.getByRole("button", { name: "Apply instance binding" }).click();
   await expect(page.getByText("Bound instance updated.")).toBeVisible();
+});
+
+test("reviewer nav and access excludes release and admin sections", async ({ page }) => {
+  await setupApiMock(page, { role: "reviewer", canRebind: false });
+  await authenticate(page);
+  await page.goto("/workspaces");
+
+  const nav = page.getByRole("navigation");
+
+  await expect(page.getByRole("heading", { name: "Draft Changes" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Draft Changes" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Changesets" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Preview Envs" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Releases" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Deployments" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Members" })).toHaveCount(0);
+});
+
+test("config manager nav includes release and operations but excludes admin", async ({ page }) => {
+  await setupApiMock(page, { role: "config_manager", canRebind: false });
+  await authenticate(page);
+  await page.goto("/workspaces");
+
+  const nav = page.getByRole("navigation");
+
+  await expect(nav.getByRole("link", { name: "Releases" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Deployments" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Runtime" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Members" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Settings" })).toHaveCount(0);
+});
+
+test("member cannot open release routes", async ({ page }) => {
+  await setupApiMock(page, { role: "member", canRebind: false });
+  await authenticate(page);
+  await page.goto("/releases");
+
+  await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
+  await expect(page.getByText("requires config_manager role or higher")).toBeVisible();
 });

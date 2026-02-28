@@ -118,6 +118,10 @@
     - release impact summary flow,
     - deployment history filtering/detail flow,
     - members + settings guided admin flow.
+  - Added role-based access regression coverage:
+    - reviewer navigation constraints,
+    - config-manager navigation visibility,
+    - member access-denied checks for release routes.
   - Updated Playwright config with `webServer` startup to make `test:e2e` self-contained.
 
 ## Verification
