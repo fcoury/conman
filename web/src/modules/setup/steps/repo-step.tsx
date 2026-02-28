@@ -28,16 +28,23 @@ export function RepoStep({ teamId, selectedRepoId, onSelect, onNext, onBack }: R
   const reposQuery = useQuery({
     queryKey: ["setup", "repos"],
     queryFn: async () => {
-      const envelope = await api.paginated<Repo[]>("/api/repos?page=1&limit=100");
+      const envelope = await api.paginated<Repo[]>("/api/repos?page=1&limit=500");
       return envelope.data;
     },
   });
 
   const repos = reposQuery.data ?? [];
+  const teamRepos = repos.filter((repo) => repo.team_id === teamId);
+  const selectedRepoMissingFromList =
+    Boolean(selectedRepoId) && !teamRepos.some((repo) => repo.id === selectedRepoId);
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!teamId) {
+      setError("Select a team before creating a repository.");
+      return;
+    }
     setLoading(true);
     try {
       const created = await api.data<Repo>(`/api/teams/${teamId}/repos`, {
@@ -59,8 +66,7 @@ export function RepoStep({ teamId, selectedRepoId, onSelect, onNext, onBack }: R
   };
 
   const handleSelectAndContinue = () => {
-    if (selectedRepoId || repos[0]?.id) {
-      if (!selectedRepoId && repos[0]) onSelect(repos[0].id);
+    if (selectedRepoId) {
       onNext();
     }
   };
@@ -75,6 +81,11 @@ export function RepoStep({ teamId, selectedRepoId, onSelect, onNext, onBack }: R
       {error && (
         <div className="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive">
           {error}
+        </div>
+      )}
+      {reposQuery.isError && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          Failed to load repositories.
         </div>
       )}
 
@@ -100,11 +111,27 @@ export function RepoStep({ teamId, selectedRepoId, onSelect, onNext, onBack }: R
       {mode === "select" ? (
         <Card className="space-y-3">
           <Select
-            value={selectedRepoId || repos[0]?.id || ""}
+            value={selectedRepoId}
             onChange={(e) => onSelect(e.target.value)}
+            disabled={reposQuery.isLoading}
           >
             <option value="">Select a repository...</option>
-            {repos.map((r) => (
+            {reposQuery.isLoading ? (
+              <option value="" disabled>
+                Loading repositories...
+              </option>
+            ) : null}
+            {!reposQuery.isLoading && teamRepos.length === 0 ? (
+              <option value="" disabled>
+                No repositories found for this team. Create one.
+              </option>
+            ) : null}
+            {selectedRepoMissingFromList ? (
+              <option value={selectedRepoId}>
+                Selected repository ({selectedRepoId.slice(0, 8)})
+              </option>
+            ) : null}
+            {teamRepos.map((r) => (
               <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </Select>
@@ -112,7 +139,7 @@ export function RepoStep({ teamId, selectedRepoId, onSelect, onNext, onBack }: R
             <Button variant="ghost" onClick={onBack} type="button">Back</Button>
             <Button
               onClick={handleSelectAndContinue}
-              disabled={!selectedRepoId && !repos[0]}
+              disabled={!selectedRepoId || reposQuery.isLoading}
               type="button"
             >
               Continue
@@ -127,7 +154,7 @@ export function RepoStep({ teamId, selectedRepoId, onSelect, onNext, onBack }: R
             <Input label="Integration branch" id="repo-branch" value={branch} onChange={(e) => setBranch(e.target.value)} required />
             <div className="flex justify-between">
               <Button variant="ghost" onClick={onBack} type="button">Back</Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading || !teamId}>
                 {loading ? "Creating..." : "Create & continue"}
               </Button>
             </div>

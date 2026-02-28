@@ -8,6 +8,7 @@
 - [x] M5 Supporting screens (runtime/envs, temp envs, jobs, apps, members, notifications, settings)
 - [x] M6 Backend-served SPA routes (`/app`, `/app/*`) and frontend E2E/unit tests baseline
 - [x] M7 Route migration: serve web UI from root (`/`) with API isolation
+- [x] M8 Setup wizard hardening (explicit selection, scoped repo selection, post-bind redirect)
 
 ## Completed
 ### M1 Backend foundation for single-repo UI context
@@ -50,6 +51,11 @@
 - `GET /` serves login shell with built assets from `web/dist`: ✅
 - `GET /api/nonexistent` returns JSON 404 envelope (not SPA fallback): ✅
 - `agent-browser` console on `/` and `/app` is clean: ✅
+- Setup wizard checks (agent-browser + Playwright MCP): ✅
+  - Team step requires explicit team selection.
+  - Repo step scopes list to selected team and requires explicit selection.
+  - Bind step requires explicit repo selection; no auto-first fallback.
+  - Completion CTA now lands on `/workspaces`.
 
 ## Notes
 - `.aidocs` is locally ignored via global gitignore; this progress log is intentionally local unless ignore rules change.

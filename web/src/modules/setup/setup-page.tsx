@@ -14,9 +14,9 @@ export function SetupPage(): React.ReactElement {
     );
   }
 
-  // Already bound — redirect to settings where they can reconfigure
+  // Already bound — setup is complete, continue to primary workspace view
   if (contextQuery.data?.status === "bound") {
-    return <Navigate to="/settings" replace />;
+    return <Navigate to="/workspaces" replace />;
   }
 
   return <SetupWizard />;

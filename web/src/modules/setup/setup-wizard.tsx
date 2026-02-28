@@ -28,13 +28,24 @@ export function SetupWizard(): React.ReactElement {
     setCurrentStep(5);
   };
 
+  const handleTeamSelect = (teamId: string) => {
+    setSelectedTeamId(teamId);
+    // Team changes invalidate any prior repo choice.
+    setSelectedRepoId("");
+  };
+
   return (
     <WizardLayout currentStep={currentStep}>
       {currentStep === 0 && (
         <WelcomeStep
-          onNewProject={() => setCurrentStep(1)}
+          onNewProject={() => {
+            setFastTrack(false);
+            setCurrentStep(1);
+          }}
           onBindExisting={() => {
             setFastTrack(true);
+            setSelectedTeamId("");
+            setSelectedRepoId("");
             setCurrentStep(4);
           }}
         />
@@ -42,7 +53,7 @@ export function SetupWizard(): React.ReactElement {
       {currentStep === 1 && (
         <TeamStep
           selectedTeamId={selectedTeamId}
-          onSelect={setSelectedTeamId}
+          onSelect={handleTeamSelect}
           onNext={() => setCurrentStep(2)}
           onBack={() => setCurrentStep(0)}
         />
