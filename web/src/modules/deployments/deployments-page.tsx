@@ -3,22 +3,23 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { RawDataPanel } from "@/components/ui/raw-data-panel";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
-import { JsonView } from "@/components/ui/json-view";
-import { StatusPill } from "@/components/ui/status-pill";
+import { canManageReleases, formatRoleLabel } from "@/lib/rbac";
 import { Page } from "@/modules/shared/page";
-import type { Deployment } from "@/types/api";
+import type { Deployment, ReleaseBatch } from "@/types/api";
 
 export function DeploymentsPage(): React.ReactElement {
   const api = useApi();
   const queryClient = useQueryClient();
   const context = useRepoContext();
   const repoId = context?.repo?.id;
+  const role = context?.role;
 
   const [environmentId, setEnvironmentId] = useState("");
   const [releaseId, setReleaseId] = useState("");
@@ -27,9 +28,20 @@ export function DeploymentsPage(): React.ReactElement {
   const [action, setAction] = useState<"deploy" | "promote" | "rollback">("deploy");
   const [error, setError] = useState<string | null>(null);
 
+  const canManage = canManageReleases(role);
+
   const environmentsQuery = useQuery({
     queryKey: ["environments", repoId],
     queryFn: () => api.data<Array<{ id: string; name: string }>>(`/api/repos/${repoId}/environments`),
+    enabled: Boolean(repoId),
+  });
+
+  const releasesQuery = useQuery({
+    queryKey: ["releases", repoId],
+    queryFn: async () => {
+      const envelope = await api.paginated<ReleaseBatch[]>(`/api/repos/${repoId}/releases?page=1&limit=100`);
+      return envelope.data;
+    },
     enabled: Boolean(repoId),
   });
 
@@ -41,7 +53,7 @@ export function DeploymentsPage(): React.ReactElement {
   });
 
   const runAction = async (): Promise<void> => {
-    if (!repoId || !environmentId || !releaseId) return;
+    if (!repoId || !environmentId || !releaseId || !canManage) return;
     setError(null);
     try {
       if (action === "rollback") {
@@ -83,8 +95,21 @@ export function DeploymentsPage(): React.ReactElement {
   }
 
   return (
-    <Page title="Deployments" description="Deploy, promote, or rollback releases across environments.">
+    <Page
+      title="Deployments"
+      description="Config managers and above deploy or promote published releases across environments."
+    >
       {error ? <Card className="border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</Card> : null}
+
+      <Card>
+        <CardTitle>Role Scope</CardTitle>
+        <CardDescription>
+          You are signed in as {formatRoleLabel(role)}.
+          {canManage
+            ? " You can deploy, promote, and rollback releases."
+            : " You can view deployment history only."}
+        </CardDescription>
+      </Card>
 
       <Card className="space-y-3">
         <CardTitle>Deployment Action</CardTitle>
@@ -102,32 +127,52 @@ export function DeploymentsPage(): React.ReactElement {
               </option>
             ))}
           </Select>
-          <Input value={releaseId} onChange={(event) => setReleaseId(event.target.value)} placeholder="release id" />
-          <Button type="button" onClick={() => void runAction()} disabled={!environmentId || !releaseId}>
+          <Select value={releaseId} onChange={(event) => setReleaseId(event.target.value)}>
+            <option value="">release</option>
+            {(releasesQuery.data ?? []).map((release) => (
+              <option key={release.id} value={release.id}>
+                {release.tag || release.id}
+              </option>
+            ))}
+          </Select>
+          <Button type="button" onClick={() => void runAction()} disabled={!environmentId || !releaseId || !canManage}>
             Execute
           </Button>
         </div>
-        <Input value={approvalsCsv} onChange={(event) => setApprovalsCsv(event.target.value)} placeholder="approver user ids csv" />
+        <Input
+          value={approvalsCsv}
+          onChange={(event) => setApprovalsCsv(event.target.value)}
+          placeholder="approver user ids csv"
+          disabled={!canManage}
+        />
         {action === "rollback" ? (
-          <Textarea value={rollbackMode} onChange={(event) => setRollbackMode(event.target.value)} className="min-h-16" />
+          <Textarea
+            value={rollbackMode}
+            onChange={(event) => setRollbackMode(event.target.value)}
+            className="min-h-16"
+            disabled={!canManage}
+          />
         ) : null}
       </Card>
 
       <Card className="space-y-3">
-        <CardTitle>Deployments</CardTitle>
+        <CardTitle>Deployment History</CardTitle>
         <div className="space-y-2">
           {(deploymentsQuery.data ?? []).map((deployment) => (
-            <div key={deployment.id} className="bg-muted flex items-center justify-between rounded-md p-2">
-              <div className="text-xs">
-                <p className="font-semibold">{deployment.id}</p>
-                <p className="text-muted-foreground">env={deployment.environment_id} release={deployment.release_id}</p>
-              </div>
-              <StatusPill label={deployment.state} />
+            <div key={deployment.id} className="rounded-md border border-border bg-muted/30 p-2">
+              <p className="text-xs font-semibold">{deployment.id}</p>
+              <p className="text-xs text-muted-foreground">
+                env={deployment.environment_id} release={deployment.release_id} state={deployment.state}
+              </p>
             </div>
           ))}
+          {!deploymentsQuery.data?.length ? (
+            <p className="text-sm text-muted-foreground">No deployments recorded yet.</p>
+          ) : null}
         </div>
-        <JsonView value={deploymentsQuery.data ?? []} />
       </Card>
+
+      <RawDataPanel title="Advanced deployment payload" value={deploymentsQuery.data ?? []} />
     </Page>
   );
 }

@@ -3,12 +3,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { RawDataPanel } from "@/components/ui/raw-data-panel";
 import { Select } from "@/components/ui/select";
 import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
-import { JsonView } from "@/components/ui/json-view";
+import { canManageAdministration, formatRoleLabel } from "@/lib/rbac";
 import { Page } from "@/modules/shared/page";
 import type { Invite, Role } from "@/types/api";
 
@@ -19,6 +20,7 @@ export function MembersPage(): React.ReactElement {
   const queryClient = useQueryClient();
   const context = useRepoContext();
   const repoId = context?.repo?.id;
+  const role = context?.role;
   const teamId = context?.team?.id ?? null;
 
   const [assignUserId, setAssignUserId] = useState("");
@@ -26,6 +28,8 @@ export function MembersPage(): React.ReactElement {
   const [inviteEmail, setInviteEmail] = useState("reviewer@example.com");
   const [inviteRole, setInviteRole] = useState<Role>("reviewer");
   const [error, setError] = useState<string | null>(null);
+
+  const canManage = canManageAdministration(role);
 
   const membersQuery = useQuery({
     queryKey: ["members", repoId],
@@ -46,7 +50,7 @@ export function MembersPage(): React.ReactElement {
 
   const assignMember = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (!repoId) return;
+    if (!repoId || !canManage) return;
     setError(null);
     try {
       await api.data(`/api/repos/${repoId}/members`, {
@@ -61,7 +65,7 @@ export function MembersPage(): React.ReactElement {
 
   const createInvite = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (!teamId) return;
+    if (!teamId || !canManage) return;
     setError(null);
     try {
       await api.data(`/api/teams/${teamId}/invites`, {
@@ -75,7 +79,7 @@ export function MembersPage(): React.ReactElement {
   };
 
   const resendInvite = async (inviteId: string): Promise<void> => {
-    if (!teamId) return;
+    if (!teamId || !canManage) return;
     setError(null);
     try {
       await api.data(`/api/teams/${teamId}/invites/${inviteId}/resend`, {
@@ -89,7 +93,7 @@ export function MembersPage(): React.ReactElement {
   };
 
   const revokeInvite = async (inviteId: string): Promise<void> => {
-    if (!teamId) return;
+    if (!teamId || !canManage) return;
     setError(null);
     try {
       await api.data(`/api/teams/${teamId}/invites/${inviteId}`, {
@@ -106,74 +110,81 @@ export function MembersPage(): React.ReactElement {
   }
 
   return (
-    <Page title="Members & Invites" description="Manage repository roles and team invitations.">
+    <Page title="Members & Invites" description="Owners and admins manage access levels and invitation flow.">
       {error ? <Card className="border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</Card> : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardTitle>Assign Repository Member</CardTitle>
-          <form className="mt-3 space-y-2" onSubmit={(event) => void assignMember(event)}>
-            <Input value={assignUserId} onChange={(event) => setAssignUserId(event.target.value)} placeholder="user id" required />
-            <Select value={assignRole} onChange={(event) => setAssignRole(event.target.value as Role)}>
-              {roles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </Select>
-            <Button type="submit">Assign</Button>
-          </form>
-        </Card>
-
-        <Card>
-          <CardTitle>Create Team Invite</CardTitle>
-          <form className="mt-3 space-y-2" onSubmit={(event) => void createInvite(event)}>
-            <Input value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="email" required />
-            <Select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as Role)}>
-              {roles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </Select>
-            <Button type="submit" disabled={!teamId}>
-              Invite
-            </Button>
-          </form>
-        </Card>
-      </div>
-
       <Card>
-        <CardTitle>Members</CardTitle>
-        <div className="mt-3">
-          <JsonView value={membersQuery.data?.data ?? []} />
-        </div>
+        <CardTitle>Role Scope</CardTitle>
+        <CardDescription>
+          You are signed in as {formatRoleLabel(role)}.
+          {canManage ? " You can invite users and assign repository roles." : " Access management requires Admin or Owner."}
+        </CardDescription>
       </Card>
+
+      {canManage ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardTitle>Assign Repository Member</CardTitle>
+            <form className="mt-3 space-y-2" onSubmit={(event) => void assignMember(event)}>
+              <Input value={assignUserId} onChange={(event) => setAssignUserId(event.target.value)} placeholder="user id" required />
+              <Select value={assignRole} onChange={(event) => setAssignRole(event.target.value as Role)}>
+                {roles.map((nextRole) => (
+                  <option key={nextRole} value={nextRole}>
+                    {nextRole}
+                  </option>
+                ))}
+              </Select>
+              <Button type="submit">Assign</Button>
+            </form>
+          </Card>
+
+          <Card>
+            <CardTitle>Create Team Invite</CardTitle>
+            <form className="mt-3 space-y-2" onSubmit={(event) => void createInvite(event)}>
+              <Input value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="email" required />
+              <Select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as Role)}>
+                {roles.map((nextRole) => (
+                  <option key={nextRole} value={nextRole}>
+                    {nextRole}
+                  </option>
+                ))}
+              </Select>
+              <Button type="submit" disabled={!teamId}>
+                Invite
+              </Button>
+            </form>
+          </Card>
+        </div>
+      ) : null}
 
       <Card>
         <CardTitle>Active Invites</CardTitle>
         <div className="mt-3 space-y-2">
           {(invitesQuery.data?.data ?? []).map((invite) => (
-            <div key={invite.id} className="bg-muted flex items-center justify-between rounded-md p-2 text-sm">
+            <div key={invite.id} className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-2 text-sm">
               <div>
                 <p>{invite.email}</p>
-                <p className="text-muted-foreground text-xs">
+                <p className="text-xs text-muted-foreground">
                   {invite.role} · expires {new Date(invite.expires_at).toLocaleString()}
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button type="button" variant="secondary" onClick={() => void resendInvite(invite.id)}>
-                  Resend
-                </Button>
-                <Button type="button" variant="danger" onClick={() => void revokeInvite(invite.id)}>
-                  Revoke
-                </Button>
-              </div>
+              {canManage ? (
+                <div className="flex gap-2">
+                  <Button type="button" variant="secondary" onClick={() => void resendInvite(invite.id)}>
+                    Resend
+                  </Button>
+                  <Button type="button" variant="danger" onClick={() => void revokeInvite(invite.id)}>
+                    Revoke
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ))}
-          {!invitesQuery.data?.data?.length ? <p className="text-muted-foreground text-sm">No active invites.</p> : null}
+          {!invitesQuery.data?.data?.length ? <p className="text-sm text-muted-foreground">No active invites.</p> : null}
         </div>
       </Card>
+
+      <RawDataPanel title="Advanced membership payload" value={membersQuery.data?.data ?? []} />
     </Page>
   );
 }

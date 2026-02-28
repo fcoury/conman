@@ -10,6 +10,7 @@
 - [x] M7 Route migration: serve web UI from root (`/`) with API isolation
 - [x] M8 Setup wizard hardening (explicit selection, scoped repo selection, post-bind redirect)
 - [x] M9 Explicit onboarding flow (`instance` first) with `<app>--<instance>.dxflow-app.com`
+- [x] M10 Role-first dashboard UX sweep (author/reviewer/release/admin flows)
 
 ## Completed
 ### M1 Backend foundation for single-repo UI context
@@ -44,6 +45,24 @@
   - Vitest setup and auth hook unit test.
   - Playwright config + smoke test file.
 
+### M10 Role-first dashboard UX sweep
+- Reorganized left navigation around actual workflows:
+  - `Build` (Draft Changes, Changesets)
+  - `Release` (Releases, Deployments, Temp Envs)
+  - `Operations` (Runtime, Jobs)
+  - `Administration` (Apps, Members, Notifications, Settings)
+- Added role-aware nav visibility and route-level guards:
+  - `config_manager+` for release/runtime areas.
+  - `admin+` for app/member/settings administration.
+- Refactored dashboard pages to reduce API-console feel:
+  - Added role-scope context cards on pages.
+  - Replaced always-visible raw JSON dumps with collapsible `Advanced payload` panels.
+  - Clarified sequential actions (draft -> changeset -> review -> release -> deploy).
+- Added startup cleanup for legacy app indexes to avoid onboarding/app-create failures on older local Mongo states.
+- Made UI binding user-scoped (`ui_config._id = user_id`) with automatic bind-to-first-accessible repo fallback.
+  - This unblocks invited reviewers/config managers from being forced into setup or blocked by another user's binding.
+  - `PATCH /api/repo` now requires `member` access on target repo (instead of `admin`) for per-user binding.
+
 ## Verification
 - `cargo check` (workspace): ✅
 - `pnpm --dir web lint`: ✅ (warnings only)
@@ -62,6 +81,12 @@
   - Instance creation issues a refreshed token and proceeds to first-app step.
   - App URL preview/creation follows `<app>--<instance>.dxflow-app.com`.
   - Final setup action binds created instance and lands on `/workspaces`.
+- Dashboard UX sweep checks (agent-browser): ✅
+  - Post-signup onboarding still completes successfully.
+  - First-step instance-name conflicts now auto-suggest next available name/slug.
+  - All dashboard routes render with role-scope guidance and simplified sections.
+  - Sidebar now emphasizes main author path (`Draft Changes` -> `Changesets`).
+  - Role visibility + route access validated with reviewer/config-manager sessions.
 
 ## Notes
 - `.aidocs` is locally ignored via global gitignore; this progress log is intentionally local unless ignore rules change.

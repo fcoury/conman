@@ -3,12 +3,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { RawDataPanel } from "@/components/ui/raw-data-panel";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
-import { JsonView } from "@/components/ui/json-view";
+import { canManageReleases, formatRoleLabel } from "@/lib/rbac";
 import { Page } from "@/modules/shared/page";
 
 const defaultRuntimeProfile = {
@@ -30,6 +31,7 @@ export function RuntimePage(): React.ReactElement {
   const queryClient = useQueryClient();
   const context = useRepoContext();
   const repoId = context?.repo?.id;
+  const role = context?.role;
 
   const [createBody, setCreateBody] = useState(JSON.stringify(defaultRuntimeProfile, null, 2));
   const [profileId, setProfileId] = useState("");
@@ -41,6 +43,8 @@ export function RuntimePage(): React.ReactElement {
   const [secretKey, setSecretKey] = useState("API_KEY");
   const [error, setError] = useState<string | null>(null);
   const [revealResponse, setRevealResponse] = useState<unknown>(null);
+
+  const canManage = canManageReleases(role);
 
   const profilesQuery = useQuery({
     queryKey: ["runtime-profiles", repoId],
@@ -74,13 +78,32 @@ export function RuntimePage(): React.ReactElement {
   }
 
   return (
-    <Page title="Runtime & Environments" description="Manage runtime profiles, secret reveal, and environment mappings.">
+    <Page
+      title="Runtime & Environments"
+      description="Define runtime profiles and environment mapping used by deployments."
+    >
       {error ? <Card className="border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</Card> : null}
+
+      <Card>
+        <CardTitle>Role Scope</CardTitle>
+        <CardDescription>
+          You are signed in as {formatRoleLabel(role)}.
+          {canManage
+            ? " You can modify runtime profiles and environment mappings."
+            : " Runtime changes require Config Manager or above."}
+        </CardDescription>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="space-y-2">
           <CardTitle>Create Runtime Profile</CardTitle>
-          <Textarea value={createBody} onChange={(event) => setCreateBody(event.target.value)} className="min-h-60 font-mono" />
+          <CardDescription>Use the JSON template to create profile defaults for environments.</CardDescription>
+          <Textarea
+            value={createBody}
+            onChange={(event) => setCreateBody(event.target.value)}
+            className="min-h-60 font-mono"
+            disabled={!canManage}
+          />
           <Button
             onClick={() =>
               void withJsonBody(async () => {
@@ -90,6 +113,7 @@ export function RuntimePage(): React.ReactElement {
                 });
               })
             }
+            disabled={!canManage}
           >
             Create profile
           </Button>
@@ -97,8 +121,18 @@ export function RuntimePage(): React.ReactElement {
 
         <Card className="space-y-2">
           <CardTitle>Update Runtime Profile</CardTitle>
-          <Input value={profileId} onChange={(event) => setProfileId(event.target.value)} placeholder="profile id" />
-          <Textarea value={updateBody} onChange={(event) => setUpdateBody(event.target.value)} className="min-h-48 font-mono" />
+          <Input
+            value={profileId}
+            onChange={(event) => setProfileId(event.target.value)}
+            placeholder="profile id"
+            disabled={!canManage}
+          />
+          <Textarea
+            value={updateBody}
+            onChange={(event) => setUpdateBody(event.target.value)}
+            className="min-h-48 font-mono"
+            disabled={!canManage}
+          />
           <Button
             onClick={() =>
               void withJsonBody(async () => {
@@ -108,7 +142,7 @@ export function RuntimePage(): React.ReactElement {
                 });
               })
             }
-            disabled={!profileId}
+            disabled={!profileId || !canManage}
           >
             Update profile
           </Button>
@@ -117,7 +151,13 @@ export function RuntimePage(): React.ReactElement {
 
       <Card className="space-y-2">
         <CardTitle>Replace Environments</CardTitle>
-        <Textarea value={replaceEnvBody} onChange={(event) => setReplaceEnvBody(event.target.value)} className="min-h-40 font-mono" />
+        <CardDescription>Keep the environment chain explicit (for example: dev → stage → prod).</CardDescription>
+        <Textarea
+          value={replaceEnvBody}
+          onChange={(event) => setReplaceEnvBody(event.target.value)}
+          className="min-h-40 font-mono"
+          disabled={!canManage}
+        />
         <Button
           onClick={() =>
             void withJsonBody(async () => {
@@ -127,6 +167,7 @@ export function RuntimePage(): React.ReactElement {
               });
             })
           }
+          disabled={!canManage}
         >
           Replace environments
         </Button>
@@ -134,9 +175,20 @@ export function RuntimePage(): React.ReactElement {
 
       <Card className="space-y-2">
         <CardTitle>Reveal Secret</CardTitle>
+        <CardDescription>Audit aid for privileged operators; values are intentionally masked elsewhere.</CardDescription>
         <div className="grid gap-2 lg:grid-cols-3">
-          <Input value={secretProfileId} onChange={(event) => setSecretProfileId(event.target.value)} placeholder="profile id" />
-          <Input value={secretKey} onChange={(event) => setSecretKey(event.target.value)} placeholder="secret key" />
+          <Input
+            value={secretProfileId}
+            onChange={(event) => setSecretProfileId(event.target.value)}
+            placeholder="profile id"
+            disabled={!canManage}
+          />
+          <Input
+            value={secretKey}
+            onChange={(event) => setSecretKey(event.target.value)}
+            placeholder="secret key"
+            disabled={!canManage}
+          />
           <Button
             onClick={() =>
               void withJsonBody(async () => {
@@ -150,28 +202,16 @@ export function RuntimePage(): React.ReactElement {
                 setRevealResponse(data);
               })
             }
-            disabled={!secretProfileId || !secretKey}
+            disabled={!secretProfileId || !secretKey || !canManage}
           >
             Reveal
           </Button>
         </div>
-        {revealResponse ? <JsonView value={revealResponse} /> : null}
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardTitle>Runtime Profiles</CardTitle>
-          <div className="mt-3">
-            <JsonView value={profilesQuery.data?.data ?? []} />
-          </div>
-        </Card>
-        <Card>
-          <CardTitle>Environments</CardTitle>
-          <div className="mt-3">
-            <JsonView value={environmentsQuery.data ?? []} />
-          </div>
-        </Card>
-      </div>
+      {revealResponse ? <RawDataPanel title="Revealed secret payload" value={revealResponse} /> : null}
+      <RawDataPanel title="Runtime profiles payload" value={profilesQuery.data?.data ?? []} />
+      <RawDataPanel title="Environments payload" value={environmentsQuery.data ?? []} />
     </Page>
   );
 }

@@ -7,6 +7,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
+import { canManageAdministration, formatRoleLabel } from "@/lib/rbac";
 import { Page } from "@/modules/shared/page";
 
 export function SettingsPage(): React.ReactElement {
@@ -18,8 +19,11 @@ export function SettingsPage(): React.ReactElement {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const canManage = canManageAdministration(context?.role);
+
   const onSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
+    if (!canManage) return;
     setStatus(null);
     setError(null);
     try {
@@ -35,7 +39,15 @@ export function SettingsPage(): React.ReactElement {
   };
 
   return (
-    <Page title="Settings" description="Rebind this console to a different instance when required.">
+    <Page title="Settings" description="Administration settings for this console instance.">
+      <Card>
+        <CardTitle>Role Scope</CardTitle>
+        <CardDescription>
+          You are signed in as {formatRoleLabel(context?.role)}.
+          {canManage ? " You can rebind the console to another instance." : " Settings updates require Admin or Owner."}
+        </CardDescription>
+      </Card>
+
       <Card>
         <CardTitle>Current Instance</CardTitle>
         <CardDescription>
@@ -46,8 +58,8 @@ export function SettingsPage(): React.ReactElement {
       <Card>
         <CardTitle>Rebind Instance</CardTitle>
         <form className="mt-3 space-y-3" onSubmit={(event) => void onSubmit(event)}>
-          <Input value={repoId} onChange={(event) => setRepoId(event.target.value)} placeholder="instance id" required />
-          <Button type="submit" disabled={!context?.can_rebind}>
+          <Input value={repoId} onChange={(event) => setRepoId(event.target.value)} placeholder="instance id" required disabled={!canManage} />
+          <Button type="submit" disabled={!context?.can_rebind || !canManage}>
             Apply instance binding
           </Button>
         </form>

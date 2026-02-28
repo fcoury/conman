@@ -3,14 +3,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { RawDataPanel } from "@/components/ui/raw-data-panel";
 import { Select } from "@/components/ui/select";
+import { StatusPill } from "@/components/ui/status-pill";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
-import { JsonView } from "@/components/ui/json-view";
-import { StatusPill } from "@/components/ui/status-pill";
+import { canManageReleases, canReviewChangesets, formatRoleLabel } from "@/lib/rbac";
 import { Page } from "@/modules/shared/page";
 import type { Changeset, Workspace } from "@/types/api";
 
@@ -21,6 +22,7 @@ export function ChangesetsPage(): React.ReactElement {
   const queryClient = useQueryClient();
   const context = useRepoContext();
   const repoId = context?.repo?.id;
+  const role = context?.role;
 
   const [workspaceId, setWorkspaceId] = useState("");
   const [title, setTitle] = useState("Update config");
@@ -33,6 +35,9 @@ export function ChangesetsPage(): React.ReactElement {
   const [diffResponse, setDiffResponse] = useState<unknown>(null);
   const [commentsResponse, setCommentsResponse] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const canReview = canReviewChangesets(role);
+  const canQueue = canManageReleases(role);
 
   const workspacesQuery = useQuery({
     queryKey: ["changesets", "workspaces", repoId],
@@ -87,12 +92,24 @@ export function ChangesetsPage(): React.ReactElement {
   }
 
   return (
-    <Page title="Changesets" description="Review and advance changesets through submit/review/queue states.">
+    <Page
+      title="Changesets"
+      description="Submit your workspace edits for review. Reviewers assess diff + semantic impact; config managers can queue for release."
+    >
       {error ? <Card className="border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</Card> : null}
+
+      <Card>
+        <CardTitle>Role Scope</CardTitle>
+        <CardDescription>
+          You are signed in as {formatRoleLabel(role)}. Members submit changesets, Reviewers approve/request changes/reject,
+          Config Managers can also queue changesets into release flow.
+        </CardDescription>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle>Create Changeset</CardTitle>
+          <CardDescription>After editing files in Draft Changes, open a changeset for review.</CardDescription>
           <form className="mt-3 space-y-2" onSubmit={(event) => void createChangeset(event)}>
             <Select value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)}>
               <option value="">Select workspace</option>
@@ -104,12 +121,15 @@ export function ChangesetsPage(): React.ReactElement {
             </Select>
             <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="title" required />
             <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="description" />
-            <Button type="submit" disabled={!workspaceId}>Create changeset</Button>
+            <Button type="submit" disabled={!workspaceId}>
+              Create changeset
+            </Button>
           </form>
         </Card>
 
         <Card>
-          <CardTitle>Selected Changeset</CardTitle>
+          <CardTitle>Select Changeset</CardTitle>
+          <CardDescription>Choose a changeset to submit, review, and inspect diff data.</CardDescription>
           <div className="mt-3 space-y-2">
             <Select value={selectedChangesetId} onChange={(event) => setSelectedChangesetId(event.target.value)}>
               <option value="">Select changeset</option>
@@ -153,7 +173,7 @@ export function ChangesetsPage(): React.ReactElement {
               <Button
                 type="button"
                 variant="secondary"
-                disabled={!selectedChangesetId}
+                disabled={!selectedChangesetId || !canQueue}
                 onClick={() =>
                   void withAction(async () => {
                     await api.data(`/api/repos/${repoId}/changesets/${selectedChangesetId}/queue`, {
@@ -163,7 +183,7 @@ export function ChangesetsPage(): React.ReactElement {
                   })
                 }
               >
-                Queue
+                Queue for release
               </Button>
               <Button
                 type="button"
@@ -181,18 +201,24 @@ export function ChangesetsPage(): React.ReactElement {
                 Move to draft
               </Button>
             </div>
-            <Textarea
-              value={submitOverridesJson}
-              onChange={(event) => setSubmitOverridesJson(event.target.value)}
-              className="min-h-24 font-mono"
-              placeholder='[{"key":"FEATURE_X","value":{"type":"boolean","value":true}}]'
-            />
+            <details>
+              <summary className="cursor-pointer text-xs text-muted-foreground">Advanced submit overrides</summary>
+              <Textarea
+                value={submitOverridesJson}
+                onChange={(event) => setSubmitOverridesJson(event.target.value)}
+                className="mt-2 min-h-24 font-mono"
+                placeholder='[{"key":"FEATURE_X","value":{"type":"boolean","value":true}}]'
+              />
+            </details>
           </div>
         </Card>
       </div>
 
       <Card className="space-y-3">
         <CardTitle>Review / Diff / Comments</CardTitle>
+        <CardDescription>
+          Reviewers and above can approve, request changes, or reject. Semantic diff should be the default review mode.
+        </CardDescription>
         <div className="grid gap-2 lg:grid-cols-4">
           <Select value={reviewAction} onChange={(event) => setReviewAction(event.target.value)}>
             {reviewActions.map((action) => (
@@ -204,7 +230,7 @@ export function ChangesetsPage(): React.ReactElement {
           <Button
             type="button"
             variant="secondary"
-            disabled={!selectedChangesetId}
+            disabled={!selectedChangesetId || !canReview}
             onClick={() =>
               void withAction(async () => {
                 await api.data(`/api/repos/${repoId}/changesets/${selectedChangesetId}/review`, {
@@ -272,40 +298,28 @@ export function ChangesetsPage(): React.ReactElement {
       </Card>
 
       <Card className="space-y-3">
-        <CardTitle>Changesets</CardTitle>
+        <CardTitle>Changeset Queue</CardTitle>
         <div className="space-y-2">
           {(changesetsQuery.data ?? []).map((changeset) => (
             <button
               key={changeset.id}
               type="button"
-              className="bg-muted hover:bg-accent flex w-full items-center justify-between rounded-md p-2"
+              className="flex w-full items-center justify-between rounded-md border border-border bg-muted/30 p-2 text-left hover:bg-accent"
               onClick={() => setSelectedChangesetId(changeset.id)}
             >
               <span className="text-sm">{changeset.title}</span>
               <StatusPill label={changeset.state} />
             </button>
           ))}
+          {!changesetsQuery.data?.length ? (
+            <p className="text-sm text-muted-foreground">No changesets yet.</p>
+          ) : null}
         </div>
-        <JsonView value={selectedChangeset ?? changesetsQuery.data ?? []} />
       </Card>
 
-      {diffResponse ? (
-        <Card>
-          <CardTitle>Diff</CardTitle>
-          <div className="mt-3">
-            <JsonView value={diffResponse} />
-          </div>
-        </Card>
-      ) : null}
-
-      {commentsResponse ? (
-        <Card>
-          <CardTitle>Comments</CardTitle>
-          <div className="mt-3">
-            <JsonView value={commentsResponse} />
-          </div>
-        </Card>
-      ) : null}
+      <RawDataPanel title="Selected changeset payload" value={selectedChangeset ?? changesetsQuery.data ?? []} />
+      {diffResponse ? <RawDataPanel title="Diff payload" value={diffResponse} /> : null}
+      {commentsResponse ? <RawDataPanel title="Comments payload" value={commentsResponse} /> : null}
     </Page>
   );
 }

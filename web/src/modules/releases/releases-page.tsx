@@ -3,13 +3,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { RawDataPanel } from "@/components/ui/raw-data-panel";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
-import { JsonView } from "@/components/ui/json-view";
-import { StatusPill } from "@/components/ui/status-pill";
+import { canManageReleases, formatRoleLabel } from "@/lib/rbac";
 import { Page } from "@/modules/shared/page";
 import type { ReleaseBatch } from "@/types/api";
 
@@ -18,11 +18,14 @@ export function ReleasesPage(): React.ReactElement {
   const queryClient = useQueryClient();
   const context = useRepoContext();
   const repoId = context?.repo?.id;
+  const role = context?.role;
 
   const [selectedReleaseId, setSelectedReleaseId] = useState("");
   const [changesetIdsCsv, setChangesetIdsCsv] = useState("");
   const [reorderBody, setReorderBody] = useState("[]");
   const [error, setError] = useState<string | null>(null);
+
+  const canManage = canManageReleases(role);
 
   const releasesQuery = useQuery({
     queryKey: ["releases", repoId],
@@ -50,7 +53,7 @@ export function ReleasesPage(): React.ReactElement {
 
   const createRelease = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    if (!repoId) return;
+    if (!repoId || !canManage) return;
     await perform(async () => {
       const created = await api.data<ReleaseBatch>(`/api/repos/${repoId}/releases`, {
         method: "POST",
@@ -65,18 +68,34 @@ export function ReleasesPage(): React.ReactElement {
   }
 
   return (
-    <Page title="Releases" description="Create, assemble, and publish release batches.">
+    <Page
+      title="Releases"
+      description="Config managers and above assemble approved changesets into release batches and publish them."
+    >
       {error ? <Card className="border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</Card> : null}
 
+      <Card>
+        <CardTitle>Role Scope</CardTitle>
+        <CardDescription>
+          You are signed in as {formatRoleLabel(role)}.
+          {canManage
+            ? " Build release batches, set order, assemble, and publish to deployment flow."
+            : " You can view release state, but only Config Manager and above can change releases."}
+        </CardDescription>
+      </Card>
+
       <Card className="space-y-2">
-        <CardTitle>Create Release</CardTitle>
+        <CardTitle>Create Release Draft</CardTitle>
         <form onSubmit={(event) => void createRelease(event)}>
-          <Button type="submit">Create release draft</Button>
+          <Button type="submit" disabled={!canManage}>
+            Create release draft
+          </Button>
         </form>
       </Card>
 
       <Card className="space-y-3">
         <CardTitle>Release Actions</CardTitle>
+        <CardDescription>1) Attach changesets, 2) reorder if needed, 3) assemble, 4) publish.</CardDescription>
         <Input
           value={selectedReleaseId}
           onChange={(event) => setSelectedReleaseId(event.target.value)}
@@ -86,18 +105,23 @@ export function ReleasesPage(): React.ReactElement {
           value={changesetIdsCsv}
           onChange={(event) => setChangesetIdsCsv(event.target.value)}
           placeholder="changeset ids csv"
+          disabled={!canManage}
         />
-        <Textarea
-          value={reorderBody}
-          onChange={(event) => setReorderBody(event.target.value)}
-          className="min-h-28 font-mono"
-          placeholder='["changeset-id-1","changeset-id-2"]'
-        />
+        <details>
+          <summary className="cursor-pointer text-xs text-muted-foreground">Advanced reorder payload</summary>
+          <Textarea
+            value={reorderBody}
+            onChange={(event) => setReorderBody(event.target.value)}
+            className="mt-2 min-h-28 font-mono"
+            placeholder='["changeset-id-1","changeset-id-2"]'
+            disabled={!canManage}
+          />
+        </details>
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="secondary"
-            disabled={!selectedReleaseId}
+            disabled={!selectedReleaseId || !canManage}
             onClick={() =>
               void perform(async () => {
                 await api.data(`/api/repos/${repoId}/releases/${selectedReleaseId}/changesets`, {
@@ -117,7 +141,7 @@ export function ReleasesPage(): React.ReactElement {
           <Button
             type="button"
             variant="secondary"
-            disabled={!selectedReleaseId}
+            disabled={!selectedReleaseId || !canManage}
             onClick={() =>
               void perform(async () => {
                 await api.data(`/api/repos/${repoId}/releases/${selectedReleaseId}/reorder`, {
@@ -132,7 +156,7 @@ export function ReleasesPage(): React.ReactElement {
           <Button
             type="button"
             variant="secondary"
-            disabled={!selectedReleaseId}
+            disabled={!selectedReleaseId || !canManage}
             onClick={() =>
               void perform(async () => {
                 await api.data(`/api/repos/${repoId}/releases/${selectedReleaseId}/assemble`, {
@@ -146,7 +170,7 @@ export function ReleasesPage(): React.ReactElement {
           </Button>
           <Button
             type="button"
-            disabled={!selectedReleaseId}
+            disabled={!selectedReleaseId || !canManage}
             onClick={() =>
               void perform(async () => {
                 await api.data(`/api/repos/${repoId}/releases/${selectedReleaseId}/publish`, {
@@ -168,17 +192,18 @@ export function ReleasesPage(): React.ReactElement {
             <button
               key={release.id}
               type="button"
-              className="bg-muted hover:bg-accent flex w-full items-center justify-between rounded-md p-2 text-left"
+              className="w-full rounded-md border border-border bg-muted/30 p-2 text-left hover:bg-accent"
               onClick={() => setSelectedReleaseId(release.id)}
             >
-              <span className="text-sm font-medium">{release.tag || release.id}</span>
-              <StatusPill label={release.state} />
+              <p className="text-sm font-medium">{release.tag || release.id}</p>
+              <p className="text-xs text-muted-foreground">state: {release.state}</p>
             </button>
           ))}
-          {!releasesQuery.data?.length ? <p className="text-muted-foreground text-sm">No releases yet.</p> : null}
+          {!releasesQuery.data?.length ? <p className="text-sm text-muted-foreground">No releases yet.</p> : null}
         </div>
-        <JsonView value={releasesQuery.data ?? []} />
       </Card>
+
+      <RawDataPanel title="Advanced release payload" value={releasesQuery.data ?? []} />
     </Page>
   );
 }

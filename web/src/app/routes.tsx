@@ -4,6 +4,7 @@ import { ApiError } from "@/api/client";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { RepoContextProvider, useRepoContextQuery } from "@/hooks/use-repo-context";
+import { hasMinimumRole } from "@/lib/rbac";
 import { AcceptInvitePage } from "@/modules/auth/accept-invite-page";
 import { AccessDeniedPage } from "@/modules/auth/access-denied-page";
 import { ForgotPasswordPage } from "@/modules/auth/forgot-password-page";
@@ -24,6 +25,7 @@ import { LoadingPanel } from "@/modules/shared/loading-panel";
 import { NotFoundPage } from "@/modules/shared/not-found-page";
 import { TempEnvsPage } from "@/modules/temp-envs/temp-envs-page";
 import { WorkspacesPage } from "@/modules/workspaces/workspaces-page";
+import type { Role } from "@/types/api";
 
 function RequireAuth(): React.ReactElement {
   const { isAuthenticated } = useAuth();
@@ -74,6 +76,23 @@ function ProtectedAppLayout(): React.ReactElement {
   );
 }
 
+function RequireRole({
+  minimum,
+  children,
+}: {
+  minimum: Role;
+  children: React.ReactElement;
+}): React.ReactElement {
+  const contextQuery = useRepoContextQuery();
+  const role = contextQuery.data?.role;
+
+  if (!hasMinimumRole(role, minimum)) {
+    return <AccessDeniedPage message={`requires ${minimum} role or higher`} />;
+  }
+
+  return children;
+}
+
 function IndexRoute(): React.ReactElement {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) {
@@ -99,15 +118,64 @@ export function AppRoutes(): React.ReactElement {
         <Route element={<ProtectedAppLayout />}>
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/changesets" element={<ChangesetsPage />} />
-          <Route path="/releases" element={<ReleasesPage />} />
-          <Route path="/deployments" element={<DeploymentsPage />} />
-          <Route path="/runtime" element={<RuntimePage />} />
-          <Route path="/temp-envs" element={<TempEnvsPage />} />
+          <Route
+            path="/releases"
+            element={
+              <RequireRole minimum="config_manager">
+                <ReleasesPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/deployments"
+            element={
+              <RequireRole minimum="config_manager">
+                <DeploymentsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/runtime"
+            element={
+              <RequireRole minimum="config_manager">
+                <RuntimePage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/temp-envs"
+            element={
+              <RequireRole minimum="config_manager">
+                <TempEnvsPage />
+              </RequireRole>
+            }
+          />
           <Route path="/jobs" element={<JobsPage />} />
-          <Route path="/apps" element={<AppsPage />} />
-          <Route path="/members" element={<MembersPage />} />
+          <Route
+            path="/apps"
+            element={
+              <RequireRole minimum="admin">
+                <AppsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/members"
+            element={
+              <RequireRole minimum="admin">
+                <MembersPage />
+              </RequireRole>
+            }
+          />
           <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route
+            path="/settings"
+            element={
+              <RequireRole minimum="admin">
+                <SettingsPage />
+              </RequireRole>
+            }
+          />
         </Route>
       </Route>
 

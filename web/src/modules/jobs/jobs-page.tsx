@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { Card, CardTitle } from "@/components/ui/card";
-import { JsonView } from "@/components/ui/json-view";
 import { Button } from "@/components/ui/button";
+import { RawDataPanel } from "@/components/ui/raw-data-panel";
 import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
+import { formatRoleLabel } from "@/lib/rbac";
 import { StatusPill } from "@/components/ui/status-pill";
 import { Page } from "@/modules/shared/page";
 import type { Job } from "@/types/api";
@@ -16,6 +17,7 @@ export function JobsPage(): React.ReactElement {
   const api = useApi();
   const context = useRepoContext();
   const repoId = context?.repo?.id;
+  const role = context?.role;
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   const jobsQuery = useQuery({
@@ -51,7 +53,13 @@ export function JobsPage(): React.ReactElement {
   }
 
   return (
-    <Page title="Jobs" description="Monitor async jobs with automatic refresh for active states.">
+    <Page title="Jobs" description="Track background operations triggered by changesets, releases, and deployments.">
+      <Card>
+        <CardTitle>Role Scope</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          You are signed in as {formatRoleLabel(role)}. Jobs are visible to help diagnose flow status.
+        </p>
+      </Card>
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
         <Card className="space-y-2">
           <CardTitle>Job List</CardTitle>
@@ -78,9 +86,12 @@ export function JobsPage(): React.ReactElement {
 
         <Card className="space-y-3">
           <CardTitle>Job Detail</CardTitle>
-          <JsonView value={jobDetailQuery.data ?? selectedJob ?? { message: "Select a job" }} />
+          <p className="text-sm text-muted-foreground">
+            Select a job to inspect full payload and result details.
+          </p>
         </Card>
       </div>
+      <RawDataPanel title="Job detail payload" value={jobDetailQuery.data ?? selectedJob ?? { message: "Select a job" }} />
     </Page>
   );
 }

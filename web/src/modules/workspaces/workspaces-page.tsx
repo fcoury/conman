@@ -7,10 +7,11 @@ import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { RawDataPanel } from "@/components/ui/raw-data-panel";
 import { Select } from "@/components/ui/select";
-import { JsonView } from "@/components/ui/json-view";
 import { useApi } from "@/hooks/use-api";
 import { useRepoContext } from "@/hooks/use-repo-context";
+import { formatRoleLabel } from "@/lib/rbac";
 import { fileExtension, formatDate, isProbablyTextFile } from "@/lib/utils";
 import { Page } from "@/modules/shared/page";
 import type { Workspace } from "@/types/api";
@@ -83,6 +84,7 @@ export function WorkspacesPage(): React.ReactElement {
   const queryClient = useQueryClient();
   const context = useRepoContext();
   const repoId = context?.repo?.id;
+  const role = context?.role;
 
   const [workspaceTitle, setWorkspaceTitle] = useState("Main Workspace");
   const [workspaceBranch, setWorkspaceBranch] = useState("");
@@ -236,12 +238,23 @@ export function WorkspacesPage(): React.ReactElement {
   }
 
   return (
-    <Page title="Workspaces" description="Edit repository files with Monaco, guardrails, and workspace actions.">
+    <Page
+      title="Draft Changes"
+      description="Main authoring flow: open a workspace, edit config files, commit in place, then create a changeset."
+    >
       {error ? <Card className="border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</Card> : null}
+      <Card>
+        <CardTitle>Role Scope</CardTitle>
+        <CardDescription>
+          You are signed in as {formatRoleLabel(role)}. Use this page to draft config edits before sending them for review
+          in Changesets.
+        </CardDescription>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <Card className="space-y-3">
           <CardTitle>Workspace Control</CardTitle>
+          <CardDescription>Create one workspace per task so each changeset stays focused.</CardDescription>
           <form className="space-y-2" onSubmit={(event) => void createWorkspace(event)}>
             <Input value={workspaceTitle} onChange={(event) => setWorkspaceTitle(event.target.value)} placeholder="title" />
             <Input value={workspaceBranch} onChange={(event) => setWorkspaceBranch(event.target.value)} placeholder="branch (optional)" />
@@ -353,10 +366,21 @@ export function WorkspacesPage(): React.ReactElement {
               </div>
             </>
           ) : (
-            <JsonView value={treeQuery.data ?? { message: "No file selected" }} />
+            <p className="text-sm text-muted-foreground">
+              Select a file from the left panel to edit it here.
+            </p>
           )}
         </Card>
       </div>
+
+      <RawDataPanel
+        title="Advanced workspace payload"
+        value={{
+          selectedWorkspace,
+          tree: treeQuery.data,
+          file: fileQuery.data,
+        }}
+      />
     </Page>
   );
 }
