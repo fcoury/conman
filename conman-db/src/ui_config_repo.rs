@@ -46,6 +46,59 @@ impl UiConfigRepo {
         }
     }
 
+    pub async fn get_for_user(&self, user_id: &str) -> Result<Option<UiConfig>, ConmanError> {
+        let row = self
+            .collection
+            .find_one(doc! {"_id": user_id})
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to load ui config for user {user_id}: {e}"),
+            })?;
+        Ok(row.map(Into::into))
+    }
+
+    pub async fn set_for_user(
+        &self,
+        repo_id: &str,
+        configured_by: &str,
+    ) -> Result<UiConfig, ConmanError> {
+        let repo_id_obj = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
+        })?;
+        let configured_by_obj =
+            ObjectId::parse_str(configured_by).map_err(|e| ConmanError::Validation {
+                message: format!("invalid configured_by: {e}"),
+            })?;
+
+        let now = Utc::now();
+        let row = self
+            .collection
+            .find_one_and_update(
+                doc! {"_id": configured_by},
+                doc! {
+                    "$set": {
+                        "repo_id": repo_id_obj,
+                        "configured_by": configured_by_obj,
+                        "updated_at": now,
+                    },
+                    "$setOnInsert": {
+                        "configured_at": now,
+                    }
+                },
+            )
+            .upsert(true)
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to set ui config for user {configured_by}: {e}"),
+            })?
+            .ok_or_else(|| ConmanError::Internal {
+                message: "failed to read ui config after update".to_string(),
+            })?;
+
+        Ok(row.into())
+    }
+
     pub async fn get_default(&self) -> Result<Option<UiConfig>, ConmanError> {
         let row = self
             .collection
@@ -106,4 +159,3 @@ impl EnsureIndexes for UiConfigRepo {
         Ok(())
     }
 }
-

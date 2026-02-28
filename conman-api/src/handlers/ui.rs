@@ -48,6 +48,20 @@ fn unbound_response() -> RepoContextResponse {
     }
 }
 
+async fn auto_bind_first_accessible_repo(
+    state: &AppState,
+    auth: &AuthUser,
+) -> Result<Option<RepoContextResponse>, ApiConmanError> {
+    let first_repo_id = auth.roles.keys().next().cloned();
+    let Some(repo_id) = first_repo_id else {
+        return Ok(None);
+    };
+
+    let ui_repo = conman_db::UiConfigRepo::new(state.db.clone());
+    let binding = ui_repo.set_for_user(&repo_id, &auth.user_id).await?;
+    Ok(Some(bound_response(state, auth, binding).await?))
+}
+
 async fn bound_response(
     state: &AppState,
     auth: &AuthUser,
@@ -86,7 +100,7 @@ async fn bound_response(
         team,
         apps,
         role: Some(role),
-        can_rebind: role.satisfies(Role::Admin),
+        can_rebind: role.satisfies(Role::Member),
     })
 }
 
@@ -94,10 +108,27 @@ pub async fn get_bound_repo(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
 ) -> Result<Json<ApiResponse<RepoContextResponse>>, ApiConmanError> {
-    let binding = conman_db::UiConfigRepo::new(state.db.clone()).get_default().await?;
+    let ui_repo = conman_db::UiConfigRepo::new(state.db.clone());
+    let binding = ui_repo.get_for_user(&auth.user_id).await?;
     let body = match binding {
-        Some(binding) => bound_response(&state, &auth, binding).await?,
-        None => unbound_response(),
+        Some(binding) => match bound_response(&state, &auth, binding).await {
+            Ok(body) => body,
+            Err(ApiConmanError(ConmanError::Forbidden { .. })) => {
+                if let Some(rebound) = auto_bind_first_accessible_repo(&state, &auth).await? {
+                    rebound
+                } else {
+                    unbound_response()
+                }
+            }
+            Err(err) => return Err(err),
+        },
+        None => {
+            if let Some(rebound) = auto_bind_first_accessible_repo(&state, &auth).await? {
+                rebound
+            } else {
+                unbound_response()
+            }
+        }
     };
     Ok(Json(ApiResponse::ok(body)))
 }
@@ -115,7 +146,7 @@ pub async fn update_bound_repo(
         .into());
     }
 
-    auth.require_role(&repo_id, Role::Admin)?;
+    auth.require_role(&repo_id, Role::Member)?;
 
     let repo_store = conman_db::RepoStore::new(state.db.clone());
     if repo_store.find_by_id(&repo_id).await?.is_none() {
@@ -127,8 +158,8 @@ pub async fn update_bound_repo(
     }
 
     let ui_repo = conman_db::UiConfigRepo::new(state.db.clone());
-    let before = ui_repo.get_default().await?;
-    let binding = ui_repo.set_default(&repo_id, &auth.user_id).await?;
+    let before = ui_repo.get_for_user(&auth.user_id).await?;
+    let binding = ui_repo.set_for_user(&repo_id, &auth.user_id).await?;
     let body = bound_response(&state, &auth, binding.clone()).await?;
 
     if let Err(err) = emit_audit(
