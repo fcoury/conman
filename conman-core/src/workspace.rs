@@ -12,7 +12,7 @@ pub enum BaseRefType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workspace {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub owner_user_id: String,
     pub branch_name: String,
     pub title: Option<String>,

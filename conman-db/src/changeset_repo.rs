@@ -15,7 +15,7 @@ use crate::EnsureIndexes;
 struct ChangesetDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     workspace_id: ObjectId,
     title: String,
     description: Option<String>,
@@ -49,7 +49,7 @@ impl From<ChangesetDoc> for Changeset {
     fn from(value: ChangesetDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             workspace_id: value.workspace_id.to_hex(),
             title: value.title,
             description: value.description,
@@ -69,7 +69,7 @@ impl From<ChangesetDoc> for Changeset {
 
 #[derive(Debug, Clone)]
 pub struct CreateChangesetInput {
-    pub app_id: String,
+    pub repo_id: String,
     pub workspace_id: String,
     pub title: String,
     pub description: Option<String>,
@@ -99,8 +99,8 @@ impl ChangesetRepo {
     }
 
     pub async fn create(&self, input: CreateChangesetInput) -> Result<Changeset, ConmanError> {
-        let app_id = ObjectId::parse_str(&input.app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(&input.repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let workspace_id =
             ObjectId::parse_str(&input.workspace_id).map_err(|e| ConmanError::Validation {
@@ -124,7 +124,7 @@ impl ChangesetRepo {
         let now = Utc::now();
         let doc = ChangesetDoc {
             id: ObjectId::new(),
-            app_id,
+            repo_id,
             workspace_id,
             title: input.title,
             description: input.description,
@@ -149,16 +149,16 @@ impl ChangesetRepo {
         Ok(doc.into())
     }
 
-    pub async fn list_by_app(
+    pub async fn list_by_repo(
         &self,
-        app_id: &str,
+        repo_id: &str,
         skip: u64,
         limit: u64,
     ) -> Result<(Vec<Changeset>, u64), ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
-        let filter = doc! {"app_id": app_id};
+        let filter = doc! {"repo_id": repo_id};
         let total = self
             .collection
             .count_documents(filter.clone())
@@ -361,9 +361,9 @@ impl ChangesetRepo {
         Ok(row.into())
     }
 
-    pub async fn next_queue_position(&self, app_id: &str) -> Result<i64, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+    pub async fn next_queue_position(&self, repo_id: &str) -> Result<i64, ConmanError> {
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let queued_state =
             mongodb::bson::to_bson(&ChangesetState::Queued).map_err(|e| ConmanError::Internal {
@@ -371,7 +371,7 @@ impl ChangesetRepo {
             })?;
         let top = self
             .collection
-            .find_one(doc! {"app_id": app_id, "state": queued_state})
+            .find_one(doc! {"repo_id": repo_id, "state": queued_state})
             .sort(doc! {"queue_position": -1})
             .await
             .map_err(|e| ConmanError::Internal {
@@ -419,9 +419,9 @@ impl ChangesetRepo {
             .await
     }
 
-    pub async fn list_queued_by_app(&self, app_id: &str) -> Result<Vec<Changeset>, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+    pub async fn list_queued_by_repo(&self, repo_id: &str) -> Result<Vec<Changeset>, ConmanError> {
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let queued =
             mongodb::bson::to_bson(&ChangesetState::Queued).map_err(|e| ConmanError::Internal {
@@ -429,7 +429,7 @@ impl ChangesetRepo {
             })?;
         let mut cursor = self
             .collection
-            .find(doc! {"app_id": app_id, "state": queued})
+            .find(doc! {"repo_id": repo_id, "state": queued})
             .sort(doc! {"queue_position": 1, "queued_at": 1})
             .await
             .map_err(|e| ConmanError::Internal {
@@ -573,7 +573,7 @@ impl ChangesetRepo {
 impl EnsureIndexes for ChangesetRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
         let by_app = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "updated_at": -1})
+            .keys(doc! {"repo_id": 1, "updated_at": -1})
             .options(
                 IndexOptions::builder()
                     .name("changeset_app_updated_at".to_string())
@@ -589,7 +589,7 @@ impl EnsureIndexes for ChangesetRepo {
             )
             .build();
         let queue_idx = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "queue_position": 1})
+            .keys(doc! {"repo_id": 1, "queue_position": 1})
             .options(
                 IndexOptions::builder()
                     .name("changeset_app_queue".to_string())

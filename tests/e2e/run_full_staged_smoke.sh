@@ -73,25 +73,25 @@ request_expect_status() {
 }
 
 latest_job_id() {
-  local app_id="$1" token="$2" job_type="$3" entity_id_pattern="$4"
+  local repo_id="$1" token="$2" job_type="$3" entity_id_pattern="$4"
   local file
-  file=$(request_assert_200 GET "/api/repos/${app_id}/jobs?page=1&limit=100" "$token")
+  file=$(request_assert_200 GET "/api/repos/${repo_id}/jobs?page=1&limit=100" "$token")
   jq -r ".data[] | select(.job_type==\"${job_type}\") | select(.entity_id|test(\"${entity_id_pattern}\")) | .id" "$file" | head -n1
   rm -f "$file"
 }
 
 job_state() {
-  local app_id="$1" token="$2" job_id="$3"
+  local repo_id="$1" token="$2" job_id="$3"
   local file
-  file=$(request_assert_200 GET "/api/repos/${app_id}/jobs/${job_id}" "$token")
+  file=$(request_assert_200 GET "/api/repos/${repo_id}/jobs/${job_id}" "$token")
   jq -r ".data.job.state" "$file"
   rm -f "$file"
 }
 
 wait_job() {
-  local app_id="$1" token="$2" job_id="$3" label="$4"
+  local repo_id="$1" token="$2" job_id="$3" label="$4"
   for _ in {1..120}; do
-    state=$(job_state "$app_id" "$token" "$job_id")
+    state=$(job_state "$repo_id" "$token" "$job_id")
     case "$state" in
       succeeded) return 0 ;;
       failed|canceled)
@@ -153,7 +153,7 @@ TEAM_ID=$(jq -r '.data.team.id' "$file")
 rm -f "$file"
 
 file=$(request_assert_200 POST "/api/teams/${TEAM_ID}/repos" "$TOKEN_ADMIN" "{\"name\":\"E2E Repo ${TS}\",\"repo_path\":\"${REPO}\",\"integration_branch\":\"main\"}")
-APP_ID=$(jq -r '.data.id' "$file")
+REPO_ID=$(jq -r '.data.id' "$file")
 rm -f "$file"
 
 # Refresh token so repo membership claim includes the newly created repo.
@@ -171,64 +171,64 @@ REVIEWER_ID=$(jq -r '.data.user.id' "$file")
 rm -f "$file"
 
 # Optional explicit role assignment endpoint coverage.
-request_assert_200 POST "/api/repos/${APP_ID}/members" "$TOKEN_ADMIN" "{\"user_id\":\"${REVIEWER_ID}\",\"role\":\"reviewer\"}" >/dev/null
+request_assert_200 POST "/api/repos/${REPO_ID}/members" "$TOKEN_ADMIN" "{\"user_id\":\"${REVIEWER_ID}\",\"role\":\"reviewer\"}" >/dev/null
 
 echo "[4/11] Setting environments + creating workspace"
-file=$(request_assert_200 PATCH "/api/repos/${APP_ID}/environments" "$TOKEN_ADMIN" "{\"environments\":[{\"name\":\"prod\",\"position\":1,\"is_canonical\":true,\"runtime_profile_id\":null}]}")
+file=$(request_assert_200 PATCH "/api/repos/${REPO_ID}/environments" "$TOKEN_ADMIN" "{\"environments\":[{\"name\":\"prod\",\"position\":1,\"is_canonical\":true,\"runtime_profile_id\":null}]}")
 ENV_ID=$(jq -r ".data[0].id" "$file")
 rm -f "$file"
 
-file=$(request_assert_200 GET "/api/repos/${APP_ID}/workspaces" "$TOKEN_ADMIN")
+file=$(request_assert_200 GET "/api/repos/${REPO_ID}/workspaces" "$TOKEN_ADMIN")
 WORKSPACE_ID=$(jq -r ".data[0].id" "$file")
 rm -f "$file"
 
-request_assert_200 PATCH "/api/repos/${APP_ID}/settings" "$TOKEN_ADMIN" "{\"file_size_limit_bytes\":128}" >/dev/null
-request_expect_status 403 PUT "/api/repos/${APP_ID}/workspaces/${WORKSPACE_ID}/files" "$TOKEN_ADMIN" "{\"path\":\".git/config\",\"content\":\"YmxvY2tlZA==\",\"message\":\"blocked-path-check\"}"
+request_assert_200 PATCH "/api/repos/${REPO_ID}/settings" "$TOKEN_ADMIN" "{\"file_size_limit_bytes\":128}" >/dev/null
+request_expect_status 403 PUT "/api/repos/${REPO_ID}/workspaces/${WORKSPACE_ID}/files" "$TOKEN_ADMIN" "{\"path\":\".git/config\",\"content\":\"YmxvY2tlZA==\",\"message\":\"blocked-path-check\"}"
 LARGE_CONTENT_B64=$(python3 - <<'PY'
 import base64
 print(base64.b64encode(b"a" * 512).decode())
 PY
 )
-request_expect_status 400 PUT "/api/repos/${APP_ID}/workspaces/${WORKSPACE_ID}/files" "$TOKEN_ADMIN" "{\"path\":\"config/too-big.txt\",\"content\":\"${LARGE_CONTENT_B64}\",\"message\":\"size-guardrail-check\"}"
+request_expect_status 400 PUT "/api/repos/${REPO_ID}/workspaces/${WORKSPACE_ID}/files" "$TOKEN_ADMIN" "{\"path\":\"config/too-big.txt\",\"content\":\"${LARGE_CONTENT_B64}\",\"message\":\"size-guardrail-check\"}"
 
 echo "[5/11] Writing workspace file"
 CONTENT_B64=$(printf 'feature: staged-%s\n' "$TS" | base64 | tr -d '\n')
-file=$(request_assert_200 PUT "/api/repos/${APP_ID}/workspaces/${WORKSPACE_ID}/files" "$TOKEN_ADMIN" "{\"path\":\"config/app.yaml\",\"content\":\"${CONTENT_B64}\",\"message\":\"update config\"}")
+file=$(request_assert_200 PUT "/api/repos/${REPO_ID}/workspaces/${WORKSPACE_ID}/files" "$TOKEN_ADMIN" "{\"path\":\"config/app.yaml\",\"content\":\"${CONTENT_B64}\",\"message\":\"update config\"}")
 WRITE_SHA=$(jq -r ".data.commit_sha" "$file")
 rm -f "$file"
 
 echo "[6/11] Changeset create/submit/approve/queue"
-file=$(request_assert_200 POST "/api/repos/${APP_ID}/changesets" "$TOKEN_ADMIN" "{\"workspace_id\":\"${WORKSPACE_ID}\",\"title\":\"Staged changeset ${TS}\",\"description\":\"e2e\"}")
+file=$(request_assert_200 POST "/api/repos/${REPO_ID}/changesets" "$TOKEN_ADMIN" "{\"workspace_id\":\"${WORKSPACE_ID}\",\"title\":\"Staged changeset ${TS}\",\"description\":\"e2e\"}")
 CHANGESET_ID=$(jq -r ".data.id" "$file")
 rm -f "$file"
 
-file=$(request_assert_200 POST "/api/repos/${APP_ID}/changesets/${CHANGESET_ID}/submit" "$TOKEN_ADMIN" "{}")
+file=$(request_assert_200 POST "/api/repos/${REPO_ID}/changesets/${CHANGESET_ID}/submit" "$TOKEN_ADMIN" "{}")
 SUBMIT_JOB_ID=$(jq -r ".data.job.id" "$file")
 rm -f "$file"
-wait_job "$APP_ID" "$TOKEN_ADMIN" "$SUBMIT_JOB_ID" "msuite_submit"
+wait_job "$REPO_ID" "$TOKEN_ADMIN" "$SUBMIT_JOB_ID" "msuite_submit"
 
-request_assert_200 POST "/api/repos/${APP_ID}/changesets/${CHANGESET_ID}/review" "$TOKEN_REVIEWER" "{\"action\":\"approve\"}" >/dev/null
-request_assert_200 POST "/api/repos/${APP_ID}/changesets/${CHANGESET_ID}/queue" "$TOKEN_ADMIN" >/dev/null
+request_assert_200 POST "/api/repos/${REPO_ID}/changesets/${CHANGESET_ID}/review" "$TOKEN_REVIEWER" "{\"action\":\"approve\"}" >/dev/null
+request_assert_200 POST "/api/repos/${REPO_ID}/changesets/${CHANGESET_ID}/queue" "$TOKEN_ADMIN" >/dev/null
 
 echo "[7/11] Release draft/assemble/publish"
-file=$(request_assert_200 POST "/api/repos/${APP_ID}/releases" "$TOKEN_ADMIN")
+file=$(request_assert_200 POST "/api/repos/${REPO_ID}/releases" "$TOKEN_ADMIN")
 RELEASE_ID=$(jq -r ".data.id" "$file")
 RELEASE_TAG=$(jq -r ".data.tag" "$file")
 rm -f "$file"
 
-request_assert_200 POST "/api/repos/${APP_ID}/releases/${RELEASE_ID}/changesets" "$TOKEN_ADMIN" "{\"changeset_ids\":[\"${CHANGESET_ID}\"]}" >/dev/null
-file=$(request_assert_200 POST "/api/repos/${APP_ID}/releases/${RELEASE_ID}/assemble" "$TOKEN_ADMIN")
+request_assert_200 POST "/api/repos/${REPO_ID}/releases/${RELEASE_ID}/changesets" "$TOKEN_ADMIN" "{\"changeset_ids\":[\"${CHANGESET_ID}\"]}" >/dev/null
+file=$(request_assert_200 POST "/api/repos/${REPO_ID}/releases/${RELEASE_ID}/assemble" "$TOKEN_ADMIN")
 ASSEMBLE_JOB_ID=$(jq -r ".data.job.id" "$file")
 rm -f "$file"
-wait_job "$APP_ID" "$TOKEN_ADMIN" "$ASSEMBLE_JOB_ID" "release_assemble"
+wait_job "$REPO_ID" "$TOKEN_ADMIN" "$ASSEMBLE_JOB_ID" "release_assemble"
 
-r=$(request POST "/api/repos/${APP_ID}/releases/${RELEASE_ID}/publish" "$TOKEN_ADMIN")
+r=$(request POST "/api/repos/${REPO_ID}/releases/${RELEASE_ID}/publish" "$TOKEN_ADMIN")
 status=${r%%|*}; file=${r#*|}
 if [[ "$status" == "409" ]]; then
   rm -f "$file"
-  MERGE_JOB_ID=$(latest_job_id "$APP_ID" "$TOKEN_ADMIN" "msuite_merge" "${RELEASE_ID}")
-  wait_job "$APP_ID" "$TOKEN_ADMIN" "$MERGE_JOB_ID" "msuite_merge"
-  file=$(request_assert_200 POST "/api/repos/${APP_ID}/releases/${RELEASE_ID}/publish" "$TOKEN_ADMIN")
+  MERGE_JOB_ID=$(latest_job_id "$REPO_ID" "$TOKEN_ADMIN" "msuite_merge" "${RELEASE_ID}")
+  wait_job "$REPO_ID" "$TOKEN_ADMIN" "$MERGE_JOB_ID" "msuite_merge"
+  file=$(request_assert_200 POST "/api/repos/${REPO_ID}/releases/${RELEASE_ID}/publish" "$TOKEN_ADMIN")
 elif [[ "$status" != "200" ]]; then
   cat "$file" >&2
   rm -f "$file"
@@ -238,7 +238,7 @@ PUBLISHED_SHA=$(jq -r ".data.release.published_sha" "$file")
 rm -f "$file"
 
 echo "[8/11] Deploy gates + deployment"
-r=$(request POST "/api/repos/${APP_ID}/environments/${ENV_ID}/deploy" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\"}")
+r=$(request POST "/api/repos/${REPO_ID}/environments/${ENV_ID}/deploy" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\"}")
 status=${r%%|*}; file=${r#*|}
 if [[ "$status" != "409" ]]; then
   cat "$file" >&2
@@ -246,10 +246,10 @@ if [[ "$status" != "409" ]]; then
   exit 1
 fi
 rm -f "$file"
-DRIFT_JOB_ID=$(latest_job_id "$APP_ID" "$TOKEN_ADMIN" "runtime_profile_drift_check" "${ENV_ID}")
-wait_job "$APP_ID" "$TOKEN_ADMIN" "$DRIFT_JOB_ID" "drift_check"
+DRIFT_JOB_ID=$(latest_job_id "$REPO_ID" "$TOKEN_ADMIN" "runtime_profile_drift_check" "${ENV_ID}")
+wait_job "$REPO_ID" "$TOKEN_ADMIN" "$DRIFT_JOB_ID" "drift_check"
 
-r=$(request POST "/api/repos/${APP_ID}/environments/${ENV_ID}/deploy" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\"}")
+r=$(request POST "/api/repos/${REPO_ID}/environments/${ENV_ID}/deploy" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\"}")
 status=${r%%|*}; file=${r#*|}
 if [[ "$status" != "409" ]]; then
   cat "$file" >&2
@@ -257,64 +257,64 @@ if [[ "$status" != "409" ]]; then
   exit 1
 fi
 rm -f "$file"
-DEPLOY_GATE_JOB_ID=$(latest_job_id "$APP_ID" "$TOKEN_ADMIN" "msuite_deploy" "${ENV_ID}:${RELEASE_ID}")
-wait_job "$APP_ID" "$TOKEN_ADMIN" "$DEPLOY_GATE_JOB_ID" "msuite_deploy"
+DEPLOY_GATE_JOB_ID=$(latest_job_id "$REPO_ID" "$TOKEN_ADMIN" "msuite_deploy" "${ENV_ID}:${RELEASE_ID}")
+wait_job "$REPO_ID" "$TOKEN_ADMIN" "$DEPLOY_GATE_JOB_ID" "msuite_deploy"
 
-file=$(request_assert_200 POST "/api/repos/${APP_ID}/environments/${ENV_ID}/deploy" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\"}")
+file=$(request_assert_200 POST "/api/repos/${REPO_ID}/environments/${ENV_ID}/deploy" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\"}")
 DEPLOYMENT_JOB_ID=$(jq -r ".data.job.id" "$file")
 DEPLOYMENT_ID=$(jq -r ".data.deployment.id" "$file")
 rm -f "$file"
-wait_job "$APP_ID" "$TOKEN_ADMIN" "$DEPLOYMENT_JOB_ID" "deploy_release"
+wait_job "$REPO_ID" "$TOKEN_ADMIN" "$DEPLOYMENT_JOB_ID" "deploy_release"
 
-file=$(request_assert_200 POST "/api/repos/${APP_ID}/environments/${ENV_ID}/promote" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\"}")
+file=$(request_assert_200 POST "/api/repos/${REPO_ID}/environments/${ENV_ID}/promote" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\"}")
 PROMOTE_JOB_ID=$(jq -r ".data.job.id" "$file")
 PROMOTE_DEPLOYMENT_ID=$(jq -r ".data.deployment.id" "$file")
 rm -f "$file"
-wait_job "$APP_ID" "$TOKEN_ADMIN" "$PROMOTE_JOB_ID" "promote_release"
+wait_job "$REPO_ID" "$TOKEN_ADMIN" "$PROMOTE_JOB_ID" "promote_release"
 
-file=$(request_assert_200 POST "/api/repos/${APP_ID}/environments/${ENV_ID}/rollback" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\",\"mode\":\"redeploy_prior_tag\",\"approvals\":[\"${USER_ID}\",\"${REVIEWER_ID}\"]}")
+file=$(request_assert_200 POST "/api/repos/${REPO_ID}/environments/${ENV_ID}/rollback" "$TOKEN_ADMIN" "{\"release_id\":\"${RELEASE_ID}\",\"mode\":\"redeploy_prior_tag\",\"approvals\":[\"${USER_ID}\",\"${REVIEWER_ID}\"]}")
 ROLLBACK_JOB_ID=$(jq -r ".data.job.id" "$file")
 ROLLBACK_DEPLOYMENT_ID=$(jq -r ".data.deployment.id" "$file")
 rm -f "$file"
-wait_job "$APP_ID" "$TOKEN_ADMIN" "$ROLLBACK_JOB_ID" "rollback_release"
+wait_job "$REPO_ID" "$TOKEN_ADMIN" "$ROLLBACK_JOB_ID" "rollback_release"
 
 echo "[9/11] Temp environment lifecycle"
-file=$(request_assert_200 POST "/api/repos/${APP_ID}/temp-envs" "$TOKEN_ADMIN" "{\"kind\":\"workspace\",\"source_id\":\"${WORKSPACE_ID}\"}")
+file=$(request_assert_200 POST "/api/repos/${REPO_ID}/temp-envs" "$TOKEN_ADMIN" "{\"kind\":\"workspace\",\"source_id\":\"${WORKSPACE_ID}\"}")
 TEMP_ENV_ID=$(jq -r ".data.temp_env.id" "$file")
 TEMP_ENV_URL=$(jq -r ".data.temp_env.url" "$file")
 TEMP_PROVISION_JOB_ID=$(jq -r ".data.job.id" "$file")
 rm -f "$file"
-wait_job "$APP_ID" "$TOKEN_ADMIN" "$TEMP_PROVISION_JOB_ID" "temp_env_provision"
-request_assert_200 POST "/api/repos/${APP_ID}/temp-envs/${TEMP_ENV_ID}/extend" "$TOKEN_ADMIN" "{\"seconds\":7200}" >/dev/null
-file=$(request_assert_200 DELETE "/api/repos/${APP_ID}/temp-envs/${TEMP_ENV_ID}" "$TOKEN_ADMIN")
+wait_job "$REPO_ID" "$TOKEN_ADMIN" "$TEMP_PROVISION_JOB_ID" "temp_env_provision"
+request_assert_200 POST "/api/repos/${REPO_ID}/temp-envs/${TEMP_ENV_ID}/extend" "$TOKEN_ADMIN" "{\"seconds\":7200}" >/dev/null
+file=$(request_assert_200 DELETE "/api/repos/${REPO_ID}/temp-envs/${TEMP_ENV_ID}" "$TOKEN_ADMIN")
 TEMP_EXPIRE_JOB_ID=$(jq -r ".data.job.id" "$file")
 rm -f "$file"
-wait_job "$APP_ID" "$TOKEN_ADMIN" "$TEMP_EXPIRE_JOB_ID" "temp_env_expire"
-request_assert_200 POST "/api/repos/${APP_ID}/temp-envs/${TEMP_ENV_ID}/undo-expire" "$TOKEN_ADMIN" >/dev/null
+wait_job "$REPO_ID" "$TOKEN_ADMIN" "$TEMP_EXPIRE_JOB_ID" "temp_env_expire"
+request_assert_200 POST "/api/repos/${REPO_ID}/temp-envs/${TEMP_ENV_ID}/undo-expire" "$TOKEN_ADMIN" >/dev/null
 
 echo "[10/11] Collecting final states"
-file=$(request_assert_200 GET "/api/repos/${APP_ID}/jobs?page=1&limit=100" "$TOKEN_ADMIN")
+file=$(request_assert_200 GET "/api/repos/${REPO_ID}/jobs?page=1&limit=100" "$TOKEN_ADMIN")
 JOBS_FILE="$file"
 
-file=$(request_assert_200 GET "/api/repos/${APP_ID}/changesets/${CHANGESET_ID}" "$TOKEN_ADMIN")
+file=$(request_assert_200 GET "/api/repos/${REPO_ID}/changesets/${CHANGESET_ID}" "$TOKEN_ADMIN")
 CHANGESET_STATE=$(jq -r ".data.changeset.state" "$file")
 rm -f "$file"
-file=$(request_assert_200 GET "/api/repos/${APP_ID}/releases/${RELEASE_ID}" "$TOKEN_ADMIN")
+file=$(request_assert_200 GET "/api/repos/${REPO_ID}/releases/${RELEASE_ID}" "$TOKEN_ADMIN")
 RELEASE_STATE=$(jq -r ".data.state" "$file")
 rm -f "$file"
-file=$(request_assert_200 GET "/api/repos/${APP_ID}/deployments?page=1&limit=50" "$TOKEN_ADMIN")
+file=$(request_assert_200 GET "/api/repos/${REPO_ID}/deployments?page=1&limit=50" "$TOKEN_ADMIN")
 DEPLOY_STATE=$(jq -r ".data[] | select(.id==\"${DEPLOYMENT_ID}\") | .state" "$file")
 PROMOTE_STATE=$(jq -r ".data[] | select(.id==\"${PROMOTE_DEPLOYMENT_ID}\") | .state" "$file")
 ROLLBACK_STATE=$(jq -r ".data[] | select(.id==\"${ROLLBACK_DEPLOYMENT_ID}\") | .state" "$file")
 rm -f "$file"
-file=$(request_assert_200 GET "/api/repos/${APP_ID}/temp-envs?page=1&limit=50" "$TOKEN_ADMIN")
+file=$(request_assert_200 GET "/api/repos/${REPO_ID}/temp-envs?page=1&limit=50" "$TOKEN_ADMIN")
 TEMP_ENV_FINAL_STATE=$(jq -r ".data[] | select(.id==\"${TEMP_ENV_ID}\") | .state" "$file")
 rm -f "$file"
 
 cat > "$SUMMARY_FILE" <<EOF2
 # Full Staged E2E Smoke (${TS})
 
-- app_id: ${APP_ID}
+- repo_id: ${REPO_ID}
 - team_id: ${TEAM_ID}
 - repo: ${REPO}
 - workspace_id: ${WORKSPACE_ID}

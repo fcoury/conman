@@ -33,11 +33,11 @@ pub struct PublishReleaseResponse {
     pub released_changesets: Vec<String>,
 }
 
-fn git_repo(app_id: &str, repo_path: &str) -> GitRepo {
+fn git_repo(repo_id: &str, repo_path: &str) -> GitRepo {
     GitRepo {
         storage_name: "default".to_string(),
         relative_path: repo_path.to_string(),
-        gl_repository: format!("project-{app_id}"),
+        gl_repository: format!("project-{repo_id}"),
     }
 }
 
@@ -54,13 +54,13 @@ fn git_user(auth: &AuthUser) -> GitUser {
 pub async fn list_releases(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<ApiResponse<Vec<ReleaseBatch>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let pagination = pagination.validate()?;
     let (rows, total) = conman_db::ReleaseRepo::new(state.db.clone())
-        .list_by_app(&app_id, pagination.skip(), pagination.limit)
+        .list_by_repo(&repo_id, pagination.skip(), pagination.limit)
         .await?;
     Ok(Json(ApiResponse::paginated(
         rows,
@@ -73,16 +73,16 @@ pub async fn list_releases(
 pub async fn create_release(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
 ) -> Result<Json<ApiResponse<ReleaseBatch>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::ConfigManager)?;
+    auth.require_role(&repo_id, Role::ConfigManager)?;
     let repo = conman_db::ReleaseRepo::new(state.db.clone());
-    let tag = repo.next_tag(&app_id).await?;
-    let release = repo.create_draft(&app_id, tag).await?;
+    let tag = repo.next_tag(&repo_id).await?;
+    let release = repo.create_draft(&repo_id, tag).await?;
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "release",
         &release.id,
         "created",
@@ -100,9 +100,9 @@ pub async fn create_release(
 pub async fn get_release(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, release_id)): Path<(String, String)>,
+    Path((repo_id, release_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<ReleaseBatch>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let release = conman_db::ReleaseRepo::new(state.db.clone())
         .find_by_id(&release_id)
         .await?
@@ -110,7 +110,7 @@ pub async fn get_release(
             entity: "release",
             id: release_id.clone(),
         })?;
-    if release.app_id != app_id {
+    if release.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
             message: "release does not belong to app".to_string(),
         }
@@ -122,13 +122,13 @@ pub async fn get_release(
 pub async fn set_release_changesets(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, release_id)): Path<(String, String)>,
+    Path((repo_id, release_id)): Path<(String, String)>,
     Json(req): Json<SetReleaseChangesetsRequest>,
 ) -> Result<Json<ApiResponse<ReleaseBatch>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::ConfigManager)?;
+    auth.require_role(&repo_id, Role::ConfigManager)?;
 
     let queued = conman_db::ChangesetRepo::new(state.db.clone())
-        .list_queued_by_app(&app_id)
+        .list_queued_by_repo(&repo_id)
         .await?;
     let queued_ids = queued.into_iter().map(|c| c.id).collect::<Vec<_>>();
     for id in &req.changeset_ids {
@@ -146,7 +146,7 @@ pub async fn set_release_changesets(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "release",
         &release.id,
         "changesets_set",
@@ -164,13 +164,13 @@ pub async fn set_release_changesets(
 pub async fn reorder_release_changesets(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, release_id)): Path<(String, String)>,
+    Path((repo_id, release_id)): Path<(String, String)>,
     Json(req): Json<SetReleaseChangesetsRequest>,
 ) -> Result<Json<ApiResponse<ReleaseBatch>>, ApiConmanError> {
     set_release_changesets(
         State(state),
         Extension(auth),
-        Path((app_id, release_id)),
+        Path((repo_id, release_id)),
         Json(req),
     )
     .await
@@ -179,9 +179,9 @@ pub async fn reorder_release_changesets(
 pub async fn assemble_release(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, release_id)): Path<(String, String)>,
+    Path((repo_id, release_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<AssembleReleaseResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::ConfigManager)?;
+    auth.require_role(&repo_id, Role::ConfigManager)?;
     let release_repo = conman_db::ReleaseRepo::new(state.db.clone());
     let release =
         release_repo
@@ -209,7 +209,7 @@ pub async fn assemble_release(
 
     let job = conman_db::JobRepo::new(state.db.clone())
         .enqueue(conman_db::EnqueueJobInput {
-            app_id: app_id.clone(),
+            repo_id: repo_id.clone(),
             job_type: JobType::ReleaseAssemble,
             entity_type: "release".to_string(),
             entity_id: release_id.clone(),
@@ -227,7 +227,7 @@ pub async fn assemble_release(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "release",
         &release.id,
         "assemble_started",
@@ -249,9 +249,9 @@ pub async fn assemble_release(
 pub async fn publish_release(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, release_id)): Path<(String, String)>,
+    Path((repo_id, release_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<PublishReleaseResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::ConfigManager)?;
+    auth.require_role(&repo_id, Role::ConfigManager)?;
     let repo = conman_db::ReleaseRepo::new(state.db.clone());
     let release = repo
         .find_by_id(&release_id)
@@ -308,7 +308,7 @@ pub async fn publish_release(
     }
 
     let merge_gate = conman_db::JobRepo::new(state.db.clone())
-        .latest_for_entity(&app_id, "release", &release_id, JobType::MsuiteMerge)
+        .latest_for_entity(&repo_id, "release", &release_id, JobType::MsuiteMerge)
         .await?;
     match merge_gate {
         Some(job) if job.state == JobState::Succeeded => {}
@@ -331,14 +331,14 @@ pub async fn publish_release(
         None => {
             let job = conman_db::JobRepo::new(state.db.clone())
                 .enqueue(conman_db::EnqueueJobInput {
-                    app_id: app_id.clone(),
+                    repo_id: repo_id.clone(),
                     job_type: JobType::MsuiteMerge,
                     entity_type: "release".to_string(),
                     entity_id: release_id.clone(),
                     payload: serde_json::json!({
                         "gate": "release_publish",
                         "release_id": release_id,
-                        "app_id": app_id,
+                        "repo_id": repo_id,
                     }),
                     max_retries: 1,
                     timeout_ms: 20 * 60 * 1000,
@@ -355,14 +355,14 @@ pub async fn publish_release(
         }
     }
 
-    let app = conman_db::AppRepo::new(state.db.clone())
-        .find_by_id(&app_id)
+    let app = conman_db::RepoStore::new(state.db.clone())
+        .find_by_id(&repo_id)
         .await?
         .ok_or_else(|| ConmanError::NotFound {
             entity: "app",
-            id: app_id.clone(),
+            id: repo_id.clone(),
         })?;
-    let git_repo = git_repo(&app_id, &app.repo_path);
+    let git_repo = git_repo(&repo_id, &app.repo_path);
     let git_user = git_user(&auth);
     let integration_branch = app.integration_branch.clone();
     let integration_ref = format!("refs/heads/{integration_branch}");
@@ -493,10 +493,10 @@ pub async fn publish_release(
         .mark_released_batch(&release.ordered_changeset_ids)
         .await?;
     let job_repo = conman_db::JobRepo::new(state.db.clone());
-    for queued in changeset_repo.list_queued_by_app(&app_id).await? {
+    for queued in changeset_repo.list_queued_by_repo(&repo_id).await? {
         let existing = job_repo
             .latest_for_entity(
-                &app_id,
+                &repo_id,
                 "changeset",
                 &queued.id,
                 JobType::RevalidateQueuedChangeset,
@@ -510,7 +510,7 @@ pub async fn publish_release(
         }
         job_repo
             .enqueue(conman_db::EnqueueJobInput {
-                app_id: app_id.clone(),
+                repo_id: repo_id.clone(),
                 job_type: JobType::RevalidateQueuedChangeset,
                 entity_type: "changeset".to_string(),
                 entity_id: queued.id,
@@ -527,7 +527,7 @@ pub async fn publish_release(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "release",
         &release.id,
         "published",
@@ -542,7 +542,7 @@ pub async fn publish_release(
     if let Err(err) = emit_notification(
         &state,
         &auth.user_id,
-        Some(&app_id),
+        Some(&repo_id),
         "release_published",
         "Release published",
         &format!("Release {} was published.", release.tag),

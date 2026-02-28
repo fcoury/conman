@@ -13,7 +13,7 @@ pub struct AuditEvent {
     pub id: String,
     pub occurred_at: DateTime<Utc>,
     pub actor_user_id: Option<String>,
-    pub app_id: Option<String>,
+    pub repo_id: Option<String>,
     pub entity_type: String,
     pub entity_id: String,
     pub action: String,

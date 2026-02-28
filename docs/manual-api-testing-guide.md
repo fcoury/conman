@@ -179,7 +179,7 @@ DEV_PROFILE_JSON=$(api_auth POST "/api/repos/$REPO_ID/runtime-profiles" -d '{
   "name": "Development",
   "kind": "persistent_env",
   "base_url": "https://dev.example.test",
-  "surface_endpoints": {
+  "app_endpoints": {
     "portal": "https://portal.dev.example.test",
     "admin": "https://admin.dev.example.test"
   },
@@ -202,7 +202,7 @@ PROD_PROFILE_JSON=$(api_auth POST "/api/repos/$REPO_ID/runtime-profiles" -d '{
   "name": "Production",
   "kind": "persistent_env",
   "base_url": "https://app.example.test",
-  "surface_endpoints": {
+  "app_endpoints": {
     "portal": "https://portal.example.test",
     "admin": "https://admin.example.test"
   },

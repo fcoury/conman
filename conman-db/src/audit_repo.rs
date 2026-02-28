@@ -16,7 +16,7 @@ struct AuditDoc {
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     occurred_at: DateTime<Utc>,
     actor_user_id: Option<ObjectId>,
-    app_id: Option<ObjectId>,
+    repo_id: Option<ObjectId>,
     entity_type: String,
     entity_id: String,
     action: String,
@@ -32,7 +32,7 @@ impl From<AuditDoc> for AuditEvent {
             id: value.id.to_hex(),
             occurred_at: value.occurred_at,
             actor_user_id: value.actor_user_id.map(|id| id.to_hex()),
-            app_id: value.app_id.map(|id| id.to_hex()),
+            repo_id: value.repo_id.map(|id| id.to_hex()),
             entity_type: value.entity_type,
             entity_id: value.entity_id,
             action: value.action,
@@ -63,7 +63,7 @@ impl AuditRepo {
             actor_user_id: event
                 .actor_user_id
                 .and_then(|id| ObjectId::parse_str(id).ok()),
-            app_id: event.app_id.and_then(|id| ObjectId::parse_str(id).ok()),
+            repo_id: event.repo_id.and_then(|id| ObjectId::parse_str(id).ok()),
             entity_type: event.entity_type,
             entity_id: event.entity_id,
             action: event.action,
@@ -86,7 +86,7 @@ impl AuditRepo {
 impl EnsureIndexes for AuditRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
         let by_app_time = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "occurred_at": -1})
+            .keys(doc! {"repo_id": 1, "occurred_at": -1})
             .options(
                 IndexOptions::builder()
                     .name("audit_app_time".to_string())

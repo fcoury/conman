@@ -13,7 +13,7 @@ use crate::EnsureIndexes;
 struct DeploymentDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     environment_id: ObjectId,
     release_id: ObjectId,
     state: DeploymentState,
@@ -36,7 +36,7 @@ impl From<DeploymentDoc> for Deployment {
     fn from(value: DeploymentDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             environment_id: value.environment_id.to_hex(),
             release_id: value.release_id.to_hex(),
             state: value.state,
@@ -55,7 +55,7 @@ impl From<DeploymentDoc> for Deployment {
 
 #[derive(Debug, Clone)]
 pub struct CreateDeploymentInput {
-    pub app_id: String,
+    pub repo_id: String,
     pub environment_id: String,
     pub release_id: String,
     pub is_skip_stage: bool,
@@ -77,8 +77,8 @@ impl DeploymentRepo {
     }
 
     pub async fn create(&self, input: CreateDeploymentInput) -> Result<Deployment, ConmanError> {
-        let app_id = ObjectId::parse_str(&input.app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(&input.repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let environment_id =
             ObjectId::parse_str(&input.environment_id).map_err(|e| ConmanError::Validation {
@@ -103,7 +103,7 @@ impl DeploymentRepo {
         let active = self
             .collection
             .count_documents(doc! {
-                "app_id": app_id,
+                "repo_id": repo_id,
                 "environment_id": environment_id,
                 "state": {"$in": [
                     mongodb::bson::to_bson(&DeploymentState::Pending).map_err(|e| ConmanError::Internal { message: format!("failed to encode pending state: {e}") })?,
@@ -123,7 +123,7 @@ impl DeploymentRepo {
         let now = Utc::now();
         let row = DeploymentDoc {
             id: ObjectId::new(),
-            app_id,
+            repo_id,
             environment_id,
             release_id,
             state: DeploymentState::Pending,
@@ -146,16 +146,16 @@ impl DeploymentRepo {
         Ok(row.into())
     }
 
-    pub async fn list_by_app(
+    pub async fn list_by_repo(
         &self,
-        app_id: &str,
+        repo_id: &str,
         skip: u64,
         limit: u64,
     ) -> Result<(Vec<Deployment>, u64), ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
-        let filter = doc! {"app_id": app_id};
+        let filter = doc! {"repo_id": repo_id};
         let total = self
             .collection
             .count_documents(filter.clone())
@@ -291,7 +291,7 @@ impl DeploymentRepo {
 impl EnsureIndexes for DeploymentRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
         let by_app = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "created_at": -1})
+            .keys(doc! {"repo_id": 1, "created_at": -1})
             .options(
                 IndexOptions::builder()
                     .name("deployment_app_created".to_string())
@@ -299,7 +299,7 @@ impl EnsureIndexes for DeploymentRepo {
             )
             .build();
         let lock_idx = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "environment_id": 1, "state": 1})
+            .keys(doc! {"repo_id": 1, "environment_id": 1, "state": 1})
             .options(
                 IndexOptions::builder()
                     .name("deployment_env_lock_lookup".to_string())

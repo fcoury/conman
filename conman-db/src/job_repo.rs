@@ -13,7 +13,7 @@ use crate::EnsureIndexes;
 struct JobDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     job_type: JobType,
     state: JobState,
     entity_type: String,
@@ -39,7 +39,7 @@ impl From<JobDoc> for Job {
     fn from(value: JobDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             job_type: value.job_type,
             state: value.state,
             entity_type: value.entity_type,
@@ -63,7 +63,7 @@ impl From<JobDoc> for Job {
 struct JobLogDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     job_id: ObjectId,
     level: String,
     message: String,
@@ -75,7 +75,7 @@ impl From<JobLogDoc> for JobLogLine {
     fn from(value: JobLogDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             job_id: value.job_id.to_hex(),
             level: value.level,
             message: value.message,
@@ -86,7 +86,7 @@ impl From<JobLogDoc> for JobLogLine {
 
 #[derive(Debug, Clone)]
 pub struct EnqueueJobInput {
-    pub app_id: String,
+    pub repo_id: String,
     pub job_type: JobType,
     pub entity_type: String,
     pub entity_id: String,
@@ -111,8 +111,8 @@ impl JobRepo {
     }
 
     pub async fn enqueue(&self, input: EnqueueJobInput) -> Result<Job, ConmanError> {
-        let app_id = ObjectId::parse_str(&input.app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(&input.repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let created_by = input
             .created_by
@@ -125,7 +125,7 @@ impl JobRepo {
         let now = Utc::now();
         let row = JobDoc {
             id: ObjectId::new(),
-            app_id,
+            repo_id,
             job_type: input.job_type,
             state: JobState::Queued,
             entity_type: input.entity_type,
@@ -260,13 +260,13 @@ impl JobRepo {
 
     pub async fn latest_for_entity(
         &self,
-        app_id: &str,
+        repo_id: &str,
         entity_type: &str,
         entity_id: &str,
         job_type: JobType,
     ) -> Result<Option<Job>, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let job_type_bson =
             mongodb::bson::to_bson(&job_type).map_err(|e| ConmanError::Internal {
@@ -275,7 +275,7 @@ impl JobRepo {
         let row = self
             .jobs
             .find_one(doc! {
-                "app_id": app_id,
+                "repo_id": repo_id,
                 "entity_type": entity_type,
                 "entity_id": entity_id,
                 "job_type": job_type_bson,
@@ -288,16 +288,16 @@ impl JobRepo {
         Ok(row.map(Into::into))
     }
 
-    pub async fn list_by_app(
+    pub async fn list_by_repo(
         &self,
-        app_id: &str,
+        repo_id: &str,
         skip: u64,
         limit: u64,
     ) -> Result<(Vec<Job>, u64), ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
-        let filter = doc! {"app_id": app_id};
+        let filter = doc! {"repo_id": repo_id};
         let total = self
             .jobs
             .count_documents(filter.clone())
@@ -331,13 +331,13 @@ impl JobRepo {
 
     pub async fn append_log(
         &self,
-        app_id: &str,
+        repo_id: &str,
         job_id: &str,
         level: &str,
         message: &str,
     ) -> Result<JobLogLine, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let job_id = ObjectId::parse_str(job_id).map_err(|e| ConmanError::Validation {
             message: format!("invalid job_id: {e}"),
@@ -345,7 +345,7 @@ impl JobRepo {
         let now = Utc::now();
         let row = JobLogDoc {
             id: ObjectId::new(),
-            app_id,
+            repo_id,
             job_id,
             level: level.to_string(),
             message: message.to_string(),
@@ -413,7 +413,7 @@ impl EnsureIndexes for JobRepo {
             )
             .build();
         let by_app = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "created_at": -1})
+            .keys(doc! {"repo_id": 1, "created_at": -1})
             .options(
                 IndexOptions::builder()
                     .name("jobs_app_created_at".to_string())

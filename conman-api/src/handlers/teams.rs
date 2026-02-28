@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, Query, State},
 };
 use conman_auth::AuthUser;
-use conman_core::{App, AppSurface, ConmanError, Invite, Role, SurfaceBranding, Team};
+use conman_core::{App, AppBranding, ConmanError, Invite, Repo, Role, Team};
 use serde::Deserialize;
 
 use crate::{
@@ -31,22 +31,22 @@ pub struct CreateTeamInviteRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CreateSurfaceRequest {
+pub struct CreateAppRequest {
     pub key: String,
     pub title: String,
     #[serde(default)]
     pub domains: Vec<String>,
     #[serde(default)]
-    pub branding: Option<SurfaceBranding>,
+    pub branding: Option<AppBranding>,
     #[serde(default)]
     pub roles: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
-pub struct UpdateSurfaceRequest {
+pub struct UpdateAppRequest {
     pub title: Option<String>,
     pub domains: Option<Vec<String>>,
-    pub branding: Option<Option<SurfaceBranding>>,
+    pub branding: Option<Option<AppBranding>>,
     pub roles: Option<Vec<String>>,
 }
 
@@ -85,7 +85,7 @@ fn validate_slug(slug: &str) -> Result<(), ApiConmanError> {
     Ok(())
 }
 
-fn validate_surface_key(key: &str) -> Result<(), ApiConmanError> {
+fn validate_app_key(key: &str) -> Result<(), ApiConmanError> {
     if key.is_empty() {
         return Err(ConmanError::Validation {
             message: "app key is required".to_string(),
@@ -256,7 +256,7 @@ pub async fn create_repo_under_team(
     Extension(auth): Extension<AuthUser>,
     Path(team_id): Path<String>,
     Json(req): Json<CreateRepoRequest>,
-) -> Result<Json<ApiResponse<App>>, ApiConmanError> {
+) -> Result<Json<ApiResponse<Repo>>, ApiConmanError> {
     if req.name.trim().is_empty() || req.repo_path.trim().is_empty() {
         return Err(ConmanError::Validation {
             message: "name and repo_path are required".to_string(),
@@ -290,11 +290,11 @@ pub async fn create_repo_under_team(
         .trim()
         .to_string();
 
-    let app_repo = conman_db::AppRepo::new(state.db.clone());
-    let membership_repo = conman_db::MembershipRepo::new(state.db.clone());
+    let repo_store = conman_db::RepoStore::new(state.db.clone());
+    let repo_membership_repo = conman_db::RepoMembershipRepo::new(state.db.clone());
     let team_membership_repo = conman_db::TeamMembershipRepo::new(state.db.clone());
 
-    let app = app_repo
+    let repo = repo_store
         .insert_for_team(
             &team.id,
             req.name.trim(),
@@ -306,13 +306,13 @@ pub async fn create_repo_under_team(
 
     let team_members = team_membership_repo.list_by_team_id(&team.id).await?;
     if team_members.is_empty() {
-        membership_repo
-            .assign_role(&auth.user_id, &app.id, Role::Owner)
+        repo_membership_repo
+            .assign_role(&auth.user_id, &repo.id, Role::Owner)
             .await?;
     } else {
         for team_member in team_members {
-            membership_repo
-                .assign_role(&team_member.user_id, &app.id, team_member.role)
+            repo_membership_repo
+                .assign_role(&team_member.user_id, &repo.id, team_member.role)
                 .await?;
         }
     }
@@ -320,12 +320,12 @@ pub async fn create_repo_under_team(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app.id),
+        Some(&repo.id),
         "repo",
-        &app.id,
+        &repo.id,
         "created",
         None,
-        serde_json::to_value(&app).ok(),
+        serde_json::to_value(&repo).ok(),
         None,
     )
     .await
@@ -333,7 +333,7 @@ pub async fn create_repo_under_team(
         tracing::warn!(error = %err, "failed to write audit event");
     }
 
-    Ok(Json(ApiResponse::ok(app)))
+    Ok(Json(ApiResponse::ok(repo)))
 }
 
 pub async fn create_team_invite(
@@ -446,26 +446,26 @@ pub async fn delete_team_invite(
     Ok(Json(ApiResponse::ok(invite)))
 }
 
-pub async fn list_repo_surfaces(
+pub async fn list_repo_apps(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
     Path(repo_id): Path<String>,
-) -> Result<Json<ApiResponse<Vec<AppSurface>>>, ApiConmanError> {
+) -> Result<Json<ApiResponse<Vec<App>>>, ApiConmanError> {
     auth.require_role(&repo_id, Role::Member)?;
-    let surfaces = conman_db::AppSurfaceRepo::new(state.db.clone())
+    let apps = conman_db::AppRepo::new(state.db.clone())
         .list_by_repo(&repo_id)
         .await?;
-    Ok(Json(ApiResponse::ok(surfaces)))
+    Ok(Json(ApiResponse::ok(apps)))
 }
 
-pub async fn create_repo_surface(
+pub async fn create_repo_app(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
     Path(repo_id): Path<String>,
-    Json(req): Json<CreateSurfaceRequest>,
-) -> Result<Json<ApiResponse<AppSurface>>, ApiConmanError> {
+    Json(req): Json<CreateAppRequest>,
+) -> Result<Json<ApiResponse<App>>, ApiConmanError> {
     auth.require_role(&repo_id, Role::Admin)?;
-    validate_surface_key(req.key.trim())?;
+    validate_app_key(req.key.trim())?;
     if req.title.trim().is_empty() {
         return Err(ConmanError::Validation {
             message: "app title is required".to_string(),
@@ -473,10 +473,10 @@ pub async fn create_repo_surface(
         .into());
     }
 
-    let surface = conman_db::AppSurfaceRepo::new(state.db.clone())
+    let app = conman_db::AppRepo::new(state.db.clone())
         .create(
             &repo_id,
-            conman_db::CreateAppSurfaceInput {
+            conman_db::CreateAppInput {
                 key: req.key.trim().to_string(),
                 title: req.title.trim().to_string(),
                 domains: req.domains,
@@ -491,10 +491,10 @@ pub async fn create_repo_surface(
         Some(&auth.user_id),
         Some(&repo_id),
         "app",
-        &surface.id,
+        &app.id,
         "created",
         None,
-        serde_json::to_value(&surface).ok(),
+        serde_json::to_value(&app).ok(),
         None,
     )
     .await
@@ -502,24 +502,24 @@ pub async fn create_repo_surface(
         tracing::warn!(error = %err, "failed to write audit event");
     }
 
-    Ok(Json(ApiResponse::ok(surface)))
+    Ok(Json(ApiResponse::ok(app)))
 }
 
-pub async fn update_repo_surface(
+pub async fn update_repo_app(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((repo_id, surface_id)): Path<(String, String)>,
-    Json(req): Json<UpdateSurfaceRequest>,
-) -> Result<Json<ApiResponse<AppSurface>>, ApiConmanError> {
+    Path((repo_id, app_id)): Path<(String, String)>,
+    Json(req): Json<UpdateAppRequest>,
+) -> Result<Json<ApiResponse<App>>, ApiConmanError> {
     auth.require_role(&repo_id, Role::Admin)?;
 
-    let repo = conman_db::AppSurfaceRepo::new(state.db.clone());
+    let repo = conman_db::AppRepo::new(state.db.clone());
     let existing = repo
-        .find_by_id(&surface_id)
+        .find_by_id(&app_id)
         .await?
         .ok_or_else(|| ConmanError::NotFound {
             entity: "app",
-            id: surface_id.clone(),
+            id: app_id.clone(),
         })?;
     if existing.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
@@ -530,8 +530,8 @@ pub async fn update_repo_surface(
 
     let updated = repo
         .update(
-            &surface_id,
-            conman_db::UpdateAppSurfaceInput {
+            &app_id,
+            conman_db::UpdateAppInput {
                 title: req.title.map(|v| v.trim().to_string()),
                 domains: req.domains,
                 branding: req.branding,

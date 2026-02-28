@@ -16,7 +16,7 @@ Conman v1 model:
 ## 2) Domain Terminology
 
 - **Team**: Top-level customer/account boundary. Owns repositories.
-- **Repository**: A managed config repository (stored in `apps` collection in
+- **Repository**: A managed config repository (stored in `repos` collection in
   v1).
 - **App**: A user-facing app within a repository (domain/branding/role hints).
 - **Workspace**: A user-owned mutable branch used to edit repository files.
@@ -67,12 +67,12 @@ Conman v1 model:
 - New repositories default baseline mode: `latest deployed release of canonical
   user-facing environment`.
 - Fallback baseline when no release exists: integration branch HEAD.
-- Baseline mode is configurable per repository and editable by app admins.
+- Baseline mode is configurable per repository and editable by repository admins.
 
 ### 3.2 Workspace model
 
 - Default v1 behavior: one long-lived workspace branch per user per repository.
-- Branch naming convention: `ws/<user>/<app>`.
+- Branch naming convention: `ws/<user>/<repo>`.
 - Metadata supports optional workspace title now, for future multi-workspace UI.
 - Extra workspace creation API is supported in v1 backend; UI can defer it.
 
@@ -126,11 +126,11 @@ Conman v1 model:
 
 ### 3.7 Edit and commit strategy
 
-- App setting `commit_mode` supports:
+- Repository setting `commit_mode` supports:
   - `submit_commit` (default): autosave to workspace working state; commit on
     submit
   - `manual_checkpoint`: user checkpoints become commits
-- App default is configurable and can be overridden per user.
+- Repository default is configurable and can be overridden per user.
 - `submit_commit` keeps detailed edit history in metadata/audit while keeping
   cleaner Git history.
 
@@ -185,7 +185,7 @@ Conman v1 model:
 - Runtime configuration is modeled as a first-class `RuntimeProfile` and is
   versioned with releases.
 - Runtime variable precedence is:
-  `app defaults < environment profile < temp profile overrides`.
+  `repo defaults < environment profile < temp profile overrides`.
 - Runtime profile overrides may be attached to changesets and travel with
   release/promotion.
 - Runtime profile overrides are auto-included on changeset submit and surfaced
@@ -252,7 +252,7 @@ Notes:
 | Deploy/promote release | N | N | Y | Y | Y |
 | Skip stage / concurrent deploy approval | N | Y | Y | Y | Y |
 | Invite users | N | N | N | Y | Y |
-| Manage app settings/roles/envs | N | N | N | Y | Y |
+| Manage repo settings/roles/envs | N | N | N | Y | Y |
 | Manage persistent runtime profiles directly | N | N | N | Y | Y |
 | Reveal secret plaintext | N | N | N | Y | Y |
 
@@ -311,7 +311,7 @@ pending -> running -> succeeded
 
 ## 6.1 Mapping
 
-- Repository (`App` record): Git repository.
+- Repository (`Repo` record): Git repository.
 - Workspace: branch from repository baseline.
 - Changeset: metadata object comparing workspace `head_sha` vs baseline.
 - Release: immutable Git tag (`rYYYY.MM.DD.N`) representing selected queued
@@ -343,9 +343,9 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 ### 7.1 Collections
 
 - `teams`
+- `repos`
 - `apps`
-- `app_surfaces`
-- `app_memberships`
+- `repo_memberships`
 - `workspaces`
 - `changesets`
 - `changeset_revisions`
@@ -387,7 +387,7 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 - `temp_url_domain`
 - `validation_gates` (submit/release/deploy profile scope + command overrides)
 
-`app_surfaces`
+`apps`
 
 - `id`, `repo_id`, `key`, `title`
 - `domains[]`, `branding?`, `roles[]`
@@ -395,14 +395,14 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 `environments`
 
-- `id`, `app_id`, `name`, `position`, `is_canonical`
+- `id`, `repo_id`, `name`, `position`, `is_canonical`
 - `runtime_profile_id`
 - `created_at`, `updated_at`
 
 `runtime_profiles`
 
-- `id`, `app_id`, `name`, `kind`
-- `base_url`, `surface_endpoints`, `env_vars_typed`, `secrets_encrypted`
+- `id`, `repo_id`, `name`, `kind`
+- `base_url`, `app_endpoints`, `env_vars_typed`, `secrets_encrypted`
 - `database` (`engine=mongodb`, `connection_ref`, `provisioning_mode`,
   `base_profile_id?`)
 - `migrations` (`repo_paths[]`, `command_ref`, `applied_state_ref`)
@@ -417,7 +417,7 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 `changeset_profile_overrides`
 
-- `id`, `changeset_id`, `app_id`
+- `id`, `changeset_id`, `repo_id`
 - `target_environment_id?`, `target_profile_id?`
 - `env_var_overrides_typed`, `secret_overrides_encrypted`
 - `database_overrides`, `data_overrides`
@@ -425,18 +425,18 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 `migration_executions`
 
-- `id`, `app_id`, `environment_id`, `release_id`
+- `id`, `repo_id`, `environment_id`, `release_id`
 - `runtime_profile_revision_id`, `status`, `started_at`, `finished_at`
 - `applied_migrations[]`, `logs_ref`, `triggered_by`
 
 `workspaces`
 
-- `id`, `app_id`, `owner_user_id`, `branch_name`, `title?`, `is_default`
+- `id`, `repo_id`, `owner_user_id`, `branch_name`, `title?`, `is_default`
 - `base_ref_type`, `base_ref_value`, `head_sha`
 
 `changesets`
 
-- `id`, `app_id`, `workspace_id`, `author_user_id`
+- `id`, `repo_id`, `workspace_id`, `author_user_id`
 - `title`, `description`, `state`
 - `base_sha`, `head_sha`, `current_revision`
 - `approval_count`, `required_approval_count=1`
@@ -448,18 +448,18 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 `release_batches`
 
-- `id`, `app_id`, `tag`, `state`
+- `id`, `repo_id`, `tag`, `state`
 - `ordered_changeset_ids[]`
 - `published_sha`, `published_at`, `published_by`
 
 `deployments`
 
-- `id`, `app_id`, `environment_id`, `release_id`, `state`
+- `id`, `repo_id`, `environment_id`, `release_id`, `state`
 - `skip_stage`, `approval_user_ids[]`, `logs_ref`
 
 `temp_environments`
 
-- `id`, `app_id`, `kind` (`workspace` | `changeset`)
+- `id`, `repo_id`, `kind` (`workspace` | `changeset`)
 - `workspace_id?`, `changeset_id?`
 - `db_name`, `state`, `last_activity_at`, `expires_at`, `grace_until`
 - `base_runtime_profile_id`, `runtime_profile_id`
@@ -467,7 +467,7 @@ Git remains file truth. MongoDB tracks workflow state and auditability.
 
 `audit_events`
 
-- `id`, `occurred_at`, `actor_user_id`, `app_id`
+- `id`, `occurred_at`, `actor_user_id`, `repo_id`
 - `entity_type`, `entity_id`, `action`
 - `before`, `after`, `git_sha?`, `context` (ip, user_agent, request_id)
 
@@ -485,55 +485,55 @@ Base path: `/api`
 - `POST /api/teams/:teamId/invites/:inviteId/resend`
 - `DELETE /api/teams/:teamId/invites/:inviteId`
 - `GET /api/repos?page=&limit=`
-- `GET /api/repos/:appId`
-- `PATCH /api/repos/:appId/settings`
-- `GET /api/repos/:appId/members?page=&limit=`
-- `POST /api/repos/:appId/members`
-- `GET /api/repos/:appId/apps`
-- `POST /api/repos/:appId/apps`
-- `PATCH /api/repos/:appId/apps/:surfaceId`
+- `GET /api/repos/:repoId`
+- `PATCH /api/repos/:repoId/settings`
+- `GET /api/repos/:repoId/members?page=&limit=`
+- `POST /api/repos/:repoId/members`
+- `GET /api/repos/:repoId/apps`
+- `POST /api/repos/:repoId/apps`
+- `PATCH /api/repos/:repoId/apps/:appId`
 
 ## 8.2 Workspaces
 
-- `GET /api/repos/:appId/workspaces?page=&limit=`
-- `POST /api/repos/:appId/workspaces`
-- `GET /api/repos/:appId/workspaces/:workspaceId`
-- `PATCH /api/repos/:appId/workspaces/:workspaceId`
-- `POST /api/repos/:appId/workspaces/:workspaceId/reset`
-- `POST /api/repos/:appId/workspaces/:workspaceId/sync-integration`
+- `GET /api/repos/:repoId/workspaces?page=&limit=`
+- `POST /api/repos/:repoId/workspaces`
+- `GET /api/repos/:repoId/workspaces/:workspaceId`
+- `PATCH /api/repos/:repoId/workspaces/:workspaceId`
+- `POST /api/repos/:repoId/workspaces/:workspaceId/reset`
+- `POST /api/repos/:repoId/workspaces/:workspaceId/sync-integration`
 
 ## 8.3 Workspace files
 
-- `GET /api/repos/:appId/workspaces/:workspaceId/files?path=`
-- `PUT /api/repos/:appId/workspaces/:workspaceId/files` (body: `path`, `content`)
-- `DELETE /api/repos/:appId/workspaces/:workspaceId/files` (body: `path`)
-- `POST /api/repos/:appId/workspaces/:workspaceId/checkpoints`
+- `GET /api/repos/:repoId/workspaces/:workspaceId/files?path=`
+- `PUT /api/repos/:repoId/workspaces/:workspaceId/files` (body: `path`, `content`)
+- `DELETE /api/repos/:repoId/workspaces/:workspaceId/files` (body: `path`)
+- `POST /api/repos/:repoId/workspaces/:workspaceId/checkpoints`
 
 ## 8.4 Changesets
 
-- `GET /api/repos/:appId/changesets?page=&limit=&state=`
-- `POST /api/repos/:appId/changesets` (from workspace)
-- `GET /api/repos/:appId/changesets/:changesetId`
-- `PATCH /api/repos/:appId/changesets/:changesetId`
-- `POST /api/repos/:appId/changesets/:changesetId/submit`
-- `POST /api/repos/:appId/changesets/:changesetId/resubmit`
-- `POST /api/repos/:appId/changesets/:changesetId/review`
-- `POST /api/repos/:appId/changesets/:changesetId/queue`
-- `POST /api/repos/:appId/changesets/:changesetId/move-to-draft`
-- `GET /api/repos/:appId/changesets/:changesetId/profile-overrides`
-- `PUT /api/repos/:appId/changesets/:changesetId/profile-overrides`
+- `GET /api/repos/:repoId/changesets?page=&limit=&state=`
+- `POST /api/repos/:repoId/changesets` (from workspace)
+- `GET /api/repos/:repoId/changesets/:changesetId`
+- `PATCH /api/repos/:repoId/changesets/:changesetId`
+- `POST /api/repos/:repoId/changesets/:changesetId/submit`
+- `POST /api/repos/:repoId/changesets/:changesetId/resubmit`
+- `POST /api/repos/:repoId/changesets/:changesetId/review`
+- `POST /api/repos/:repoId/changesets/:changesetId/queue`
+- `POST /api/repos/:repoId/changesets/:changesetId/move-to-draft`
+- `GET /api/repos/:repoId/changesets/:changesetId/profile-overrides`
+- `PUT /api/repos/:repoId/changesets/:changesetId/profile-overrides`
 
 `POST .../submit` responses include an `included_profile_overrides` summary.
 
 ## 8.5 Diffs, comments, and AI
 
-- `GET /api/repos/:appId/changesets/:changesetId/diff?mode=raw|semantic`
-- `GET /api/repos/:appId/changesets/:changesetId/comments?page=&limit=`
-- `POST /api/repos/:appId/changesets/:changesetId/comments`
-- `PATCH /api/repos/:appId/changesets/:changesetId/comments/:commentId` (stores
+- `GET /api/repos/:repoId/changesets/:changesetId/diff?mode=raw|semantic`
+- `GET /api/repos/:repoId/changesets/:changesetId/comments?page=&limit=`
+- `POST /api/repos/:repoId/changesets/:changesetId/comments`
+- `PATCH /api/repos/:repoId/changesets/:changesetId/comments/:commentId` (stores
   comment revision history)
-- `POST /api/repos/:appId/changesets/:changesetId/analyze`
-- `POST /api/repos/:appId/changesets/:changesetId/chat`
+- `POST /api/repos/:repoId/changesets/:changesetId/analyze`
+- `POST /api/repos/:repoId/changesets/:changesetId/chat`
 
 Semantic diff API contract (v1 standard):
 
@@ -576,50 +576,50 @@ interface SemanticDiffResponse {
 
 ## 8.6 Releases
 
-- `GET /api/repos/:appId/releases?page=&limit=&state=`
-- `POST /api/repos/:appId/releases` (create draft release)
-- `POST /api/repos/:appId/releases/:releaseId/changesets` (add/remove subset)
-- `POST /api/repos/:appId/releases/:releaseId/reorder`
-- `POST /api/repos/:appId/releases/:releaseId/assemble`
-- `POST /api/repos/:appId/releases/:releaseId/publish`
-- `GET /api/repos/:appId/releases/:releaseId`
+- `GET /api/repos/:repoId/releases?page=&limit=&state=`
+- `POST /api/repos/:repoId/releases` (create draft release)
+- `POST /api/repos/:repoId/releases/:releaseId/changesets` (add/remove subset)
+- `POST /api/repos/:repoId/releases/:releaseId/reorder`
+- `POST /api/repos/:repoId/releases/:releaseId/assemble`
+- `POST /api/repos/:repoId/releases/:releaseId/publish`
+- `GET /api/repos/:repoId/releases/:releaseId`
 
 ## 8.7 Environments and deployments
 
-- `GET /api/repos/:appId/environments`
-- `PATCH /api/repos/:appId/environments`
-- `POST /api/repos/:appId/environments/:envId/deploy`
-- `POST /api/repos/:appId/environments/:envId/promote`
-- `POST /api/repos/:appId/environments/:envId/rollback`
-- `POST /api/repos/:appId/environments/:envId/create-drift-fix-changeset`
-- `GET /api/repos/:appId/deployments?page=&limit=`
+- `GET /api/repos/:repoId/environments`
+- `PATCH /api/repos/:repoId/environments`
+- `POST /api/repos/:repoId/environments/:envId/deploy`
+- `POST /api/repos/:repoId/environments/:envId/promote`
+- `POST /api/repos/:repoId/environments/:envId/rollback`
+- `POST /api/repos/:repoId/environments/:envId/create-drift-fix-changeset`
+- `GET /api/repos/:repoId/deployments?page=&limit=`
 
 ## 8.8 Runtime profiles
 
-- `GET /api/repos/:appId/runtime-profiles?page=&limit=`
-- `POST /api/repos/:appId/runtime-profiles`
-- `GET /api/repos/:appId/runtime-profiles/:profileId`
-- `PATCH /api/repos/:appId/runtime-profiles/:profileId`
-- `GET /api/repos/:appId/runtime-profiles/:profileId/revisions?page=&limit=`
-- `POST /api/repos/:appId/runtime-profiles/:profileId/revert`
-- `POST /api/repos/:appId/runtime-profiles/:profileId/rotate-key` (manual)
-- `POST /api/repos/:appId/runtime-profiles/:profileId/secrets/:key/reveal`
+- `GET /api/repos/:repoId/runtime-profiles?page=&limit=`
+- `POST /api/repos/:repoId/runtime-profiles`
+- `GET /api/repos/:repoId/runtime-profiles/:profileId`
+- `PATCH /api/repos/:repoId/runtime-profiles/:profileId`
+- `GET /api/repos/:repoId/runtime-profiles/:profileId/revisions?page=&limit=`
+- `POST /api/repos/:repoId/runtime-profiles/:profileId/revert`
+- `POST /api/repos/:repoId/runtime-profiles/:profileId/rotate-key` (manual)
+- `POST /api/repos/:repoId/runtime-profiles/:profileId/secrets/:key/reveal`
   (`admin` only; audited)
-- `surface_endpoints` keys must reference existing
-  `/api/repos/:appId/apps` keys
+- `app_endpoints` keys must reference existing
+  `/api/repos/:repoId/apps` keys
 
 `PATCH .../runtime-profiles/:profileId` allows direct emergency edits by
 `admin`; resulting drift still blocks deployment until revalidation.
 
 ## 8.9 Temp environments and jobs
 
-- `POST /api/repos/:appId/temp-envs` (workspace or changeset)
-- `GET /api/repos/:appId/temp-envs?page=&limit=`
-- `POST /api/repos/:appId/temp-envs/:tempEnvId/extend`
-- `POST /api/repos/:appId/temp-envs/:tempEnvId/undo-expire`
-- `DELETE /api/repos/:appId/temp-envs/:tempEnvId`
-- `GET /api/repos/:appId/jobs/:jobId`
-- `GET /api/repos/:appId/jobs?page=&limit=&type=&state=`
+- `POST /api/repos/:repoId/temp-envs` (workspace or changeset)
+- `GET /api/repos/:repoId/temp-envs?page=&limit=`
+- `POST /api/repos/:repoId/temp-envs/:tempEnvId/extend`
+- `POST /api/repos/:repoId/temp-envs/:tempEnvId/undo-expire`
+- `DELETE /api/repos/:repoId/temp-envs/:tempEnvId`
+- `GET /api/repos/:repoId/jobs/:jobId`
+- `GET /api/repos/:repoId/jobs?page=&limit=&type=&state=`
 
 ## 8.10 Notifications and auth
 

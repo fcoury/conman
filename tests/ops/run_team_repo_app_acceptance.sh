@@ -11,7 +11,7 @@ OPS_RESULTS_DIR="$ROOT/tests/ops/results"
 mkdir -p "$OPS_RESULTS_DIR"
 
 STAMP="$(date -u +%Y%m%d%H%M%S)"
-SUMMARY_FILE="$OPS_RESULTS_DIR/${STAMP}-team-repo-surface-acceptance-summary.md"
+SUMMARY_FILE="$OPS_RESULTS_DIR/${STAMP}-team-repo-app-acceptance-summary.md"
 
 BASE_URL="${CONMAN_BASE_URL:-http://127.0.0.1:3000}"
 TOKEN="${CONMAN_TOKEN:-}"
@@ -231,16 +231,16 @@ if [[ -n "${REPO_ID:-}" ]]; then
 
   if expect_status_any "Create app lims" "200,201" POST "/api/repos/${REPO_ID}/apps" "$S1_PAYLOAD"; then
     file="$LAST_RESPONSE_FILE"
-    SURFACE_1_ID="$(jq -r '.data.id // empty' "$file")"
+    APP_1_ID="$(jq -r '.data.id // empty' "$file")"
     rm -f "$file"
   fi
   if expect_status_any "Create app portal" "200,201" POST "/api/repos/${REPO_ID}/apps" "$S2_PAYLOAD"; then
     file="$LAST_RESPONSE_FILE"
-    SURFACE_2_ID="$(jq -r '.data.id // empty' "$file")"
+    APP_2_ID="$(jq -r '.data.id // empty' "$file")"
     rm -f "$file"
   fi
 
-  if [[ -n "${SURFACE_1_ID:-}" && -n "${SURFACE_2_ID:-}" ]]; then
+  if [[ -n "${APP_1_ID:-}" && -n "${APP_2_ID:-}" ]]; then
     record_pass "TRS-AC-03 app create" "Created two apps for repo."
   else
     record_fail "TRS-AC-03 app create" "Failed to create both required apps."
@@ -266,7 +266,7 @@ if [[ -n "${REPO_ID:-}" ]]; then
       name:$name,
       kind:"persistent_env",
       base_url:$base,
-      surface_endpoints:{lims:$lims,portal:$portal},
+      app_endpoints:{lims:$lims,portal:$portal},
       env_vars:{FEATURE_X:{type:"boolean",value:true}},
       secrets:{API_KEY:"acceptance-secret"},
       database_engine:"mongodb",
@@ -276,7 +276,7 @@ if [[ -n "${REPO_ID:-}" ]]; then
       migration_command:"echo migrate"
     }')"
 
-  if expect_status_any "Create runtime profile with surface endpoints" "200,201" POST "/api/repos/${REPO_ID}/runtime-profiles" "$PROFILE_PAYLOAD"; then
+  if expect_status_any "Create runtime profile with app endpoints" "200,201" POST "/api/repos/${REPO_ID}/runtime-profiles" "$PROFILE_PAYLOAD"; then
     file="$LAST_RESPONSE_FILE"
     PROFILE_ID="$(jq -r '.data.id // empty' "$file")"
     if [[ -n "$PROFILE_ID" ]]; then
@@ -290,12 +290,12 @@ if [[ -n "${REPO_ID:-}" ]]; then
   if [[ -n "${PROFILE_ID:-}" ]]; then
     if expect_status_any "Get runtime profile" "200" GET "/api/repos/${REPO_ID}/runtime-profiles/${PROFILE_ID}"; then
       file="$LAST_RESPONSE_FILE"
-      LIMS_EP="$(jq -r '.data.surface_endpoints.lims // empty' "$file")"
-      PORTAL_EP="$(jq -r '.data.surface_endpoints.portal // empty' "$file")"
+      LIMS_EP="$(jq -r '.data.app_endpoints.lims // empty' "$file")"
+      PORTAL_EP="$(jq -r '.data.app_endpoints.portal // empty' "$file")"
       if [[ -n "$LIMS_EP" && -n "$PORTAL_EP" ]]; then
-        record_pass "TRS-AC-04 runtime profile read" "Runtime profile returns persisted \`surface_endpoints\`."
+        record_pass "TRS-AC-04 runtime profile read" "Runtime profile returns persisted \`app_endpoints\`."
       else
-        record_fail "TRS-AC-04 runtime profile read" "Missing \`surface_endpoints\` in runtime profile response."
+        record_fail "TRS-AC-04 runtime profile read" "Missing \`app_endpoints\` in runtime profile response."
       fi
       rm -f "$file"
     fi

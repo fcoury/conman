@@ -5,7 +5,7 @@ use axum::{
 use base64::{Engine, engine::general_purpose::STANDARD};
 use conman_auth::AuthUser;
 use conman_core::{
-    App, BaseRefType, CommitMode, ConflictStatus, ConmanError, FileAction, FileEntry,
+    Repo, BaseRefType, CommitMode, ConflictStatus, ConmanError, FileAction, FileEntry,
     FileEntryType, GitRepo, GitTreeEntryType, GitUser, Role, Workspace,
 };
 use conman_db::CreateWorkspaceInput;
@@ -87,11 +87,11 @@ pub struct SyncIntegrationResponse {
     pub message: String,
 }
 
-fn git_repo(app: &App) -> GitRepo {
+fn git_repo(repo: &Repo) -> GitRepo {
     GitRepo {
         storage_name: "default".to_string(),
-        relative_path: app.repo_path.clone(),
-        gl_repository: format!("project-{}", app.id),
+        relative_path: repo.repo_path.clone(),
+        gl_repository: format!("project-{}", repo.id),
     }
 }
 
@@ -105,8 +105,8 @@ fn git_user(auth: &AuthUser) -> GitUser {
     }
 }
 
-fn default_workspace_branch(auth: &AuthUser, app: &App) -> String {
-    let app_slug = app
+fn default_workspace_branch(auth: &AuthUser, repo: &Repo) -> String {
+    let app_slug = repo
         .name
         .chars()
         .map(|ch| {
@@ -154,13 +154,13 @@ fn is_missing_revision_git(err: &ConmanError) -> bool {
     )
 }
 
-async fn find_app(state: &AppState, app_id: &str) -> Result<App, ApiConmanError> {
-    conman_db::AppRepo::new(state.db.clone())
-        .find_by_id(app_id)
+async fn find_repo(state: &AppState, repo_id: &str) -> Result<Repo, ApiConmanError> {
+    conman_db::RepoStore::new(state.db.clone())
+        .find_by_id(repo_id)
         .await?
         .ok_or_else(|| ConmanError::NotFound {
-            entity: "app",
-            id: app_id.to_string(),
+            entity: "repo",
+            id: repo_id.to_string(),
         })
         .map_err(Into::into)
 }
@@ -189,7 +189,7 @@ async fn find_workspace_for_owner(
 async fn audit_workspace_event(
     state: &AppState,
     auth: &AuthUser,
-    app_id: &str,
+    repo_id: &str,
     workspace_id: &str,
     action: &str,
     after: Option<serde_json::Value>,
@@ -198,7 +198,7 @@ async fn audit_workspace_event(
     if let Err(err) = emit_audit(
         state,
         Some(&auth.user_id),
-        Some(app_id),
+        Some(repo_id),
         "workspace",
         workspace_id,
         action,
@@ -215,21 +215,21 @@ async fn audit_workspace_event(
 async fn ensure_default_workspace(
     state: &AppState,
     auth: &AuthUser,
-    app: &App,
+    repo: &Repo,
 ) -> Result<Workspace, ApiConmanError> {
-    let repo = conman_db::WorkspaceRepo::new(state.db.clone());
-    if let Some(existing) = repo.find_default(&app.id, &auth.user_id).await? {
+    let workspace_repo = conman_db::WorkspaceRepo::new(state.db.clone());
+    if let Some(existing) = workspace_repo.find_default(&repo.id, &auth.user_id).await? {
         return Ok(existing);
     }
 
-    let branch_name = default_workspace_branch(auth, app);
-    let git_repo = git_repo(app);
+    let branch_name = default_workspace_branch(auth, repo);
+    let git_repo = git_repo(repo);
     let git_user = git_user(auth);
-    let mut head_sha = app.integration_branch.clone();
+    let mut head_sha = repo.integration_branch.clone();
 
     match state
         .git_adapter
-        .create_branch(&git_repo, &git_user, &branch_name, &app.integration_branch)
+        .create_branch(&git_repo, &git_user, &branch_name, &repo.integration_branch)
         .await
     {
         Ok(branch) => {
@@ -241,22 +241,22 @@ async fn ensure_default_workspace(
         Err(err) => return Err(err.into()),
     }
 
-    let workspace = repo
+    let workspace = workspace_repo
         .create(CreateWorkspaceInput {
-            app_id: app.id.clone(),
+            repo_id: repo.id.clone(),
             owner_user_id: auth.user_id.clone(),
             branch_name,
             title: None,
             is_default: true,
             base_ref_type: BaseRefType::Branch,
-            base_ref_value: app.integration_branch.clone(),
+            base_ref_value: repo.integration_branch.clone(),
             head_sha,
         })
         .await?;
     audit_workspace_event(
         state,
         auth,
-        &workspace.app_id,
+        &workspace.repo_id,
         &workspace.id,
         "created",
         serde_json::to_value(&workspace).ok(),
@@ -269,15 +269,17 @@ async fn ensure_default_workspace(
 pub async fn list_workspaces(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<Workspace>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let app = find_app(&state, &app_id).await?;
-    let repo = conman_db::WorkspaceRepo::new(state.db.clone());
-    let mut workspaces = repo.list_by_app_owner(&app_id, &auth.user_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let repo = find_repo(&state, &repo_id).await?;
+    let workspace_repo = conman_db::WorkspaceRepo::new(state.db.clone());
+    let mut workspaces = workspace_repo
+        .list_by_repo_owner(&repo_id, &auth.user_id)
+        .await?;
 
     if workspaces.is_empty() {
-        workspaces.push(ensure_default_workspace(&state, &auth, &app).await?);
+        workspaces.push(ensure_default_workspace(&state, &auth, &repo).await?);
     }
 
     Ok(Json(ApiResponse::ok(workspaces)))
@@ -286,38 +288,38 @@ pub async fn list_workspaces(
 pub async fn create_workspace(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Json(req): Json<CreateWorkspaceRequest>,
 ) -> Result<Json<ApiResponse<Workspace>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let app = find_app(&state, &app_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let repo = find_repo(&state, &repo_id).await?;
 
     let provided_branch = req.branch_name;
     let is_default = provided_branch.is_none();
-    let branch_name = provided_branch.unwrap_or_else(|| default_workspace_branch(&auth, &app));
+    let branch_name = provided_branch.unwrap_or_else(|| default_workspace_branch(&auth, &repo));
 
     if is_default
         && conman_db::WorkspaceRepo::new(state.db.clone())
-            .find_default(&app_id, &auth.user_id)
+            .find_default(&repo_id, &auth.user_id)
             .await?
             .is_some()
     {
         return Err(ConmanError::Conflict {
-            message: "default workspace already exists for this app".to_string(),
+            message: "default workspace already exists for this repo".to_string(),
         }
         .into());
     }
 
-    let git_repo = git_repo(&app);
+    let git_repo = git_repo(&repo);
     let git_user = git_user(&auth);
-    let mut head_sha = app.integration_branch.clone();
+    let mut head_sha = repo.integration_branch.clone();
     match state
         .git_adapter
         .create_branch(
             &git_repo,
             &git_user,
             &branch_name,
-            app.integration_branch.as_str(),
+            repo.integration_branch.as_str(),
         )
         .await
     {
@@ -332,13 +334,13 @@ pub async fn create_workspace(
 
     let workspace = conman_db::WorkspaceRepo::new(state.db.clone())
         .create(CreateWorkspaceInput {
-            app_id,
+            repo_id,
             owner_user_id: auth.user_id.clone(),
             branch_name,
             title: req.title,
             is_default,
             base_ref_type: BaseRefType::Branch,
-            base_ref_value: app.integration_branch,
+            base_ref_value: repo.integration_branch,
             head_sha,
         })
         .await?;
@@ -346,7 +348,7 @@ pub async fn create_workspace(
     audit_workspace_event(
         &state,
         &auth,
-        &workspace.app_id,
+        &workspace.repo_id,
         &workspace.id,
         "created",
         serde_json::to_value(&workspace).ok(),
@@ -360,13 +362,13 @@ pub async fn create_workspace(
 pub async fn get_workspace(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, workspace_id)): Path<(String, String)>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<Workspace>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
-    if workspace.app_id != app_id {
+    if workspace.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "workspace does not belong to app".to_string(),
+            message: "workspace does not belong to repo".to_string(),
         }
         .into());
     }
@@ -376,14 +378,14 @@ pub async fn get_workspace(
 pub async fn update_workspace(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, workspace_id)): Path<(String, String)>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
     Json(req): Json<UpdateWorkspaceRequest>,
 ) -> Result<Json<ApiResponse<Workspace>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
-    if workspace.app_id != app_id {
+    if workspace.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "workspace does not belong to app".to_string(),
+            message: "workspace does not belong to repo".to_string(),
         }
         .into());
     }
@@ -394,7 +396,7 @@ pub async fn update_workspace(
     audit_workspace_event(
         &state,
         &auth,
-        &app_id,
+        &repo_id,
         &updated.id,
         "updated",
         serde_json::to_value(&updated).ok(),
@@ -408,21 +410,21 @@ pub async fn update_workspace(
 pub async fn get_workspace_file_or_tree(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, workspace_id)): Path<(String, String)>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
     Query(query): Query<FilePathQuery>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let app = find_app(&state, &app_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let repo = find_repo(&state, &repo_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
-    if workspace.app_id != app_id {
+    if workspace.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "workspace does not belong to app".to_string(),
+            message: "workspace does not belong to repo".to_string(),
         }
         .into());
     }
 
     let path = normalize_path(&query.path)?;
-    let git_repo = git_repo(&app);
+    let git_repo = git_repo(&repo);
 
     if !path.is_empty() {
         match state
@@ -482,23 +484,23 @@ pub async fn get_workspace_file_or_tree(
 pub async fn write_workspace_file(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, workspace_id)): Path<(String, String)>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
     Json(req): Json<WriteFileRequest>,
 ) -> Result<Json<ApiResponse<FileWriteResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let app = find_app(&state, &app_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let repo = find_repo(&state, &repo_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
-    if workspace.app_id != app_id {
+    if workspace.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "workspace does not belong to app".to_string(),
+            message: "workspace does not belong to repo".to_string(),
         }
         .into());
     }
 
     let path = normalize_path(&req.path)?;
-    if is_blocked_path(&path, &app.settings.blocked_paths) {
+    if is_blocked_path(&path, &repo.settings.blocked_paths) {
         return Err(ConmanError::Forbidden {
-            message: format!("path is blocked by app settings: {path}"),
+            message: format!("path is blocked by repo settings: {path}"),
         }
         .into());
     }
@@ -507,18 +509,18 @@ pub async fn write_workspace_file(
         .map_err(|e| ConmanError::Validation {
             message: format!("content must be base64: {e}"),
         })?;
-    if content.len() as u64 > app.settings.file_size_limit_bytes {
+    if content.len() as u64 > repo.settings.file_size_limit_bytes {
         return Err(ConmanError::Validation {
             message: format!(
-                "file exceeds app limit of {} bytes",
-                app.settings.file_size_limit_bytes
+                "file exceeds repo limit of {} bytes",
+                repo.settings.file_size_limit_bytes
             ),
         }
         .into());
     }
 
     let message = req.message.unwrap_or_else(|| format!("update {path}"));
-    let git_repo = git_repo(&app);
+    let git_repo = git_repo(&repo);
     let git_user = git_user(&auth);
     let file_action = match state
         .git_adapter
@@ -549,7 +551,7 @@ pub async fn write_workspace_file(
             &git_repo,
             &git_user,
             &workspace.branch_name,
-            Some(&app.integration_branch),
+            Some(&repo.integration_branch),
             &message,
             vec![file_action],
         )
@@ -562,7 +564,7 @@ pub async fn write_workspace_file(
     audit_workspace_event(
         &state,
         &auth,
-        &app_id,
+        &repo_id,
         &workspace.id,
         "file_written",
         Some(serde_json::json!({
@@ -583,29 +585,29 @@ pub async fn write_workspace_file(
 pub async fn delete_workspace_file(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, workspace_id)): Path<(String, String)>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
     Json(req): Json<DeleteFileRequest>,
 ) -> Result<Json<ApiResponse<FileWriteResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let app = find_app(&state, &app_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let repo = find_repo(&state, &repo_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
-    if workspace.app_id != app_id {
+    if workspace.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "workspace does not belong to app".to_string(),
+            message: "workspace does not belong to repo".to_string(),
         }
         .into());
     }
 
     let path = normalize_path(&req.path)?;
-    if is_blocked_path(&path, &app.settings.blocked_paths) {
+    if is_blocked_path(&path, &repo.settings.blocked_paths) {
         return Err(ConmanError::Forbidden {
-            message: format!("path is blocked by app settings: {path}"),
+            message: format!("path is blocked by repo settings: {path}"),
         }
         .into());
     }
 
     let message = req.message.unwrap_or_else(|| format!("delete {path}"));
-    let git_repo = git_repo(&app);
+    let git_repo = git_repo(&repo);
     let git_user = git_user(&auth);
     let result = state
         .git_adapter
@@ -613,7 +615,7 @@ pub async fn delete_workspace_file(
             &git_repo,
             &git_user,
             &workspace.branch_name,
-            Some(&app.integration_branch),
+            Some(&repo.integration_branch),
             &message,
             vec![FileAction::Delete { path: path.clone() }],
         )
@@ -626,7 +628,7 @@ pub async fn delete_workspace_file(
     audit_workspace_event(
         &state,
         &auth,
-        &app_id,
+        &repo_id,
         &workspace.id,
         "file_deleted",
         Some(serde_json::json!({
@@ -647,27 +649,27 @@ pub async fn delete_workspace_file(
 pub async fn sync_workspace_integration(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, workspace_id)): Path<(String, String)>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<SyncIntegrationResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let app = find_app(&state, &app_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let repo = find_repo(&state, &repo_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
-    if workspace.app_id != app_id {
+    if workspace.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "workspace does not belong to app".to_string(),
+            message: "workspace does not belong to repo".to_string(),
         }
         .into());
     }
 
-    let repo = git_repo(&app);
+    let git_repo = git_repo(&repo);
     let user = git_user(&auth);
     let status = match state
         .git_adapter
         .rebase_to_ref(
-            &repo,
+            &git_repo,
             &user,
             &workspace.head_sha,
-            &format!("refs/heads/{}", app.integration_branch),
+            &format!("refs/heads/{}", repo.integration_branch),
             &format!("refs/heads/{}", workspace.branch_name),
         )
         .await
@@ -695,7 +697,7 @@ pub async fn sync_workspace_integration(
     audit_workspace_event(
         &state,
         &auth,
-        &app_id,
+        &repo_id,
         &workspace.id,
         "synced_integration",
         Some(serde_json::json!({
@@ -719,19 +721,19 @@ pub async fn sync_workspace_integration(
 pub async fn reset_workspace(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, workspace_id)): Path<(String, String)>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<ResetResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let app = find_app(&state, &app_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let repo = find_repo(&state, &repo_id).await?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
-    if workspace.app_id != app_id {
+    if workspace.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "workspace does not belong to app".to_string(),
+            message: "workspace does not belong to repo".to_string(),
         }
         .into());
     }
 
-    let repo = git_repo(&app);
+    let repo = git_repo(&repo);
     let user = git_user(&auth);
     let base_ref = workspace.base_ref_value.clone();
     let head_sha = match state
@@ -751,7 +753,7 @@ pub async fn reset_workspace(
     audit_workspace_event(
         &state,
         &auth,
-        &app_id,
+        &repo_id,
         &workspace.id,
         "reset",
         Some(serde_json::json!({
@@ -771,14 +773,14 @@ pub async fn reset_workspace(
 pub async fn create_workspace_checkpoint(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, workspace_id)): Path<(String, String)>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
     Json(req): Json<CreateCheckpointRequest>,
 ) -> Result<Json<ApiResponse<CheckpointResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
-    if workspace.app_id != app_id {
+    if workspace.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "workspace does not belong to app".to_string(),
+            message: "workspace does not belong to repo".to_string(),
         }
         .into());
     }
@@ -786,7 +788,7 @@ pub async fn create_workspace_checkpoint(
     let _message = req
         .message
         .unwrap_or_else(|| "workspace checkpoint".to_string());
-    let strategy = find_app(&state, &app_id)
+    let strategy = find_repo(&state, &repo_id)
         .await?
         .settings
         .commit_mode_default;
@@ -802,7 +804,7 @@ pub async fn create_workspace_checkpoint(
     audit_workspace_event(
         &state,
         &auth,
-        &app_id,
+        &repo_id,
         &workspace.id,
         "checkpoint_created",
         Some(serde_json::json!({

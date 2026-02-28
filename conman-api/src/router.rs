@@ -11,10 +11,10 @@ use uuid::Uuid;
 use crate::auth::{
     accept_invite, auth_middleware, forgot_password, login, logout, reset_password, signup,
 };
-use crate::handlers::apps::{
-    assign_member, create_runtime_profile, get_app, get_runtime_profile, list_apps,
+use crate::handlers::repos::{
+    assign_member, create_runtime_profile, get_repo, get_runtime_profile, list_repos,
     list_environments, list_members, list_runtime_profiles, replace_environments,
-    reveal_runtime_profile_secret, update_app_settings, update_runtime_profile,
+    reveal_runtime_profile_secret, update_repo_settings, update_runtime_profile,
 };
 use crate::handlers::changesets::{
     create_changeset, create_changeset_comment, get_changeset, get_changeset_diff,
@@ -33,9 +33,9 @@ use crate::handlers::releases::{
     reorder_release_changesets, set_release_changesets,
 };
 use crate::handlers::teams::{
-    create_repo_surface, create_repo_under_team, create_team, create_team_invite,
-    delete_team_invite, get_team, list_repo_surfaces, list_teams, resend_team_invite,
-    update_repo_surface,
+    create_repo_app, create_repo_under_team, create_team, create_team_invite,
+    delete_team_invite, get_team, list_repo_apps, list_teams, resend_team_invite,
+    update_repo_app,
 };
 use crate::handlers::temp_envs::{
     create_temp_env, delete_temp_env, extend_temp_env, list_temp_envs, undo_expire_temp_env,
@@ -66,18 +66,18 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/teams/{teamId}", get(get_team))
         .route("/api/teams/{teamId}/repos", post(create_repo_under_team))
         .route(
-            "/api/repos/{appId}/apps",
-            get(list_repo_surfaces).post(create_repo_surface),
+            "/api/repos/{repoId}/apps",
+            get(list_repo_apps).post(create_repo_app),
         )
         .route(
-            "/api/repos/{appId}/apps/{surfaceId}",
-            patch(update_repo_surface),
+            "/api/repos/{repoId}/apps/{appId}",
+            patch(update_repo_app),
         )
-        .route("/api/repos", get(list_apps))
-        .route("/api/repos/{appId}", get(get_app))
-        .route("/api/repos/{appId}/settings", patch(update_app_settings))
+        .route("/api/repos", get(list_repos))
+        .route("/api/repos/{repoId}", get(get_repo))
+        .route("/api/repos/{repoId}/settings", patch(update_repo_settings))
         .route(
-            "/api/repos/{appId}/members",
+            "/api/repos/{repoId}/members",
             get(list_members).post(assign_member),
         )
         .route("/api/teams/{teamId}/invites", post(create_team_invite))
@@ -87,135 +87,135 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/teams/{teamId}/invites/{inviteId}", delete(delete_team_invite))
         .route(
-            "/api/repos/{appId}/workspaces",
+            "/api/repos/{repoId}/workspaces",
             get(list_workspaces).post(create_workspace),
         )
         .route(
-            "/api/repos/{appId}/workspaces/{workspaceId}",
+            "/api/repos/{repoId}/workspaces/{workspaceId}",
             get(get_workspace).patch(update_workspace),
         )
         .route(
-            "/api/repos/{appId}/workspaces/{workspaceId}/reset",
+            "/api/repos/{repoId}/workspaces/{workspaceId}/reset",
             post(reset_workspace),
         )
         .route(
-            "/api/repos/{appId}/workspaces/{workspaceId}/sync-integration",
+            "/api/repos/{repoId}/workspaces/{workspaceId}/sync-integration",
             post(sync_workspace_integration),
         )
         .route(
-            "/api/repos/{appId}/workspaces/{workspaceId}/files",
+            "/api/repos/{repoId}/workspaces/{workspaceId}/files",
             get(get_workspace_file_or_tree)
                 .put(write_workspace_file)
                 .delete(delete_workspace_file),
         )
         .route(
-            "/api/repos/{appId}/workspaces/{workspaceId}/checkpoints",
+            "/api/repos/{repoId}/workspaces/{workspaceId}/checkpoints",
             post(create_workspace_checkpoint),
         )
         .route(
-            "/api/repos/{appId}/changesets",
+            "/api/repos/{repoId}/changesets",
             get(list_changesets).post(create_changeset),
         )
         .route(
-            "/api/repos/{appId}/changesets/{changesetId}",
+            "/api/repos/{repoId}/changesets/{changesetId}",
             get(get_changeset).patch(update_changeset),
         )
         .route(
-            "/api/repos/{appId}/changesets/{changesetId}/submit",
+            "/api/repos/{repoId}/changesets/{changesetId}/submit",
             post(submit_changeset),
         )
         .route(
-            "/api/repos/{appId}/changesets/{changesetId}/resubmit",
+            "/api/repos/{repoId}/changesets/{changesetId}/resubmit",
             post(resubmit_changeset),
         )
         .route(
-            "/api/repos/{appId}/changesets/{changesetId}/review",
+            "/api/repos/{repoId}/changesets/{changesetId}/review",
             post(review_changeset),
         )
         .route(
-            "/api/repos/{appId}/changesets/{changesetId}/queue",
+            "/api/repos/{repoId}/changesets/{changesetId}/queue",
             post(queue_changeset),
         )
         .route(
-            "/api/repos/{appId}/changesets/{changesetId}/move-to-draft",
+            "/api/repos/{repoId}/changesets/{changesetId}/move-to-draft",
             post(move_changeset_to_draft),
         )
         .route(
-            "/api/repos/{appId}/changesets/{changesetId}/diff",
+            "/api/repos/{repoId}/changesets/{changesetId}/diff",
             get(get_changeset_diff),
         )
         .route(
-            "/api/repos/{appId}/changesets/{changesetId}/comments",
+            "/api/repos/{repoId}/changesets/{changesetId}/comments",
             get(list_changeset_comments).post(create_changeset_comment),
         )
         .route(
-            "/api/repos/{appId}/releases",
+            "/api/repos/{repoId}/releases",
             get(list_releases).post(create_release),
         )
-        .route("/api/repos/{appId}/releases/{releaseId}", get(get_release))
+        .route("/api/repos/{repoId}/releases/{releaseId}", get(get_release))
         .route(
-            "/api/repos/{appId}/releases/{releaseId}/changesets",
+            "/api/repos/{repoId}/releases/{releaseId}/changesets",
             post(set_release_changesets),
         )
         .route(
-            "/api/repos/{appId}/releases/{releaseId}/reorder",
+            "/api/repos/{repoId}/releases/{releaseId}/reorder",
             post(reorder_release_changesets),
         )
         .route(
-            "/api/repos/{appId}/releases/{releaseId}/assemble",
+            "/api/repos/{repoId}/releases/{releaseId}/assemble",
             post(assemble_release),
         )
         .route(
-            "/api/repos/{appId}/releases/{releaseId}/publish",
+            "/api/repos/{repoId}/releases/{releaseId}/publish",
             post(publish_release),
         )
         .route(
-            "/api/repos/{appId}/environments",
+            "/api/repos/{repoId}/environments",
             get(list_environments).patch(replace_environments),
         )
         .route(
-            "/api/repos/{appId}/runtime-profiles",
+            "/api/repos/{repoId}/runtime-profiles",
             get(list_runtime_profiles).post(create_runtime_profile),
         )
         .route(
-            "/api/repos/{appId}/runtime-profiles/{profileId}",
+            "/api/repos/{repoId}/runtime-profiles/{profileId}",
             get(get_runtime_profile).patch(update_runtime_profile),
         )
         .route(
-            "/api/repos/{appId}/runtime-profiles/{profileId}/secrets/{key}/reveal",
+            "/api/repos/{repoId}/runtime-profiles/{profileId}/secrets/{key}/reveal",
             post(reveal_runtime_profile_secret),
         )
         .route(
-            "/api/repos/{appId}/environments/{envId}/deploy",
+            "/api/repos/{repoId}/environments/{envId}/deploy",
             post(deploy_environment),
         )
         .route(
-            "/api/repos/{appId}/environments/{envId}/promote",
+            "/api/repos/{repoId}/environments/{envId}/promote",
             post(promote_environment),
         )
         .route(
-            "/api/repos/{appId}/environments/{envId}/rollback",
+            "/api/repos/{repoId}/environments/{envId}/rollback",
             post(rollback_environment),
         )
-        .route("/api/repos/{appId}/deployments", get(list_deployments))
+        .route("/api/repos/{repoId}/deployments", get(list_deployments))
         .route(
-            "/api/repos/{appId}/temp-envs",
+            "/api/repos/{repoId}/temp-envs",
             get(list_temp_envs).post(create_temp_env),
         )
         .route(
-            "/api/repos/{appId}/temp-envs/{tempEnvId}/extend",
+            "/api/repos/{repoId}/temp-envs/{tempEnvId}/extend",
             post(extend_temp_env),
         )
         .route(
-            "/api/repos/{appId}/temp-envs/{tempEnvId}/undo-expire",
+            "/api/repos/{repoId}/temp-envs/{tempEnvId}/undo-expire",
             post(undo_expire_temp_env),
         )
         .route(
-            "/api/repos/{appId}/temp-envs/{tempEnvId}",
+            "/api/repos/{repoId}/temp-envs/{tempEnvId}",
             delete(delete_temp_env),
         )
-        .route("/api/repos/{appId}/jobs", get(list_jobs))
-        .route("/api/repos/{appId}/jobs/{jobId}", get(get_job))
+        .route("/api/repos/{repoId}/jobs", get(list_jobs))
+        .route("/api/repos/{repoId}/jobs/{jobId}", get(get_job))
         .route(
             "/api/me/notification-preferences",
             get(get_notification_preferences).patch(update_notification_preferences),
@@ -462,27 +462,27 @@ mod tests {
             ("src/auth.rs", "forgot_password", "emit_audit("),
             ("src/auth.rs", "reset_password", "emit_audit("),
             ("src/auth.rs", "accept_invite", "emit_audit("),
-            ("src/handlers/apps.rs", "create_app", "emit_audit("),
-            ("src/handlers/apps.rs", "update_app_settings", "emit_audit("),
-            ("src/handlers/apps.rs", "assign_member", "emit_audit("),
-            ("src/handlers/apps.rs", "create_invite", "emit_audit("),
+            ("src/handlers/repos.rs", "create_repo", "emit_audit("),
+            ("src/handlers/repos.rs", "update_repo_settings", "emit_audit("),
+            ("src/handlers/repos.rs", "assign_member", "emit_audit("),
+            ("src/handlers/teams.rs", "create_team_invite", "emit_audit("),
             (
-                "src/handlers/apps.rs",
+                "src/handlers/repos.rs",
                 "replace_environments",
                 "emit_audit(",
             ),
             (
-                "src/handlers/apps.rs",
+                "src/handlers/repos.rs",
                 "create_runtime_profile",
                 "emit_audit(",
             ),
             (
-                "src/handlers/apps.rs",
+                "src/handlers/repos.rs",
                 "update_runtime_profile",
                 "emit_audit(",
             ),
             (
-                "src/handlers/apps.rs",
+                "src/handlers/repos.rs",
                 "reveal_runtime_profile_secret",
                 "emit_audit(",
             ),

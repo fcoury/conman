@@ -6,7 +6,7 @@ use axum::{
 };
 use conman_auth::{AuthUser, decrypt_secret};
 use conman_core::{
-    App, BaselineMode, CommitMode, ConmanError, EnvVarValue, Environment, ProfileApprovalPolicy,
+    Repo, BaselineMode, CommitMode, ConmanError, EnvVarValue, Environment, ProfileApprovalPolicy,
     Role, RuntimeProfile, RuntimeProfileKind, mask_secret,
 };
 use conman_db::{EnvironmentInput, RuntimeProfileInput, RuntimeProfileUpdate};
@@ -18,14 +18,14 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
-pub struct CreateAppRequest {
+pub struct CreateRepoRequest {
     pub name: String,
     pub repo_path: String,
     pub integration_branch: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct UpdateAppSettingsRequest {
+pub struct UpdateRepoSettingsRequest {
     pub baseline_mode: Option<String>,
     pub canonical_env_id: Option<String>,
     pub commit_mode_default: Option<String>,
@@ -37,7 +37,7 @@ pub struct UpdateAppSettingsRequest {
 #[derive(Debug, Serialize)]
 pub struct MemberResponse {
     pub user_id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub role: Role,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub email: Option<String>,
@@ -70,7 +70,7 @@ pub struct CreateRuntimeProfileRequest {
     pub kind: String,
     pub base_url: String,
     #[serde(default)]
-    pub surface_endpoints: BTreeMap<String, String>,
+    pub app_endpoints: BTreeMap<String, String>,
     #[serde(default)]
     pub env_vars: BTreeMap<String, EnvVarValue>,
     #[serde(default)]
@@ -88,7 +88,7 @@ pub struct CreateRuntimeProfileRequest {
 pub struct UpdateRuntimeProfileRequest {
     pub name: Option<String>,
     pub base_url: Option<String>,
-    pub surface_endpoints: Option<BTreeMap<String, String>>,
+    pub app_endpoints: Option<BTreeMap<String, String>>,
     pub env_vars: Option<BTreeMap<String, EnvVarValue>>,
     pub secrets: Option<BTreeMap<String, String>>,
     pub database_engine: Option<String>,
@@ -102,11 +102,11 @@ pub struct UpdateRuntimeProfileRequest {
 #[derive(Debug, Serialize)]
 pub struct RuntimeProfileResponse {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub name: String,
     pub kind: RuntimeProfileKind,
     pub base_url: String,
-    pub surface_endpoints: BTreeMap<String, String>,
+    pub app_endpoints: BTreeMap<String, String>,
     pub env_vars: BTreeMap<String, EnvVarValue>,
     pub secrets: BTreeMap<String, String>,
     pub database_engine: String,
@@ -126,8 +126,8 @@ pub struct RevealSecretResponse {
     pub value: String,
 }
 
-fn require_role(auth: &AuthUser, app_id: &str, role: Role) -> Result<(), ApiConmanError> {
-    auth.require_role(app_id, role)?;
+fn require_role(auth: &AuthUser, repo_id: &str, role: Role) -> Result<(), ApiConmanError> {
+    auth.require_role(repo_id, role)?;
     Ok(())
 }
 
@@ -176,11 +176,11 @@ fn runtime_profile_response(
 
     Ok(RuntimeProfileResponse {
         id: profile.id,
-        app_id: profile.app_id,
+        repo_id: profile.repo_id,
         name: profile.name,
         kind: profile.kind,
         base_url: profile.base_url,
-        surface_endpoints: profile.surface_endpoints,
+        app_endpoints: profile.app_endpoints,
         env_vars: profile.env_vars,
         secrets,
         database_engine: profile.database_engine,
@@ -195,27 +195,27 @@ fn runtime_profile_response(
     })
 }
 
-async fn validate_surface_endpoint_keys(
+async fn validate_app_endpoint_keys(
     state: &AppState,
-    app_id: &str,
-    surface_endpoints: &BTreeMap<String, String>,
+    repo_id: &str,
+    app_endpoints: &BTreeMap<String, String>,
 ) -> Result<(), ApiConmanError> {
-    if surface_endpoints.is_empty() {
+    if app_endpoints.is_empty() {
         return Ok(());
     }
 
-    let surfaces = conman_db::AppSurfaceRepo::new(state.db.clone())
-        .list_by_repo(app_id)
+    let apps = conman_db::AppRepo::new(state.db.clone())
+        .list_by_repo(repo_id)
         .await?;
-    let keys = surfaces
+    let keys = apps
         .into_iter()
         .map(|s| s.key)
         .collect::<std::collections::BTreeSet<_>>();
 
-    for key in surface_endpoints.keys() {
+    for key in app_endpoints.keys() {
         if !keys.contains(key) {
             return Err(ConmanError::Validation {
-                message: format!("unknown surface endpoint key `{key}` for app {app_id}"),
+                message: format!("unknown app endpoint key `{key}` for repo {repo_id}"),
             }
             .into());
         }
@@ -224,16 +224,16 @@ async fn validate_surface_endpoint_keys(
     Ok(())
 }
 
-pub async fn list_apps(
+pub async fn list_repos(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
     Query(pagination): Query<Pagination>,
-) -> Result<Json<ApiResponse<Vec<App>>>, ApiConmanError> {
+) -> Result<Json<ApiResponse<Vec<Repo>>>, ApiConmanError> {
     let pagination = pagination.validate()?;
-    let app_ids = auth.roles.keys().cloned().collect::<Vec<_>>();
-    let apps = conman_db::AppRepo::new(state.db.clone());
-    let (items, total) = apps
-        .list_by_ids(&app_ids, pagination.skip(), pagination.limit)
+    let repo_ids = auth.roles.keys().cloned().collect::<Vec<_>>();
+    let repos = conman_db::RepoStore::new(state.db.clone());
+    let (items, total) = repos
+        .list_by_ids(&repo_ids, pagination.skip(), pagination.limit)
         .await?;
     Ok(Json(ApiResponse::paginated(
         items,
@@ -243,11 +243,11 @@ pub async fn list_apps(
     )))
 }
 
-pub async fn create_app(
+pub async fn create_repo(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Json(req): Json<CreateAppRequest>,
-) -> Result<Json<ApiResponse<App>>, ApiConmanError> {
+    Json(req): Json<CreateRepoRequest>,
+) -> Result<Json<ApiResponse<Repo>>, ApiConmanError> {
     if req.name.trim().is_empty() || req.repo_path.trim().is_empty() {
         return Err(ConmanError::Validation {
             message: "name and repo_path are required".to_string(),
@@ -261,9 +261,9 @@ pub async fn create_app(
         .trim()
         .to_string();
 
-    let app_repo = conman_db::AppRepo::new(state.db.clone());
-    let membership_repo = conman_db::MembershipRepo::new(state.db.clone());
-    let app = app_repo
+    let repo_store = conman_db::RepoStore::new(state.db.clone());
+    let repo_membership_repo = conman_db::RepoMembershipRepo::new(state.db.clone());
+    let repo = repo_store
         .insert(
             &req.name,
             &req.repo_path,
@@ -272,18 +272,18 @@ pub async fn create_app(
         )
         .await?;
 
-    membership_repo
-        .assign_role(&auth.user_id, &app.id, Role::Admin)
+    repo_membership_repo
+        .assign_role(&auth.user_id, &repo.id, Role::Admin)
         .await?;
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app.id),
-        "app",
-        &app.id,
+        Some(&repo.id),
+        "repo",
+        &repo.id,
         "created",
         None,
-        serde_json::to_value(&app).ok(),
+        serde_json::to_value(&repo).ok(),
         None,
     )
     .await
@@ -291,57 +291,57 @@ pub async fn create_app(
         tracing::warn!(error = %err, "failed to write audit event");
     }
 
-    Ok(Json(ApiResponse::ok(app)))
+    Ok(Json(ApiResponse::ok(repo)))
 }
 
-pub async fn get_app(
+pub async fn get_repo(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
-) -> Result<Json<ApiResponse<App>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Member)?;
-    let app = conman_db::AppRepo::new(state.db.clone())
-        .find_by_id(&app_id)
+    Path(repo_id): Path<String>,
+) -> Result<Json<ApiResponse<Repo>>, ApiConmanError> {
+    require_role(&auth, &repo_id, Role::Member)?;
+    let repo = conman_db::RepoStore::new(state.db.clone())
+        .find_by_id(&repo_id)
         .await?
         .ok_or_else(|| ConmanError::NotFound {
-            entity: "app",
-            id: app_id.clone(),
+            entity: "repo",
+            id: repo_id.clone(),
         })?;
-    Ok(Json(ApiResponse::ok(app)))
+    Ok(Json(ApiResponse::ok(repo)))
 }
 
-pub async fn update_app_settings(
+pub async fn update_repo_settings(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
-    Json(req): Json<UpdateAppSettingsRequest>,
-) -> Result<Json<ApiResponse<App>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Admin)?;
+    Path(repo_id): Path<String>,
+    Json(req): Json<UpdateRepoSettingsRequest>,
+) -> Result<Json<ApiResponse<Repo>>, ApiConmanError> {
+    require_role(&auth, &repo_id, Role::Admin)?;
 
-    let app_repo = conman_db::AppRepo::new(state.db.clone());
-    let mut app = app_repo
-        .find_by_id(&app_id)
+    let repo_store = conman_db::RepoStore::new(state.db.clone());
+    let mut repo = repo_store
+        .find_by_id(&repo_id)
         .await?
         .ok_or_else(|| ConmanError::NotFound {
-            entity: "app",
-            id: app_id.clone(),
+            entity: "repo",
+            id: repo_id.clone(),
         })?;
 
     if let Some(mode) = req.baseline_mode.as_deref() {
-        app.settings.baseline_mode = parse_enum::<BaselineMode>(mode, "baseline_mode")?;
+        repo.settings.baseline_mode = parse_enum::<BaselineMode>(mode, "baseline_mode")?;
     }
     if let Some(mode) = req.commit_mode_default.as_deref() {
-        app.settings.commit_mode_default = parse_enum::<CommitMode>(mode, "commit_mode_default")?;
+        repo.settings.commit_mode_default = parse_enum::<CommitMode>(mode, "commit_mode_default")?;
     }
     if let Some(policy) = req.profile_approval_policy.as_deref() {
-        app.settings.profile_approval_policy =
+        repo.settings.profile_approval_policy =
             parse_enum::<ProfileApprovalPolicy>(policy, "profile_approval_policy")?;
     }
     if let Some(canonical_env_id) = req.canonical_env_id {
-        app.settings.canonical_env_id = Some(canonical_env_id);
+        repo.settings.canonical_env_id = Some(canonical_env_id);
     }
     if let Some(paths) = req.blocked_paths {
-        app.settings.blocked_paths = paths;
+        repo.settings.blocked_paths = paths;
     }
     if let Some(limit) = req.file_size_limit_bytes {
         if limit == 0 {
@@ -350,36 +350,36 @@ pub async fn update_app_settings(
             }
             .into());
         }
-        app.settings.file_size_limit_bytes = limit;
+        repo.settings.file_size_limit_bytes = limit;
     }
 
-    let app = app_repo.update_settings(&app_id, &app.settings).await?;
+    let repo = repo_store.update_settings(&repo_id, &repo.settings).await?;
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "app_settings",
-        &app.id,
+        &repo.id,
         "updated",
         None,
-        serde_json::to_value(&app.settings).ok(),
+        serde_json::to_value(&repo.settings).ok(),
         None,
     )
     .await
     {
         tracing::warn!(error = %err, "failed to write audit event");
     }
-    Ok(Json(ApiResponse::ok(app)))
+    Ok(Json(ApiResponse::ok(repo)))
 }
 
 pub async fn list_members(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<MemberResponse>>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Member)?;
-    let memberships = conman_db::MembershipRepo::new(state.db.clone())
-        .list_by_app_id(&app_id)
+    require_role(&auth, &repo_id, Role::Member)?;
+    let memberships = conman_db::RepoMembershipRepo::new(state.db.clone())
+        .list_by_repo_id(&repo_id)
         .await?;
     let users = conman_db::UserRepo::new(state.db.clone());
     let mut out = Vec::with_capacity(memberships.len());
@@ -387,7 +387,7 @@ pub async fn list_members(
         let user = users.find_by_id(&membership.user_id).await?;
         out.push(MemberResponse {
             user_id: membership.user_id,
-            app_id: membership.app_id,
+            repo_id: membership.repo_id,
             role: membership.role,
             created_at: membership.created_at,
             email: user.as_ref().map(|u| u.email.clone()),
@@ -400,12 +400,12 @@ pub async fn list_members(
 pub async fn assign_member(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Json(req): Json<AssignMemberRequest>,
 ) -> Result<Json<ApiResponse<MemberResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Admin)?;
-    let membership = conman_db::MembershipRepo::new(state.db.clone())
-        .assign_role(&req.user_id, &app_id, req.role)
+    require_role(&auth, &repo_id, Role::Admin)?;
+    let membership = conman_db::RepoMembershipRepo::new(state.db.clone())
+        .assign_role(&req.user_id, &repo_id, req.role)
         .await?;
     let user = conman_db::UserRepo::new(state.db.clone())
         .find_by_id(&req.user_id)
@@ -413,9 +413,9 @@ pub async fn assign_member(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "membership",
-        &format!("{}:{}", app_id, membership.user_id),
+        &format!("{}:{}", repo_id, membership.user_id),
         "assigned",
         None,
         Some(serde_json::json!({
@@ -430,7 +430,7 @@ pub async fn assign_member(
     }
     Ok(Json(ApiResponse::ok(MemberResponse {
         user_id: membership.user_id,
-        app_id: membership.app_id,
+        repo_id: membership.repo_id,
         role: membership.role,
         created_at: membership.created_at,
         email: user.as_ref().map(|u| u.email.clone()),
@@ -441,11 +441,11 @@ pub async fn assign_member(
 pub async fn list_environments(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<Environment>>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Member)?;
+    require_role(&auth, &repo_id, Role::Member)?;
     let environments = conman_db::EnvironmentRepo::new(state.db.clone())
-        .list_by_app(&app_id)
+        .list_by_repo(&repo_id)
         .await?;
     Ok(Json(ApiResponse::ok(environments)))
 }
@@ -453,10 +453,10 @@ pub async fn list_environments(
 pub async fn replace_environments(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Json(req): Json<UpdateEnvironmentsRequest>,
 ) -> Result<Json<ApiResponse<Vec<Environment>>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Admin)?;
+    require_role(&auth, &repo_id, Role::Admin)?;
     let input = req
         .environments
         .iter()
@@ -468,23 +468,23 @@ pub async fn replace_environments(
         })
         .collect::<Vec<_>>();
     let environments = conman_db::EnvironmentRepo::new(state.db.clone())
-        .replace_all(&app_id, &input)
+        .replace_all(&repo_id, &input)
         .await?;
 
     if let Some(canonical) = environments.iter().find(|e| e.is_canonical) {
-        let app_repo = conman_db::AppRepo::new(state.db.clone());
-        if let Some(mut app) = app_repo.find_by_id(&app_id).await? {
-            app.settings.canonical_env_id = Some(canonical.id.clone());
-            app_repo.update_settings(&app_id, &app.settings).await?;
+        let repo_store = conman_db::RepoStore::new(state.db.clone());
+        if let Some(mut repo) = repo_store.find_by_id(&repo_id).await? {
+            repo.settings.canonical_env_id = Some(canonical.id.clone());
+            repo_store.update_settings(&repo_id, &repo.settings).await?;
         }
     }
 
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "environment_set",
-        &app_id,
+        &repo_id,
         "replaced",
         None,
         serde_json::to_value(&environments).ok(),
@@ -501,11 +501,11 @@ pub async fn replace_environments(
 pub async fn list_runtime_profiles(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
 ) -> Result<Json<ApiResponse<Vec<RuntimeProfileResponse>>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Member)?;
+    require_role(&auth, &repo_id, Role::Member)?;
     let profiles = conman_db::RuntimeProfileRepo::new(state.db.clone())
-        .list_by_app(&app_id)
+        .list_by_repo(&repo_id)
         .await?;
     let mut out = Vec::with_capacity(profiles.len());
     for profile in profiles {
@@ -520,21 +520,21 @@ pub async fn list_runtime_profiles(
 pub async fn create_runtime_profile(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Json(req): Json<CreateRuntimeProfileRequest>,
 ) -> Result<Json<ApiResponse<RuntimeProfileResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Admin)?;
+    require_role(&auth, &repo_id, Role::Admin)?;
     validate_env_keys(&req.env_vars)?;
-    validate_surface_endpoint_keys(&state, &app_id, &req.surface_endpoints).await?;
+    validate_app_endpoint_keys(&state, &repo_id, &req.app_endpoints).await?;
     let kind = parse_enum::<RuntimeProfileKind>(&req.kind, "kind")?;
     let profile = conman_db::RuntimeProfileRepo::new(state.db.clone())
         .create(
-            &app_id,
+            &repo_id,
             RuntimeProfileInput {
                 name: req.name,
                 kind,
                 base_url: req.base_url,
-                surface_endpoints: req.surface_endpoints,
+                app_endpoints: req.app_endpoints,
                 env_vars: req.env_vars,
                 secrets_plain: req.secrets,
                 database_engine: req.database_engine,
@@ -551,7 +551,7 @@ pub async fn create_runtime_profile(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "runtime_profile",
         &profile.id,
         "created",
@@ -577,9 +577,9 @@ pub async fn create_runtime_profile(
 pub async fn get_runtime_profile(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, profile_id)): Path<(String, String)>,
+    Path((repo_id, profile_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<RuntimeProfileResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Member)?;
+    require_role(&auth, &repo_id, Role::Member)?;
     let profile = conman_db::RuntimeProfileRepo::new(state.db.clone())
         .find_by_id(&profile_id)
         .await?
@@ -587,9 +587,9 @@ pub async fn get_runtime_profile(
             entity: "runtime_profile",
             id: profile_id.clone(),
         })?;
-    if profile.app_id != app_id {
+    if profile.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "runtime profile does not belong to app".to_string(),
+            message: "runtime profile does not belong to repo".to_string(),
         }
         .into());
     }
@@ -602,15 +602,15 @@ pub async fn get_runtime_profile(
 pub async fn update_runtime_profile(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, profile_id)): Path<(String, String)>,
+    Path((repo_id, profile_id)): Path<(String, String)>,
     Json(req): Json<UpdateRuntimeProfileRequest>,
 ) -> Result<Json<ApiResponse<RuntimeProfileResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Admin)?;
+    require_role(&auth, &repo_id, Role::Admin)?;
     if let Some(env_vars) = req.env_vars.as_ref() {
         validate_env_keys(env_vars)?;
     }
-    if let Some(surface_endpoints) = req.surface_endpoints.as_ref() {
-        validate_surface_endpoint_keys(&state, &app_id, surface_endpoints).await?;
+    if let Some(app_endpoints) = req.app_endpoints.as_ref() {
+        validate_app_endpoint_keys(&state, &repo_id, app_endpoints).await?;
     }
 
     let profile = conman_db::RuntimeProfileRepo::new(state.db.clone())
@@ -619,7 +619,7 @@ pub async fn update_runtime_profile(
             RuntimeProfileUpdate {
                 name: req.name,
                 base_url: req.base_url,
-                surface_endpoints: req.surface_endpoints,
+                app_endpoints: req.app_endpoints,
                 env_vars: req.env_vars,
                 secrets_plain: req.secrets,
                 database_engine: req.database_engine,
@@ -632,9 +632,9 @@ pub async fn update_runtime_profile(
             &state.config.secrets_master_key,
         )
         .await?;
-    if profile.app_id != app_id {
+    if profile.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
-            message: "runtime profile does not belong to app".to_string(),
+            message: "runtime profile does not belong to repo".to_string(),
         }
         .into());
     }
@@ -642,7 +642,7 @@ pub async fn update_runtime_profile(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "runtime_profile",
         &profile.id,
         "updated",
@@ -668,16 +668,16 @@ pub async fn update_runtime_profile(
 pub async fn reveal_runtime_profile_secret(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, profile_id, key)): Path<(String, String, String)>,
+    Path((repo_id, profile_id, key)): Path<(String, String, String)>,
 ) -> Result<Json<ApiResponse<RevealSecretResponse>>, ApiConmanError> {
-    require_role(&auth, &app_id, Role::Admin)?;
+    require_role(&auth, &repo_id, Role::Admin)?;
     let value = conman_db::RuntimeProfileRepo::new(state.db.clone())
         .reveal_secret(&profile_id, &key, &state.config.secrets_master_key)
         .await?;
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "runtime_profile_secret",
         &profile_id,
         "revealed",

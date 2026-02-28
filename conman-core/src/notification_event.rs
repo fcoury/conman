@@ -15,7 +15,7 @@ pub struct NotificationEvent {
     pub id: String,
     pub user_id: String,
     pub recipient_email: String,
-    pub app_id: Option<String>,
+    pub repo_id: Option<String>,
     pub event_type: String,
     pub subject: String,
     pub body: String,

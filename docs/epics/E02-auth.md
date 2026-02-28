@@ -57,7 +57,7 @@ impl std::fmt::Display for Role {
 }
 
 /// Every guarded operation in the system. Handlers call
-/// `auth_user.require_capability(app_id, Capability::X)?` before proceeding.
+/// `auth_user.require_capability(repo_id, Capability::X)?` before proceeding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Capability {
     /// Read app/repo metadata, list workspaces, view changesets, etc.
@@ -138,13 +138,13 @@ pub struct User {
 // App membership
 // ---------------------------------------------------------------------------
 
-/// One record per (user, app) pair. Stored in `app_memberships`.
+/// One record per (user, app) pair. Stored in `repo_memberships`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppMembership {
     #[serde(rename = "_id")]
     pub id: ObjectId,
     pub user_id: ObjectId,
-    pub app_id: ObjectId,
+    pub repo_id: ObjectId,
     pub role: Role,
     pub created_at: DateTime<Utc>,
 }
@@ -158,7 +158,7 @@ pub struct AppMembership {
 pub struct Invite {
     #[serde(rename = "_id")]
     pub id: ObjectId,
-    pub app_id: ObjectId,
+    pub repo_id: ObjectId,
     /// Email of the person being invited.
     pub email: String,
     /// Role granted upon acceptance.
@@ -231,22 +231,22 @@ pub struct Claims {
 pub struct AuthUser {
     pub user_id: ObjectId,
     pub email: String,
-    /// Mapping of app_id -> role for every app this user is a member of.
-    /// Loaded from `app_memberships` on every request.
+    /// Mapping of repo_id -> role for every app this user is a member of.
+    /// Loaded from `repo_memberships` on every request.
     pub roles: HashMap<ObjectId, Role>,
 }
 
 impl AuthUser {
     /// Require the user to have at least `required` role for the given app.
     /// Returns `ConmanError::Forbidden` on failure.
-    pub fn require_role(&self, app_id: &ObjectId, required: Role) -> Result<(), ConmanError> {
-        match self.roles.get(app_id) {
+    pub fn require_role(&self, repo_id: &ObjectId, required: Role) -> Result<(), ConmanError> {
+        match self.roles.get(repo_id) {
             Some(role) if role.satisfies(required) => Ok(()),
             _ => Err(ConmanError::Forbidden {
                 message: format!(
                     "requires role {} on app {}",
                     required,
-                    app_id.to_hex()
+                    repo_id.to_hex()
                 ),
             }),
         }
@@ -256,15 +256,15 @@ impl AuthUser {
     /// capability's `min_role()` to determine the threshold.
     pub fn require_capability(
         &self,
-        app_id: &ObjectId,
+        repo_id: &ObjectId,
         capability: Capability,
     ) -> Result<(), ConmanError> {
-        self.require_role(app_id, capability.min_role())
+        self.require_role(repo_id, capability.min_role())
     }
 
     /// Returns the user's role for an app, if any.
-    pub fn role_for(&self, app_id: &ObjectId) -> Option<Role> {
-        self.roles.get(app_id).copied()
+    pub fn role_for(&self, repo_id: &ObjectId) -> Option<Role> {
+        self.roles.get(repo_id).copied()
     }
 }
 
@@ -358,7 +358,7 @@ pub struct InviteRequest {
 #[derive(Debug, Serialize)]
 pub struct InviteResponse {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub email: String,
     pub role: Role,
     pub expires_at: String,
@@ -434,13 +434,13 @@ Example document:
 }
 ```
 
-### Collection: `app_memberships`
+### Collection: `repo_memberships`
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `_id` | `ObjectId` | Primary key |
 | `user_id` | `ObjectId` | References `users._id` |
-| `app_id` | `ObjectId` | References `apps._id` |
+| `repo_id` | `ObjectId` | References `apps._id` |
 | `role` | `String` | One of: `user`, `reviewer`, `config_manager`, `admin` |
 | `created_at` | `DateTime` | Membership creation timestamp |
 
@@ -448,10 +448,10 @@ Indexes:
 
 ```javascript
 // Unique pair: one role per user per app
-{ "user_id": 1, "app_id": 1 }  // unique: true
+{ "user_id": 1, "repo_id": 1 }  // unique: true
 
-// List all members of an app (used by GET /api/repos/:appId/members)
-{ "app_id": 1 }
+// List all members of an app (used by GET /api/repos/:repoId/members)
+{ "repo_id": 1 }
 
 // Load all memberships for a user (used by auth middleware on every request)
 { "user_id": 1 }
@@ -463,7 +463,7 @@ Example document:
 {
   "_id": { "$oid": "665a1c0000000000000000a1" },
   "user_id": { "$oid": "665a1b2c3d4e5f6a7b8c9d0e" },
-  "app_id": { "$oid": "665a1a0000000000000000b1" },
+  "repo_id": { "$oid": "665a1a0000000000000000b1" },
   "role": "config_manager",
   "created_at": { "$date": "2025-06-01T10:05:00Z" }
 }
@@ -474,7 +474,7 @@ Example document:
 | Field | Type | Description |
 |-------|------|-------------|
 | `_id` | `ObjectId` | Primary key |
-| `app_id` | `ObjectId` | References `apps._id` |
+| `repo_id` | `ObjectId` | References `apps._id` |
 | `email` | `String` | Invitee email address |
 | `role` | `String` | Role to grant on acceptance |
 | `token` | `String` | URL-safe opaque token (32 random bytes, base64url) |
@@ -490,10 +490,10 @@ Indexes:
 { "token": 1 }  // unique: true
 
 // List pending invites for an app
-{ "app_id": 1, "accepted_at": 1 }
+{ "repo_id": 1, "accepted_at": 1 }
 
 // Prevent duplicate pending invites to the same email for the same app
-{ "app_id": 1, "email": 1, "accepted_at": 1 }  // unique: true, partialFilterExpression: { "accepted_at": null }
+{ "repo_id": 1, "email": 1, "accepted_at": 1 }  // unique: true, partialFilterExpression: { "accepted_at": null }
 ```
 
 Example document:
@@ -501,7 +501,7 @@ Example document:
 ```json
 {
   "_id": { "$oid": "665a1d0000000000000000c1" },
-  "app_id": { "$oid": "665a1a0000000000000000b1" },
+  "repo_id": { "$oid": "665a1a0000000000000000b1" },
   "email": "bob@example.com",
   "role": "reviewer",
   "token": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2",
@@ -747,7 +747,7 @@ Errors:
 | 400 | `validation_error` | Password does not meet policy |
 | 409 | `conflict` | User already has a membership for this app |
 
-### `GET /api/repos/:appId/members?page=&limit=`
+### `GET /api/repos/:repoId/members?page=&limit=`
 
 List members of an app with their roles. Paginated.
 
@@ -804,7 +804,7 @@ Response `201`:
 {
   "data": {
     "id": "665a1d0000000000000000c2",
-    "app_id": "665a1a0000000000000000b1",
+    "repo_id": "665a1a0000000000000000b1",
     "email": "carol@example.com",
     "role": "reviewer",
     "expires_at": "2025-06-08T10:00:00Z",
@@ -839,7 +839,7 @@ Response `200`:
 {
   "data": {
     "id": "665a1d0000000000000000c2",
-    "app_id": "665a1a0000000000000000b1",
+    "repo_id": "665a1a0000000000000000b1",
     "email": "carol@example.com",
     "role": "reviewer",
     "expires_at": "2025-06-08T12:30:00Z",
@@ -1040,7 +1040,7 @@ Accept flow:
    - Invite has not expired (expires_at > now)
    - Password meets policy
 4. Server creates User (if email not already registered) with hashed password
-5. Server creates AppMembership { user_id, app_id, role }
+5. Server creates AppMembership { user_id, repo_id, role }
 6. Server sets invite.accepted_at = now
 7. Server issues JWT and returns it so the user is immediately logged in
 8. Server emits audit event (action: "invite_accepted")
@@ -1078,9 +1078,9 @@ inheritance rule from the scope doc.
 
 ```
 Per-request flow:
-1. Handler calls auth_user.require_capability(app_id, Capability::X)
+1. Handler calls auth_user.require_capability(repo_id, Capability::X)
 2. require_capability looks up capability.min_role()
-3. require_capability calls require_role(app_id, min_role)
+3. require_capability calls require_role(repo_id, min_role)
 4. require_role looks up the user's role for that app in the roles HashMap
 5. If role >= min_role -> Ok(())
 6. If role < min_role or no membership -> Err(ConmanError::Forbidden)
@@ -1091,7 +1091,7 @@ additionally check ownership when the user's role is below ConfigManager:
 
 ```rust
 // In the move-to-draft handler:
-let user_role = auth_user.role_for(&app_id);
+let user_role = auth_user.role_for(&repo_id);
 let is_owner = changeset.author_user_id == auth_user.user_id;
 
 match (user_role, is_owner) {
@@ -1149,10 +1149,10 @@ pub async fn auth_middleware(
             message: format!("failed to load memberships: {e}"),
         })?;
 
-    // Build the roles map: app_id -> role
+    // Build the roles map: repo_id -> role
     let roles: HashMap<ObjectId, Role> = memberships
         .into_iter()
-        .map(|m| (m.app_id, m.role))
+        .map(|m| (m.repo_id, m.role))
         .collect();
 
     // Populate the AuthUser in request extensions
@@ -1194,7 +1194,7 @@ tested independently.
 - [ ] **E02-S16**: Implement `POST /api/auth/forgot-password` handler. Integration test: existing email creates token, nonexistent email still returns 200.
 - [ ] **E02-S17**: Implement `POST /api/auth/reset-password` handler. Integration test: valid token updates password, expired token returns 410, used token returns 400.
 - [ ] **E02-S18**: Implement `POST /api/auth/accept-invite` handler. Integration test: valid invite creates user + membership + returns JWT, expired invite returns 410, already-accepted returns 400.
-- [ ] **E02-S19**: Implement `GET /api/repos/:appId/members` handler with pagination. Integration test: returns members with roles, respects pagination, non-member returns 403.
+- [ ] **E02-S19**: Implement `GET /api/repos/:repoId/members` handler with pagination. Integration test: returns members with roles, respects pagination, non-member returns 403.
 - [ ] **E02-S20**: Implement `POST /api/teams/:teamId/invites` handler. Integration test: admin can invite, non-admin returns 403, duplicate invite returns 409.
 - [ ] **E02-S21**: Implement `POST /api/teams/:teamId/invites/:inviteId/resend` handler. Integration test: resets expiry, already-accepted returns 400.
 - [ ] **E02-S22**: Implement `DELETE /api/teams/:teamId/invites/:inviteId` handler. Integration test: deletes pending invite, already-accepted returns 400.

@@ -134,7 +134,7 @@ pub async fn login(
     }
 
     let users = conman_db::UserRepo::new(state.db.clone());
-    let memberships = conman_db::MembershipRepo::new(state.db.clone());
+    let memberships = conman_db::RepoMembershipRepo::new(state.db.clone());
 
     let user = users.find_by_email(&req.email).await?.ok_or_else(|| {
         counter!(AUTH_FAILURES_TOTAL, "reason" => "unknown_email").increment(1);
@@ -187,8 +187,8 @@ pub async fn signup(
     let users = conman_db::UserRepo::new(state.db.clone());
     let team_repo = conman_db::TeamRepo::new(state.db.clone());
     let team_memberships = conman_db::TeamMembershipRepo::new(state.db.clone());
-    let app_repo = conman_db::AppRepo::new(state.db.clone());
-    let memberships = conman_db::MembershipRepo::new(state.db.clone());
+    let app_repo = conman_db::RepoStore::new(state.db.clone());
+    let memberships = conman_db::RepoMembershipRepo::new(state.db.clone());
 
     if users.find_by_email(&req.email).await?.is_some() {
         return Err(ConmanError::Conflict {
@@ -413,8 +413,8 @@ pub async fn accept_invite(
     let invites = conman_db::InviteRepo::new(state.db.clone());
     let users = conman_db::UserRepo::new(state.db.clone());
     let team_memberships = conman_db::TeamMembershipRepo::new(state.db.clone());
-    let memberships = conman_db::MembershipRepo::new(state.db.clone());
-    let app_repo = conman_db::AppRepo::new(state.db.clone());
+    let memberships = conman_db::RepoMembershipRepo::new(state.db.clone());
+    let app_repo = conman_db::RepoStore::new(state.db.clone());
 
     let invite = invites
         .find_active_by_token(&req.token)

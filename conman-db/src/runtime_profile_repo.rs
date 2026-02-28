@@ -16,12 +16,12 @@ use crate::EnsureIndexes;
 struct RuntimeProfileDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     name: String,
     kind: RuntimeProfileKind,
     base_url: String,
     #[serde(default)]
-    surface_endpoints: BTreeMap<String, String>,
+    app_endpoints: BTreeMap<String, String>,
     env_vars: BTreeMap<String, EnvVarValue>,
     secrets_encrypted: BTreeMap<String, String>,
     database_engine: String,
@@ -42,7 +42,7 @@ struct RuntimeProfileRevisionDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
     profile_id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     revision: u32,
     snapshot: RuntimeProfileDoc,
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
@@ -53,11 +53,11 @@ impl From<RuntimeProfileDoc> for RuntimeProfile {
     fn from(value: RuntimeProfileDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             name: value.name,
             kind: value.kind,
             base_url: value.base_url,
-            surface_endpoints: value.surface_endpoints,
+            app_endpoints: value.app_endpoints,
             env_vars: value.env_vars,
             secrets_encrypted: value.secrets_encrypted,
             database_engine: value.database_engine,
@@ -78,7 +78,7 @@ pub struct RuntimeProfileInput {
     pub name: String,
     pub kind: RuntimeProfileKind,
     pub base_url: String,
-    pub surface_endpoints: BTreeMap<String, String>,
+    pub app_endpoints: BTreeMap<String, String>,
     pub env_vars: BTreeMap<String, EnvVarValue>,
     pub secrets_plain: BTreeMap<String, String>,
     pub database_engine: String,
@@ -93,7 +93,7 @@ pub struct RuntimeProfileInput {
 pub struct RuntimeProfileUpdate {
     pub name: Option<String>,
     pub base_url: Option<String>,
-    pub surface_endpoints: Option<BTreeMap<String, String>>,
+    pub app_endpoints: Option<BTreeMap<String, String>>,
     pub env_vars: Option<BTreeMap<String, EnvVarValue>>,
     pub secrets_plain: Option<BTreeMap<String, String>>,
     pub database_engine: Option<String>,
@@ -120,12 +120,12 @@ impl RuntimeProfileRepo {
 
     pub async fn create(
         &self,
-        app_id: &str,
+        repo_id: &str,
         input: RuntimeProfileInput,
         master_key: &str,
     ) -> Result<RuntimeProfile, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let base_profile_id = input
             .base_profile_id
@@ -144,11 +144,11 @@ impl RuntimeProfileRepo {
         let now = Utc::now();
         let doc = RuntimeProfileDoc {
             id: ObjectId::new(),
-            app_id,
+            repo_id,
             name: input.name,
             kind: input.kind,
             base_url: input.base_url,
-            surface_endpoints: input.surface_endpoints,
+            app_endpoints: input.app_endpoints,
             env_vars: input.env_vars,
             secrets_encrypted,
             database_engine: input.database_engine,
@@ -173,14 +173,14 @@ impl RuntimeProfileRepo {
         Ok(doc.into())
     }
 
-    pub async fn list_by_app(&self, app_id: &str) -> Result<Vec<RuntimeProfile>, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+    pub async fn list_by_repo(&self, repo_id: &str) -> Result<Vec<RuntimeProfile>, ConmanError> {
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
 
         let mut cursor = self
             .collection
-            .find(doc! {"app_id": app_id})
+            .find(doc! {"repo_id": repo_id})
             .sort(doc! {"updated_at": -1})
             .await
             .map_err(|e| ConmanError::Internal {
@@ -250,8 +250,8 @@ impl RuntimeProfileRepo {
         if let Some(base_url) = patch.base_url {
             profile.base_url = base_url;
         }
-        if let Some(surface_endpoints) = patch.surface_endpoints {
-            profile.surface_endpoints = surface_endpoints;
+        if let Some(app_endpoints) = patch.app_endpoints {
+            profile.app_endpoints = app_endpoints;
         }
         if let Some(env_vars) = patch.env_vars {
             profile.env_vars = env_vars;
@@ -330,7 +330,7 @@ impl RuntimeProfileRepo {
         let doc = RuntimeProfileRevisionDoc {
             id: ObjectId::new(),
             profile_id: snapshot.id,
-            app_id: snapshot.app_id,
+            repo_id: snapshot.repo_id,
             revision: snapshot.revision,
             snapshot,
             created_at: Utc::now(),
@@ -349,7 +349,7 @@ impl RuntimeProfileRepo {
 impl EnsureIndexes for RuntimeProfileRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
         let by_app_name = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "name": 1})
+            .keys(doc! {"repo_id": 1, "name": 1})
             .options(
                 IndexOptions::builder()
                     .name("runtime_profiles_app_name_unique".to_string())
@@ -358,7 +358,7 @@ impl EnsureIndexes for RuntimeProfileRepo {
             )
             .build();
         let by_app_kind = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "kind": 1})
+            .keys(doc! {"repo_id": 1, "kind": 1})
             .options(
                 IndexOptions::builder()
                     .name("runtime_profiles_app_kind".to_string())

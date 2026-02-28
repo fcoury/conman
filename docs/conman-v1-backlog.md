@@ -106,7 +106,7 @@ Issues:
    approval policy config.
 8. E03-08: Runtime profile secret visibility rules (`admin` reveal endpoint,
    masked previews for other roles) and typed env var schema validation.
-9. E03-09: Runtime profile `surface_endpoints` persistence and validation
+9. E03-09: Runtime profile `app_endpoints` persistence and validation
    against app keys.
 10. E03-10: Direct app-admin runtime profile emergency edit flow (audited).
 

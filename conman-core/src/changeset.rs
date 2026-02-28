@@ -90,7 +90,7 @@ pub struct Approval {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Changeset {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub workspace_id: String,
     pub title: String,
     pub description: Option<String>,
@@ -115,7 +115,7 @@ pub struct ChangesetCommentEdit {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangesetComment {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub changeset_id: String,
     pub author_user_id: String,
     pub body: String,

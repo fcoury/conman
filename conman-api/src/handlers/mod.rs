@@ -1,10 +1,10 @@
-pub mod apps;
 pub mod changesets;
 pub mod deployments;
 pub mod health;
 pub mod jobs;
 pub mod me;
 pub mod metrics;
+pub mod repos;
 pub mod releases;
 pub mod teams;
 pub mod temp_envs;

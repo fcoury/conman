@@ -55,13 +55,13 @@ routing in each profile.
 
 Add per-profile surface routing config, for example:
 
-- `surface_endpoints`: map of `surface_key -> base_url`
+- `app_endpoints`: map of `app_key -> base_url`
 
 Keep existing precedence model:
 
 - `app defaults < environment profile < temp overrides`
 
-Apply precedence per surface endpoint and per variable/secret.
+Apply precedence per app endpoint and per variable/secret.
 
 ## 5) API and naming changes
 
@@ -107,7 +107,7 @@ Add `app_surfaces` collection:
 Update environments/runtime profiles:
 
 - environment remains repo-scoped
-- runtime profile adds `surface_endpoints`
+- runtime profile adds `app_endpoints`
 
 ## 7) Release/deploy semantics
 

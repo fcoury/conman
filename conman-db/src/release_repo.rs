@@ -13,7 +13,7 @@ use crate::EnsureIndexes;
 struct ReleaseDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     tag: String,
     state: ReleaseState,
     ordered_changeset_ids: Vec<ObjectId>,
@@ -32,7 +32,7 @@ impl From<ReleaseDoc> for ReleaseBatch {
     fn from(value: ReleaseDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             tag: value.tag,
             state: value.state,
             ordered_changeset_ids: value
@@ -62,15 +62,15 @@ impl ReleaseRepo {
         }
     }
 
-    pub async fn next_tag(&self, app_id: &str) -> Result<String, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+    pub async fn next_tag(&self, repo_id: &str) -> Result<String, ConmanError> {
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let now = Utc::now();
         let day_prefix = format!("r{:04}.{:02}.{:02}.", now.year(), now.month(), now.day());
         let count = self
             .collection
-            .count_documents(doc! {"app_id": app_id, "tag": {"$regex": format!("^{}", day_prefix)}})
+            .count_documents(doc! {"repo_id": repo_id, "tag": {"$regex": format!("^{}", day_prefix)}})
             .await
             .map_err(|e| ConmanError::Internal {
                 message: format!("failed to count releases for next tag: {e}"),
@@ -80,16 +80,16 @@ impl ReleaseRepo {
 
     pub async fn create_draft(
         &self,
-        app_id: &str,
+        repo_id: &str,
         tag: String,
     ) -> Result<ReleaseBatch, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let now = Utc::now();
         let row = ReleaseDoc {
             id: ObjectId::new(),
-            app_id,
+            repo_id,
             tag,
             state: ReleaseState::DraftRelease,
             ordered_changeset_ids: Vec::new(),
@@ -123,16 +123,16 @@ impl ReleaseRepo {
         Ok(row.map(Into::into))
     }
 
-    pub async fn list_by_app(
+    pub async fn list_by_repo(
         &self,
-        app_id: &str,
+        repo_id: &str,
         skip: u64,
         limit: u64,
     ) -> Result<(Vec<ReleaseBatch>, u64), ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
-        let filter = doc! {"app_id": app_id};
+        let filter = doc! {"repo_id": repo_id};
         let total = self
             .collection
             .count_documents(filter.clone())
@@ -309,7 +309,7 @@ impl ReleaseRepo {
 impl EnsureIndexes for ReleaseRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
         let by_app = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "created_at": -1})
+            .keys(doc! {"repo_id": 1, "created_at": -1})
             .options(
                 IndexOptions::builder()
                     .name("release_app_created".to_string())
@@ -317,7 +317,7 @@ impl EnsureIndexes for ReleaseRepo {
             )
             .build();
         let uniq_tag = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "tag": 1})
+            .keys(doc! {"repo_id": 1, "tag": 1})
             .options(
                 IndexOptions::builder()
                     .name("release_app_tag_unique".to_string())

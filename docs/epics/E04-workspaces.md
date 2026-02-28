@@ -62,7 +62,7 @@ pub struct Workspace {
     /// MongoDB ObjectId, serialized as hex string in API responses.
     pub id: ObjectId,
     /// The app this workspace belongs to.
-    pub app_id: ObjectId,
+    pub repo_id: ObjectId,
     /// The user who owns this workspace.
     pub owner_user_id: ObjectId,
     /// Full Git branch name, e.g. "ws/alice/my-app".
@@ -146,7 +146,7 @@ use serde::{Deserialize, Serialize};
 
 // -- Requests ------------------------------------------------------------
 
-/// POST /api/repos/:appId/workspaces
+/// POST /api/repos/:repoId/workspaces
 #[derive(Debug, Deserialize)]
 pub struct CreateWorkspaceRequest {
     /// Optional title. Omit for default workspace.
@@ -155,13 +155,13 @@ pub struct CreateWorkspaceRequest {
     pub branch_name: Option<String>,
 }
 
-/// PATCH /api/repos/:appId/workspaces/:workspaceId
+/// PATCH /api/repos/:repoId/workspaces/:workspaceId
 #[derive(Debug, Deserialize)]
 pub struct UpdateWorkspaceRequest {
     pub title: Option<String>,
 }
 
-/// PUT /api/repos/:appId/workspaces/:workspaceId/files
+/// PUT /api/repos/:repoId/workspaces/:workspaceId/files
 #[derive(Debug, Deserialize)]
 pub struct WriteFileRequest {
     /// Relative path from repo root.
@@ -172,7 +172,7 @@ pub struct WriteFileRequest {
     pub message: Option<String>,
 }
 
-/// DELETE /api/repos/:appId/workspaces/:workspaceId/files
+/// DELETE /api/repos/:repoId/workspaces/:workspaceId/files
 #[derive(Debug, Deserialize)]
 pub struct DeleteFileRequest {
     /// Relative path from repo root.
@@ -181,7 +181,7 @@ pub struct DeleteFileRequest {
     pub message: Option<String>,
 }
 
-/// POST /api/repos/:appId/workspaces/:workspaceId/checkpoints
+/// POST /api/repos/:repoId/workspaces/:workspaceId/checkpoints
 #[derive(Debug, Deserialize)]
 pub struct CreateCheckpointRequest {
     /// Commit message for the checkpoint.
@@ -202,7 +202,7 @@ pub struct FilePathQuery {
 #[derive(Debug, Serialize)]
 pub struct WorkspaceResponse {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub owner_user_id: String,
     pub branch_name: String,
     pub title: Option<String>,
@@ -271,7 +271,7 @@ pub struct CheckpointResponse {
 ```json
 {
   "_id": ObjectId("..."),
-  "app_id": ObjectId("..."),
+  "repo_id": ObjectId("..."),
   "owner_user_id": ObjectId("..."),
   "branch_name": "ws/alice/my-app",
   "title": null,
@@ -288,10 +288,10 @@ pub struct CheckpointResponse {
 
 | Index | Fields | Options | Purpose |
 |-------|--------|---------|---------|
-| `idx_ws_app_branch` | `{ app_id: 1, branch_name: 1 }` | `unique: true` | Prevent duplicate branches per app |
-| `idx_ws_app_owner_default` | `{ app_id: 1, owner_user_id: 1, is_default: 1 }` | `unique: true, partialFilterExpression: { is_default: true }` | At most one default workspace per user per app |
-| `idx_ws_app_owner` | `{ app_id: 1, owner_user_id: 1 }` | -- | Efficient lookup for listing a user's workspaces in an app |
-| `idx_ws_app` | `{ app_id: 1 }` | -- | Paginated listing of all workspaces in an app |
+| `idx_ws_app_branch` | `{ repo_id: 1, branch_name: 1 }` | `unique: true` | Prevent duplicate branches per app |
+| `idx_ws_app_owner_default` | `{ repo_id: 1, owner_user_id: 1, is_default: 1 }` | `unique: true, partialFilterExpression: { is_default: true }` | At most one default workspace per user per app |
+| `idx_ws_app_owner` | `{ repo_id: 1, owner_user_id: 1 }` | -- | Efficient lookup for listing a user's workspaces in an app |
+| `idx_ws_app` | `{ repo_id: 1 }` | -- | Paginated listing of all workspaces in an app |
 
 ### 4.3 Repository: `WorkspaceRepo`
 
@@ -304,9 +304,9 @@ impl WorkspaceRepo {
     pub async fn ensure_indexes(&self) -> Result<(), ConmanError>;
     pub async fn insert(&self, workspace: &Workspace) -> Result<(), ConmanError>;
     pub async fn find_by_id(&self, id: ObjectId) -> Result<Option<Workspace>, ConmanError>;
-    pub async fn find_default(&self, app_id: ObjectId, user_id: ObjectId) -> Result<Option<Workspace>, ConmanError>;
-    pub async fn find_by_app_and_branch(&self, app_id: ObjectId, branch: &str) -> Result<Option<Workspace>, ConmanError>;
-    pub async fn list_by_app(&self, app_id: ObjectId, page: u64, limit: u64) -> Result<(Vec<Workspace>, u64), ConmanError>;
+    pub async fn find_default(&self, repo_id: ObjectId, user_id: ObjectId) -> Result<Option<Workspace>, ConmanError>;
+    pub async fn find_by_app_and_branch(&self, repo_id: ObjectId, branch: &str) -> Result<Option<Workspace>, ConmanError>;
+    pub async fn list_by_app(&self, repo_id: ObjectId, page: u64, limit: u64) -> Result<(Vec<Workspace>, u64), ConmanError>;
     pub async fn update_head_sha(&self, id: ObjectId, head_sha: &str) -> Result<(), ConmanError>;
     pub async fn update_title(&self, id: ObjectId, title: Option<&str>) -> Result<(), ConmanError>;
     pub async fn delete(&self, id: ObjectId) -> Result<(), ConmanError>;
@@ -323,21 +323,21 @@ All endpoints require `Authorization: Bearer <token>` and at minimum `Role::Memb
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
-| `GET` | `/api/repos/:appId/workspaces?page=&limit=` | `list_workspaces` | List workspaces for the app. Paginated. |
-| `POST` | `/api/repos/:appId/workspaces` | `create_workspace` | Create a new workspace. Creates Git branch. Returns `201`. |
-| `GET` | `/api/repos/:appId/workspaces/:workspaceId` | `get_workspace` | Get single workspace by ID. |
-| `PATCH` | `/api/repos/:appId/workspaces/:workspaceId` | `update_workspace` | Update workspace title. |
-| `POST` | `/api/repos/:appId/workspaces/:workspaceId/reset` | `reset_workspace` | Reset workspace branch to baseline. |
-| `POST` | `/api/repos/:appId/workspaces/:workspaceId/sync-integration` | `sync_workspace` | Rebase/merge workspace onto current integration branch. |
+| `GET` | `/api/repos/:repoId/workspaces?page=&limit=` | `list_workspaces` | List workspaces for the app. Paginated. |
+| `POST` | `/api/repos/:repoId/workspaces` | `create_workspace` | Create a new workspace. Creates Git branch. Returns `201`. |
+| `GET` | `/api/repos/:repoId/workspaces/:workspaceId` | `get_workspace` | Get single workspace by ID. |
+| `PATCH` | `/api/repos/:repoId/workspaces/:workspaceId` | `update_workspace` | Update workspace title. |
+| `POST` | `/api/repos/:repoId/workspaces/:workspaceId/reset` | `reset_workspace` | Reset workspace branch to baseline. |
+| `POST` | `/api/repos/:repoId/workspaces/:workspaceId/sync-integration` | `sync_workspace` | Rebase/merge workspace onto current integration branch. |
 
 ### 5.2 File Operations
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
-| `GET` | `/api/repos/:appId/workspaces/:workspaceId/files?path=` | `get_files` | If `path` is a directory: list tree entries. If `path` is a file: return content. |
-| `PUT` | `/api/repos/:appId/workspaces/:workspaceId/files` | `write_file` | Create or update a file. Body: `{ path, content, message? }`. |
-| `DELETE` | `/api/repos/:appId/workspaces/:workspaceId/files` | `delete_file` | Delete a file. Body: `{ path, message? }`. |
-| `POST` | `/api/repos/:appId/workspaces/:workspaceId/checkpoints` | `create_checkpoint` | Commit current working state (for `manual_checkpoint` mode). |
+| `GET` | `/api/repos/:repoId/workspaces/:workspaceId/files?path=` | `get_files` | If `path` is a directory: list tree entries. If `path` is a file: return content. |
+| `PUT` | `/api/repos/:repoId/workspaces/:workspaceId/files` | `write_file` | Create or update a file. Body: `{ path, content, message? }`. |
+| `DELETE` | `/api/repos/:repoId/workspaces/:workspaceId/files` | `delete_file` | Delete a file. Body: `{ path, message? }`. |
+| `POST` | `/api/repos/:repoId/workspaces/:workspaceId/checkpoints` | `create_checkpoint` | Commit current working state (for `manual_checkpoint` mode). |
 
 ### 5.3 Ownership and authorization rules
 
@@ -352,7 +352,7 @@ All endpoints require `Authorization: Bearer <token>` and at minimum `Role::Memb
 
 ### 6.1 Default workspace creation
 
-When a user calls `POST /api/repos/:appId/workspaces` without specifying a
+When a user calls `POST /api/repos/:repoId/workspaces` without specifying a
 `branch_name`, or when any file/changeset operation references a workspace
 that does not yet exist:
 
@@ -1247,9 +1247,9 @@ test suite before moving to the next.
 - [ ] **8.10** Implement `resolve_commit()` in `conman-git` using `FindCommit`. Integration test.
 - [ ] **8.11** Implement `rebase_workspace_onto_integration()` in `conman-git` using `UserRebaseToRef`. Integration test.
 - [ ] **8.12** Implement `detect_conflicting_paths()` in `conman-git` using `FindChangedPaths` / `CommitDiff`. Integration test.
-- [ ] **8.13** Wire up `POST /api/repos/:appId/workspaces` handler with default workspace creation logic.
-- [ ] **8.14** Wire up `GET /api/repos/:appId/workspaces` and `GET .../workspaces/:workspaceId` handlers.
-- [ ] **8.15** Wire up `PATCH /api/repos/:appId/workspaces/:workspaceId` handler.
+- [ ] **8.13** Wire up `POST /api/repos/:repoId/workspaces` handler with default workspace creation logic.
+- [ ] **8.14** Wire up `GET /api/repos/:repoId/workspaces` and `GET .../workspaces/:workspaceId` handlers.
+- [ ] **8.15** Wire up `PATCH /api/repos/:repoId/workspaces/:workspaceId` handler.
 - [ ] **8.16** Wire up `GET .../workspaces/:workspaceId/files?path=` handler (tree listing + file read).
 - [ ] **8.17** Wire up `PUT .../workspaces/:workspaceId/files` handler with blocked-path and size guardrails.
 - [ ] **8.18** Wire up `DELETE .../workspaces/:workspaceId/files` handler with blocked-path guardrail.
@@ -1283,12 +1283,12 @@ test suite before moving to the next.
 | # | Test | Assertion |
 |---|------|-----------|
 | D1 | Insert workspace, find by ID | Found with matching fields |
-| D2 | Insert two workspaces with same `app_id + branch_name` | Second insert fails (unique index) |
+| D2 | Insert two workspaces with same `repo_id + branch_name` | Second insert fails (unique index) |
 | D3 | Insert two default workspaces for same user + app | Second insert fails (partial unique index) |
 | D4 | Insert non-default workspace for same user + app | Succeeds |
 | D5 | `list_by_app` with pagination | Returns correct page and total count |
 | D6 | `update_head_sha` | Subsequent `find_by_id` returns new SHA |
-| D7 | `find_default(app_id, user_id)` | Returns the `is_default: true` workspace |
+| D7 | `find_default(repo_id, user_id)` | Returns the `is_default: true` workspace |
 
 ### 9.3 Git integration tests (`conman-git`)
 

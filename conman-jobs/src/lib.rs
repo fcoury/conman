@@ -51,7 +51,7 @@ async fn run_shell_command(
         .arg(command)
         .env("CONMAN_JOB_ID", &job.id)
         .env("CONMAN_JOB_TYPE", format!("{:?}", job.job_type))
-        .env("CONMAN_APP_ID", &job.app_id)
+        .env("CONMAN_REPO_ID", &job.repo_id)
         .env("CONMAN_ENTITY_TYPE", &job.entity_type)
         .env("CONMAN_ENTITY_ID", &job.entity_id)
         .env("CONMAN_JOB_PAYLOAD", payload_json)
@@ -342,7 +342,7 @@ impl JobWorker for RevalidateQueuedChangesetWorker {
             .map_err(|e| e.to_string())?;
         let queued = self
             .changesets
-            .list_queued_by_app(&changeset.app_id)
+            .list_queued_by_repo(&changeset.repo_id)
             .await
             .map_err(|e| e.to_string())?;
         let current_position = changeset.queue_position.unwrap_or(i64::MAX);
@@ -553,7 +553,7 @@ impl JobRunner {
         let timeout = Duration::from_millis(job.timeout_ms.max(1000));
 
         self.repo
-            .append_log(&job.app_id, &job.id, "info", "job started")
+            .append_log(&job.repo_id, &job.id, "info", "job started")
             .await?;
         let started_at = std::time::Instant::now();
         let job_type = job_type_label(job.job_type);
@@ -563,7 +563,7 @@ impl JobRunner {
             Ok(Ok(result)) => {
                 self.repo.complete_success(&job.id, result).await?;
                 self.repo
-                    .append_log(&job.app_id, &job.id, "info", "job succeeded")
+                    .append_log(&job.repo_id, &job.id, "info", "job succeeded")
                     .await?;
                 counter!(JOBS_COMPLETED_TOTAL, "job_type" => job_type, "outcome" => "succeeded")
                     .increment(1);
@@ -571,7 +571,7 @@ impl JobRunner {
             Ok(Err(err)) => {
                 self.repo.complete_failure(&job.id, err.clone()).await?;
                 self.repo
-                    .append_log(&job.app_id, &job.id, "error", &format!("job failed: {err}"))
+                    .append_log(&job.repo_id, &job.id, "error", &format!("job failed: {err}"))
                     .await?;
                 counter!(JOBS_COMPLETED_TOTAL, "job_type" => job_type, "outcome" => "failed")
                     .increment(1);
@@ -580,7 +580,7 @@ impl JobRunner {
                 let err = "job timed out".to_string();
                 self.repo.complete_failure(&job.id, err.clone()).await?;
                 self.repo
-                    .append_log(&job.app_id, &job.id, "error", &err)
+                    .append_log(&job.repo_id, &job.id, "error", &err)
                     .await?;
                 if job.job_type == JobType::DeployRelease {
                     let _ = self
@@ -621,7 +621,7 @@ impl JobRunner {
             let existing = self
                 .repo
                 .latest_for_entity(
-                    &temp_env.app_id,
+                    &temp_env.repo_id,
                     "temp_environment",
                     &temp_env.id,
                     JobType::TempEnvExpire,
@@ -635,7 +635,7 @@ impl JobRunner {
             }
             self.repo
                 .enqueue(EnqueueJobInput {
-                    app_id: temp_env.app_id.clone(),
+                    repo_id: temp_env.repo_id.clone(),
                     job_type: JobType::TempEnvExpire,
                     entity_type: "temp_environment".to_string(),
                     entity_id: temp_env.id.clone(),

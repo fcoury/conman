@@ -86,7 +86,7 @@ pub struct ReleaseBatch {
     pub id: ObjectId,
 
     /// The app this release belongs to.
-    pub app_id: ObjectId,
+    pub repo_id: ObjectId,
 
     /// Release tag in `rYYYY.MM.DD.N` format. Assigned at creation time
     /// (next available sequence number for today). Unique per app.
@@ -243,7 +243,7 @@ use bson::oid::ObjectId;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-/// POST /api/repos/:appId/releases
+/// POST /api/repos/:repoId/releases
 ///
 /// Creates a draft release. The tag is auto-generated as `rYYYY.MM.DD.N`.
 /// Optionally accepts an initial set of changeset IDs to include.
@@ -254,7 +254,7 @@ pub struct CreateReleaseRequest {
     pub changeset_ids: Vec<String>,
 }
 
-/// POST /api/repos/:appId/releases/:releaseId/changesets
+/// POST /api/repos/:repoId/releases/:releaseId/changesets
 ///
 /// Add or remove changesets from a draft release. Only valid when release
 /// is in `draft_release` state.
@@ -268,7 +268,7 @@ pub struct AddChangesetsRequest {
     pub remove: Vec<String>,
 }
 
-/// POST /api/repos/:appId/releases/:releaseId/reorder
+/// POST /api/repos/:repoId/releases/:releaseId/reorder
 ///
 /// Set the explicit merge order for changesets in a draft release.
 #[derive(Debug, Deserialize)]
@@ -282,7 +282,7 @@ pub struct ReorderRequest {
 #[derive(Debug, Serialize)]
 pub struct ReleaseResponse {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub tag: String,
     pub state: String,
     pub ordered_changeset_ids: Vec<String>,
@@ -294,7 +294,7 @@ pub struct ReleaseResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-/// List query parameters for GET /api/repos/:appId/releases
+/// List query parameters for GET /api/repos/:repoId/releases
 #[derive(Debug, Deserialize)]
 pub struct ReleaseListQuery {
     #[serde(default = "super::default_page")]
@@ -309,7 +309,7 @@ impl From<&ReleaseBatch> for ReleaseResponse {
     fn from(r: &ReleaseBatch) -> Self {
         Self {
             id: r.id.to_hex(),
-            app_id: r.app_id.to_hex(),
+            repo_id: r.repo_id.to_hex(),
             tag: r.tag.clone(),
             state: r.state.to_string(),
             ordered_changeset_ids: r.ordered_changeset_ids.iter().map(|id| id.to_hex()).collect(),
@@ -336,7 +336,7 @@ lifecycle.
 | Field | BSON type | Description |
 |-------|-----------|-------------|
 | `_id` | ObjectId | Document ID |
-| `app_id` | ObjectId | Parent app |
+| `repo_id` | ObjectId | Parent app |
 | `tag` | String | Release tag (`rYYYY.MM.DD.N`) |
 | `state` | String | Current `ReleaseState` value |
 | `ordered_changeset_ids` | Array\<ObjectId\> | Changeset IDs in merge order |
@@ -357,14 +357,14 @@ async fn ensure_indexes(&self) -> Result<(), ConmanError> {
     // Lookup by app + state (list releases filtered by state).
     collection.create_index(
         IndexModel::builder()
-            .keys(doc! { "app_id": 1, "state": 1 })
+            .keys(doc! { "repo_id": 1, "state": 1 })
             .build(),
     ).await?;
 
     // Unique tag per app -- prevents duplicate release tags.
     collection.create_index(
         IndexModel::builder()
-            .keys(doc! { "app_id": 1, "tag": 1 })
+            .keys(doc! { "repo_id": 1, "tag": 1 })
             .options(IndexOptions::builder().unique(true).build())
             .build(),
     ).await?;
@@ -372,7 +372,7 @@ async fn ensure_indexes(&self) -> Result<(), ConmanError> {
     // Lookup by app sorted by creation time (list recent releases).
     collection.create_index(
         IndexModel::builder()
-            .keys(doc! { "app_id": 1, "created_at": -1 })
+            .keys(doc! { "repo_id": 1, "created_at": -1 })
             .build(),
     ).await?;
 
@@ -387,7 +387,7 @@ Draft release with two changesets selected:
 ```json
 {
   "_id": ObjectId("664f1a2b3c4d5e6f7a8b9c0e"),
-  "app_id": ObjectId("664f1a2b3c4d5e6f7a8b9c01"),
+  "repo_id": ObjectId("664f1a2b3c4d5e6f7a8b9c01"),
   "tag": "r2026.02.25.1",
   "state": "draft_release",
   "ordered_changeset_ids": [
@@ -408,7 +408,7 @@ Published release:
 ```json
 {
   "_id": ObjectId("664f1a2b3c4d5e6f7a8b9c0f"),
-  "app_id": ObjectId("664f1a2b3c4d5e6f7a8b9c01"),
+  "repo_id": ObjectId("664f1a2b3c4d5e6f7a8b9c01"),
   "tag": "r2026.02.24.2",
   "state": "published",
   "ordered_changeset_ids": [
@@ -481,7 +481,7 @@ async fn ensure_indexes(&self) -> Result<(), ConmanError> {
 
 ## 5. API Endpoints
 
-All endpoints are scoped under `/api/repos/:appId/releases`. Authentication
+All endpoints are scoped under `/api/repos/:repoId/releases`. Authentication
 is required. Role checks are noted per endpoint.
 
 ---
@@ -489,7 +489,7 @@ is required. Role checks are noted per endpoint.
 ### 5.1 List Releases
 
 ```
-GET /api/repos/:appId/releases?page=&limit=&state=
+GET /api/repos/:repoId/releases?page=&limit=&state=
 ```
 
 **Role:** Any app member (read access).
@@ -509,7 +509,7 @@ GET /api/repos/:appId/releases?page=&limit=&state=
   "data": [
     {
       "id": "664f1a2b3c4d5e6f7a8b9c0e",
-      "app_id": "664f1a2b3c4d5e6f7a8b9c01",
+      "repo_id": "664f1a2b3c4d5e6f7a8b9c01",
       "tag": "r2026.02.25.1",
       "state": "draft_release",
       "ordered_changeset_ids": ["664f1a2b3c4d5e6f7a8b9c10"],
@@ -528,24 +528,24 @@ GET /api/repos/:appId/releases?page=&limit=&state=
 **Handler:**
 
 ```rust
-/// GET /api/repos/:appId/releases
+/// GET /api/repos/:repoId/releases
 ///
 /// List releases for the app, optionally filtered by state.
 /// Sorted by created_at descending (most recent first).
 pub async fn list_releases(
     State(state): State<AppState>,
     Extension(auth_user): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Query(params): Query<ReleaseListQuery>,
 ) -> Result<Json<ApiResponse<Vec<ReleaseResponse>>>, ConmanError> {
-    let app_id = parse_object_id(&app_id)?;
-    auth_user.require_member(app_id)?;
+    let repo_id = parse_object_id(&repo_id)?;
+    auth_user.require_member(repo_id)?;
 
     let pagination = Pagination { page: params.page, limit: params.limit }.validate()?;
     let state_filter = params.state.as_deref().map(parse_release_state).transpose()?;
 
     let (releases, total) = release_repo
-        .list_by_app(app_id, state_filter, &pagination)
+        .list_by_app(repo_id, state_filter, &pagination)
         .await?;
 
     let data: Vec<ReleaseResponse> = releases.iter().map(ReleaseResponse::from).collect();
@@ -558,7 +558,7 @@ pub async fn list_releases(
 ### 5.2 Create Draft Release
 
 ```
-POST /api/repos/:appId/releases
+POST /api/repos/:repoId/releases
 ```
 
 **Role:** `config_manager` or `admin`.
@@ -579,7 +579,7 @@ POST /api/repos/:appId/releases
 {
   "data": {
     "id": "664f1a2b3c4d5e6f7a8b9c0e",
-    "app_id": "664f1a2b3c4d5e6f7a8b9c01",
+    "repo_id": "664f1a2b3c4d5e6f7a8b9c01",
     "tag": "r2026.02.25.1",
     "state": "draft_release",
     "ordered_changeset_ids": ["664f1a2b3c4d5e6f7a8b9c10", "664f1a2b3c4d5e6f7a8b9c11"],
@@ -608,7 +608,7 @@ POST /api/repos/:appId/releases
 ### 5.3 Get Release Detail
 
 ```
-GET /api/repos/:appId/releases/:releaseId
+GET /api/repos/:repoId/releases/:releaseId
 ```
 
 **Role:** Any app member.
@@ -620,7 +620,7 @@ with per-changeset detail:
 {
   "data": {
     "id": "664f1a2b3c4d5e6f7a8b9c0e",
-    "app_id": "664f1a2b3c4d5e6f7a8b9c01",
+    "repo_id": "664f1a2b3c4d5e6f7a8b9c01",
     "tag": "r2026.02.25.1",
     "state": "draft_release",
     "ordered_changeset_ids": ["664f1a2b3c4d5e6f7a8b9c10"],
@@ -646,7 +646,7 @@ with per-changeset detail:
 ### 5.4 Add/Remove Changesets
 
 ```
-POST /api/repos/:appId/releases/:releaseId/changesets
+POST /api/repos/:repoId/releases/:releaseId/changesets
 ```
 
 **Role:** `config_manager` or `admin`.
@@ -680,7 +680,7 @@ POST /api/repos/:appId/releases/:releaseId/changesets
 ### 5.5 Reorder Changesets
 
 ```
-POST /api/repos/:appId/releases/:releaseId/reorder
+POST /api/repos/:repoId/releases/:releaseId/reorder
 ```
 
 **Role:** `config_manager` or `admin`.
@@ -716,7 +716,7 @@ POST /api/repos/:appId/releases/:releaseId/reorder
 ### 5.6 Assemble Release
 
 ```
-POST /api/repos/:appId/releases/:releaseId/assemble
+POST /api/repos/:repoId/releases/:releaseId/assemble
 ```
 
 **Role:** `config_manager` or `admin`.
@@ -766,7 +766,7 @@ The `release_assemble` worker performs the composition sequentially:
 ///   - Mark failing changeset(s) with appropriate state.
 async fn execute_release_assemble(job: &Job, ctx: &WorkerContext) -> Result<(), ConmanError> {
     let release = ctx.release_repo.find_by_id(job.entity_id).await?;
-    let app = ctx.app_repo.find_by_id(release.app_id).await?;
+    let app = ctx.app_repo.find_by_id(release.repo_id).await?;
     let repo = app_to_gitaly_repo(&app);
 
     // Resolve current integration branch HEAD as the starting point.
@@ -847,7 +847,7 @@ async fn execute_release_assemble(job: &Job, ctx: &WorkerContext) -> Result<(), 
 ### 5.7 Publish Release
 
 ```
-POST /api/repos/:appId/releases/:releaseId/publish
+POST /api/repos/:repoId/releases/:releaseId/publish
 ```
 
 **Role:** `config_manager` or `admin`.
@@ -895,18 +895,18 @@ calendar day within the app.
 /// Generate the next release tag for today.
 ///
 /// Queries existing tags matching today's date prefix and increments the
-/// sequence number. Thread-safe because the unique index on (app_id, tag)
+/// sequence number. Thread-safe because the unique index on (repo_id, tag)
 /// rejects duplicates, causing a retry with the next N.
 pub async fn next_tag(
     release_repo: &ReleaseRepo,
-    app_id: ObjectId,
+    repo_id: ObjectId,
 ) -> Result<String, ConmanError> {
     let today = Utc::now().format("%Y.%m.%d").to_string();
     let prefix = format!("r{today}.");
 
     // Find the highest N for today's tags on this app.
     let max_n = release_repo
-        .find_max_tag_sequence(app_id, &prefix)
+        .find_max_tag_sequence(repo_id, &prefix)
         .await?;
 
     let next_n = max_n.map_or(1, |n| n + 1);
@@ -958,7 +958,7 @@ Tags follow the `rYYYY.MM.DD.N` convention:
 - Examples: `r2026.02.25.1`, `r2026.02.25.2`, `r2026.03.01.1`.
 
 The tag is generated at draft creation time and reserved via the unique
-`(app_id, tag)` index.
+`(repo_id, tag)` index.
 
 ### 6.4 Publish Flow
 
@@ -1508,27 +1508,27 @@ run test (passes), commit.
   Add to `conman-core` or a service layer. Write unit tests for first tag
   of the day, incrementing, and date boundary behavior.
 
-- [ ] **E08-S08** -- Implement `POST /api/repos/:appId/releases` handler.
+- [ ] **E08-S08** -- Implement `POST /api/repos/:repoId/releases` handler.
   Create draft release with tag generation, changeset validation, and
   `ReleaseChangeset` insertion. Write integration test: create release with
   two queued changesets, verify 201 response and database state.
 
-- [ ] **E08-S09** -- Implement `GET /api/repos/:appId/releases` handler.
+- [ ] **E08-S09** -- Implement `GET /api/repos/:repoId/releases` handler.
   List with pagination and optional state filter. Write integration tests
   for pagination, state filtering, and empty results.
 
-- [ ] **E08-S10** -- Implement `GET /api/repos/:appId/releases/:releaseId` handler.
+- [ ] **E08-S10** -- Implement `GET /api/repos/:repoId/releases/:releaseId` handler.
   Return release detail with `changesets` array. Write integration test.
 
-- [ ] **E08-S11** -- Implement `POST /api/repos/:appId/releases/:releaseId/changesets` handler.
+- [ ] **E08-S11** -- Implement `POST /api/repos/:repoId/releases/:releaseId/changesets` handler.
   Add/remove changesets from draft. Write integration tests for add, remove,
   state guard rejection, and duplicate detection.
 
-- [ ] **E08-S12** -- Implement `POST /api/repos/:appId/releases/:releaseId/reorder` handler.
+- [ ] **E08-S12** -- Implement `POST /api/repos/:repoId/releases/:releaseId/reorder` handler.
   Validate permutation and update positions. Write integration tests for
   valid reorder, non-permutation rejection, and state guard.
 
-- [ ] **E08-S13** -- Implement `POST /api/repos/:appId/releases/:releaseId/assemble` handler.
+- [ ] **E08-S13** -- Implement `POST /api/repos/:repoId/releases/:releaseId/assemble` handler.
   Transition to `Assembling`, create job, return 202. Write integration test
   verifying state transition and job creation.
 
@@ -1542,7 +1542,7 @@ run test (passes), commit.
   `create_release_tag`, `find_tag`, `list_all_tags`, `find_commit`.
   Write unit tests with mock gRPC server for each method.
 
-- [ ] **E08-S16** -- Implement `POST /api/repos/:appId/releases/:releaseId/publish` handler.
+- [ ] **E08-S16** -- Implement `POST /api/repos/:repoId/releases/:releaseId/publish` handler.
   Full publish flow: merge to the integration branch, create tag, persist metadata, mark
   changesets released, trigger revalidation. Write integration tests with
   mock gitaly for success and race condition (expected_old_oid mismatch).
@@ -1699,12 +1699,12 @@ async fn first_tag_of_the_day_is_1() {
 #[tokio::test]
 async fn second_tag_of_the_day_is_2() {
     let repo = test_release_repo().await;
-    let app_id = test_app_id();
+    let repo_id = test_app_id();
 
     // Insert a release with today's first tag.
-    insert_release(&repo, app_id, &format!("r{}.1", Utc::now().format("%Y.%m.%d"))).await;
+    insert_release(&repo, repo_id, &format!("r{}.1", Utc::now().format("%Y.%m.%d"))).await;
 
-    let tag = next_tag(&repo, app_id).await.unwrap();
+    let tag = next_tag(&repo, repo_id).await.unwrap();
     let today = Utc::now().format("%Y.%m.%d");
     assert_eq!(tag, format!("r{today}.2"));
 }
@@ -1712,12 +1712,12 @@ async fn second_tag_of_the_day_is_2() {
 #[tokio::test]
 async fn tags_from_different_days_dont_affect_sequence() {
     let repo = test_release_repo().await;
-    let app_id = test_app_id();
+    let repo_id = test_app_id();
 
     // Insert a release from yesterday.
-    insert_release(&repo, app_id, "r2026.02.24.5").await;
+    insert_release(&repo, repo_id, "r2026.02.24.5").await;
 
-    let tag = next_tag(&repo, app_id).await.unwrap();
+    let tag = next_tag(&repo, repo_id).await.unwrap();
     let today = Utc::now().format("%Y.%m.%d");
     assert_eq!(tag, format!("r{today}.1"));
 }
@@ -1729,14 +1729,14 @@ async fn tags_from_different_days_dont_affect_sequence() {
 #[tokio::test]
 async fn create_release_returns_201_with_tag() {
     let app = test_app_with_real_mongo().await;
-    let app_id = seed_app(&app).await;
-    let cs1 = seed_queued_changeset(&app, app_id).await;
-    let cs2 = seed_queued_changeset(&app, app_id).await;
+    let repo_id = seed_app(&app).await;
+    let cs1 = seed_queued_changeset(&app, repo_id).await;
+    let cs2 = seed_queued_changeset(&app, repo_id).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases"))
+            .uri(&format!("/api/repos/{repo_id}/releases"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1756,13 +1756,13 @@ async fn create_release_returns_201_with_tag() {
 #[tokio::test]
 async fn create_release_rejects_non_queued_changesets() {
     let app = test_app_with_real_mongo().await;
-    let app_id = seed_app(&app).await;
-    let draft_cs = seed_draft_changeset(&app, app_id).await;
+    let repo_id = seed_app(&app).await;
+    let draft_cs = seed_draft_changeset(&app, repo_id).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases"))
+            .uri(&format!("/api/repos/{repo_id}/releases"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1777,12 +1777,12 @@ async fn create_release_rejects_non_queued_changesets() {
 #[tokio::test]
 async fn create_release_rejects_user_role() {
     let app = test_app_with_real_mongo().await;
-    let app_id = seed_app(&app).await;
+    let repo_id = seed_app(&app).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases"))
+            .uri(&format!("/api/repos/{repo_id}/releases"))
             .header("content-type", "application/json")
             .header("authorization", user_token()) // not config_manager
             .body(Body::from(json!({ "changeset_ids": [] }).to_string()))
@@ -1799,13 +1799,13 @@ async fn create_release_rejects_user_role() {
 #[tokio::test]
 async fn add_changeset_to_draft_release() {
     let app = test_app_with_real_mongo().await;
-    let (app_id, release_id) = seed_draft_release(&app).await;
-    let cs = seed_queued_changeset(&app, app_id).await;
+    let (repo_id, release_id) = seed_draft_release(&app).await;
+    let cs = seed_queued_changeset(&app, repo_id).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/changesets"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/changesets"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1826,13 +1826,13 @@ async fn add_changeset_to_draft_release() {
 #[tokio::test]
 async fn modify_changesets_rejected_for_non_draft_release() {
     let app = test_app_with_real_mongo().await;
-    let (app_id, release_id) = seed_published_release(&app).await;
-    let cs = seed_queued_changeset(&app, app_id).await;
+    let (repo_id, release_id) = seed_published_release(&app).await;
+    let cs = seed_queued_changeset(&app, repo_id).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/changesets"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/changesets"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1852,12 +1852,12 @@ async fn modify_changesets_rejected_for_non_draft_release() {
 #[tokio::test]
 async fn reorder_changesets_updates_positions() {
     let app = test_app_with_real_mongo().await;
-    let (app_id, release_id, cs1, cs2) = seed_draft_release_with_two_changesets(&app).await;
+    let (repo_id, release_id, cs1, cs2) = seed_draft_release_with_two_changesets(&app).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/reorder"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/reorder"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1876,12 +1876,12 @@ async fn reorder_changesets_updates_positions() {
 #[tokio::test]
 async fn reorder_rejects_non_permutation() {
     let app = test_app_with_real_mongo().await;
-    let (app_id, release_id, cs1, _cs2) = seed_draft_release_with_two_changesets(&app).await;
+    let (repo_id, release_id, cs1, _cs2) = seed_draft_release_with_two_changesets(&app).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/reorder"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/reorder"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({
@@ -1954,7 +1954,7 @@ async fn assembly_worker_marks_changeset_conflicted_on_merge_failure() {
 #[tokio::test]
 async fn publish_creates_tag_and_updates_main() {
     let app = test_app_with_mock_gitaly().await;
-    let (app_id, release_id) = seed_validated_release(&app).await;
+    let (repo_id, release_id) = seed_validated_release(&app).await;
 
     // Mock: FindCommit returns current integration branch HEAD.
     app.mock_gitaly.expect_find_commit()
@@ -1971,7 +1971,7 @@ async fn publish_creates_tag_and_updates_main() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/publish"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/publish"))
             .header("authorization", config_manager_token())
             .body(Body::empty())
             .unwrap()
@@ -1988,7 +1988,7 @@ async fn publish_creates_tag_and_updates_main() {
 #[tokio::test]
 async fn publish_fails_on_race_condition() {
     let app = test_app_with_mock_gitaly().await;
-    let (app_id, release_id) = seed_validated_release(&app).await;
+    let (repo_id, release_id) = seed_validated_release(&app).await;
 
     // Mock: FindCommit returns integration branch HEAD.
     app.mock_gitaly.expect_find_commit()
@@ -2001,7 +2001,7 @@ async fn publish_fails_on_race_condition() {
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/publish"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/publish"))
             .header("authorization", config_manager_token())
             .body(Body::empty())
             .unwrap()
@@ -2014,12 +2014,12 @@ async fn publish_fails_on_race_condition() {
 #[tokio::test]
 async fn publish_rejects_non_validated_release() {
     let app = test_app_with_real_mongo().await;
-    let (app_id, release_id) = seed_draft_release(&app).await;
+    let (repo_id, release_id) = seed_draft_release(&app).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/publish"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/publish"))
             .header("authorization", config_manager_token())
             .body(Body::empty())
             .unwrap()
@@ -2035,13 +2035,13 @@ async fn publish_rejects_non_validated_release() {
 #[tokio::test]
 async fn published_release_rejects_changeset_modification() {
     let app = test_app_with_real_mongo().await;
-    let (app_id, release_id) = seed_published_release(&app).await;
+    let (repo_id, release_id) = seed_published_release(&app).await;
 
     // Attempt to add a changeset.
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/changesets"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/changesets"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({ "add": ["aabbcc"], "remove": [] }).to_string()))
@@ -2054,12 +2054,12 @@ async fn published_release_rejects_changeset_modification() {
 #[tokio::test]
 async fn published_release_rejects_reorder() {
     let app = test_app_with_real_mongo().await;
-    let (app_id, release_id) = seed_published_release(&app).await;
+    let (repo_id, release_id) = seed_published_release(&app).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/reorder"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/reorder"))
             .header("content-type", "application/json")
             .header("authorization", config_manager_token())
             .body(Body::from(json!({ "ordered_changeset_ids": [] }).to_string()))
@@ -2072,12 +2072,12 @@ async fn published_release_rejects_reorder() {
 #[tokio::test]
 async fn published_release_rejects_re_assembly() {
     let app = test_app_with_real_mongo().await;
-    let (app_id, release_id) = seed_published_release(&app).await;
+    let (repo_id, release_id) = seed_published_release(&app).await;
 
     let response = app.oneshot(
         Request::builder()
             .method("POST")
-            .uri(&format!("/api/repos/{app_id}/releases/{release_id}/assemble"))
+            .uri(&format!("/api/repos/{repo_id}/releases/{release_id}/assemble"))
             .header("authorization", config_manager_token())
             .body(Body::empty())
             .unwrap()

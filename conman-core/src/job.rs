@@ -34,7 +34,7 @@ impl JobState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub job_type: JobType,
     pub state: JobState,
     pub entity_type: String,
@@ -55,7 +55,7 @@ pub struct Job {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobLogLine {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub job_id: String,
     pub level: String,
     pub message: String,

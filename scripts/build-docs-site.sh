@@ -52,6 +52,12 @@ build_page \
   "style.css"
 
 build_page \
+  "$SRC_DIR/entity-relationship-diagram.md" \
+  "$DIST_DIR/entity-relationship-diagram.html" \
+  "Conman Entity Relationship Diagram" \
+  "style.css"
+
+build_page \
   "$SRC_DIR/conman-v1-backlog.md" \
   "$DIST_DIR/conman-v1-backlog.html" \
   "Conman V1 Backlog" \
@@ -138,6 +144,10 @@ cat > "$DIST_DIR/index.html" <<EOF
         <a class="doc-card" href="./conman-v1-scope.html">
           <p class="card-title">V1 Scope Specification</p>
           <p class="card-desc">Architecture, features, and technical scope for the first release.</p>
+        </a>
+        <a class="doc-card" href="./entity-relationship-diagram.html">
+          <p class="card-title">Entity Relationship Diagram</p>
+          <p class="card-desc">Current implemented domain entities and their relationships.</p>
         </a>
         <a class="doc-card" href="./conman-v1-backlog.html">
           <p class="card-title">V1 Implementation Backlog</p>

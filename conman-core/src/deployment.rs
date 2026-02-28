@@ -27,7 +27,7 @@ pub enum RollbackMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deployment {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub environment_id: String,
     pub release_id: String,
     pub state: DeploymentState,

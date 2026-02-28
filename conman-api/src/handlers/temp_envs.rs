@@ -47,7 +47,7 @@ fn parse_kind(value: &str) -> Result<TempEnvKind, ApiConmanError> {
 
 async fn find_owned_temp_env(
     state: &AppState,
-    app_id: &str,
+    repo_id: &str,
     temp_env_id: &str,
     owner_user_id: &str,
 ) -> Result<TempEnvironment, ApiConmanError> {
@@ -58,7 +58,7 @@ async fn find_owned_temp_env(
             entity: "temp_environment",
             id: temp_env_id.to_string(),
         })?;
-    if temp_env.app_id != app_id {
+    if temp_env.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
             message: "temp environment does not belong to app".to_string(),
         }
@@ -76,13 +76,13 @@ async fn find_owned_temp_env(
 pub async fn list_temp_envs(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<ApiResponse<Vec<TempEnvironment>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let pagination = pagination.validate()?;
     let (rows, total) = conman_db::TempEnvRepo::new(state.db.clone())
-        .list_by_app(&app_id, pagination.skip(), pagination.limit)
+        .list_by_repo(&repo_id, pagination.skip(), pagination.limit)
         .await?;
     Ok(Json(ApiResponse::paginated(
         rows,
@@ -95,14 +95,14 @@ pub async fn list_temp_envs(
 pub async fn create_temp_env(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Json(req): Json<CreateTempEnvRequest>,
 ) -> Result<Json<ApiResponse<TempEnvActionResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let kind = parse_kind(&req.kind)?;
     let temp_env = conman_db::TempEnvRepo::new(state.db.clone())
         .create(conman_db::CreateTempEnvInput {
-            app_id: app_id.clone(),
+            repo_id: repo_id.clone(),
             kind,
             source_id: req.source_id,
             owner_user_id: auth.user_id.clone(),
@@ -113,7 +113,7 @@ pub async fn create_temp_env(
         .await?;
     let job = conman_db::JobRepo::new(state.db.clone())
         .enqueue(conman_db::EnqueueJobInput {
-            app_id: app_id.clone(),
+            repo_id: repo_id.clone(),
             job_type: JobType::TempEnvProvision,
             entity_type: "temp_environment".to_string(),
             entity_id: temp_env.id.clone(),
@@ -126,7 +126,7 @@ pub async fn create_temp_env(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "temp_environment",
         &temp_env.id,
         "created",
@@ -141,7 +141,7 @@ pub async fn create_temp_env(
     if let Err(err) = emit_notification(
         &state,
         &auth.user_id,
-        Some(&app_id),
+        Some(&repo_id),
         "temp_env_created",
         "Temporary environment created",
         &format!(
@@ -162,11 +162,11 @@ pub async fn create_temp_env(
 pub async fn extend_temp_env(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, temp_env_id)): Path<(String, String)>,
+    Path((repo_id, temp_env_id)): Path<(String, String)>,
     Json(req): Json<ExtendTempEnvRequest>,
 ) -> Result<Json<ApiResponse<TempEnvActionResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let _owned = find_owned_temp_env(&state, &app_id, &temp_env_id, &auth.user_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let _owned = find_owned_temp_env(&state, &repo_id, &temp_env_id, &auth.user_id).await?;
     let seconds = req.seconds.unwrap_or(24 * 3600).max(300);
     let temp_env = conman_db::TempEnvRepo::new(state.db.clone())
         .extend_ttl(&temp_env_id, seconds)
@@ -174,7 +174,7 @@ pub async fn extend_temp_env(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "temp_environment",
         &temp_env.id,
         "ttl_extended",
@@ -195,10 +195,10 @@ pub async fn extend_temp_env(
 pub async fn undo_expire_temp_env(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, temp_env_id)): Path<(String, String)>,
+    Path((repo_id, temp_env_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<TempEnvActionResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let _owned = find_owned_temp_env(&state, &app_id, &temp_env_id, &auth.user_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let _owned = find_owned_temp_env(&state, &repo_id, &temp_env_id, &auth.user_id).await?;
     let temp_env = conman_db::TempEnvRepo::new(state.db.clone())
         .set_state(&temp_env_id, TempEnvState::Active, None)
         .await?;
@@ -208,7 +208,7 @@ pub async fn undo_expire_temp_env(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "temp_environment",
         &temp_env.id,
         "undo_expire",
@@ -229,17 +229,17 @@ pub async fn undo_expire_temp_env(
 pub async fn delete_temp_env(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, temp_env_id)): Path<(String, String)>,
+    Path((repo_id, temp_env_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<TempEnvActionResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
-    let _owned = find_owned_temp_env(&state, &app_id, &temp_env_id, &auth.user_id).await?;
+    auth.require_role(&repo_id, Role::Member)?;
+    let _owned = find_owned_temp_env(&state, &repo_id, &temp_env_id, &auth.user_id).await?;
     let grace = Utc::now() + Duration::hours(1);
     let temp_env = conman_db::TempEnvRepo::new(state.db.clone())
         .set_state(&temp_env_id, TempEnvState::Deleted, Some(grace))
         .await?;
     let job = conman_db::JobRepo::new(state.db.clone())
         .enqueue(conman_db::EnqueueJobInput {
-            app_id: app_id.clone(),
+            repo_id: repo_id.clone(),
             job_type: JobType::TempEnvExpire,
             entity_type: "temp_environment".to_string(),
             entity_id: temp_env_id,
@@ -252,7 +252,7 @@ pub async fn delete_temp_env(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "temp_environment",
         &temp_env.id,
         "deleted",

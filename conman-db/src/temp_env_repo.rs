@@ -28,15 +28,15 @@ fn readable_slug(uuid: Uuid) -> String {
     format!("{first}-{second}-{suffix}")
 }
 
-fn app_slug_prefix(app_id: &str) -> String {
-    app_id.chars().take(8).collect::<String>()
+fn app_slug_prefix(repo_id: &str) -> String {
+    repo_id.chars().take(8).collect::<String>()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TempEnvDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     kind: TempEnvKind,
     source_id: String,
     owner_user_id: ObjectId,
@@ -63,7 +63,7 @@ impl From<TempEnvDoc> for TempEnvironment {
     fn from(value: TempEnvDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             kind: value.kind,
             source_id: value.source_id,
             owner_user_id: value.owner_user_id.to_hex(),
@@ -85,7 +85,7 @@ impl From<TempEnvDoc> for TempEnvironment {
 
 #[derive(Debug, Clone)]
 pub struct CreateTempEnvInput {
-    pub app_id: String,
+    pub repo_id: String,
     pub kind: TempEnvKind,
     pub source_id: String,
     pub owner_user_id: String,
@@ -107,8 +107,8 @@ impl TempEnvRepo {
     }
 
     pub async fn create(&self, input: CreateTempEnvInput) -> Result<TempEnvironment, ConmanError> {
-        let app_id = ObjectId::parse_str(&input.app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(&input.repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let owner_user_id =
             ObjectId::parse_str(&input.owner_user_id).map_err(|e| ConmanError::Validation {
@@ -141,14 +141,14 @@ impl TempEnvRepo {
         };
         let url = format!(
             "{}-{kind_label}-{short}.{}",
-            app_slug_prefix(&input.app_id),
+            app_slug_prefix(&input.repo_id),
             input.url_domain
         );
-        let db_name = format!("tmp_{}_{}", input.app_id, short);
+        let db_name = format!("tmp_{}_{}", input.repo_id, short);
 
         let row = TempEnvDoc {
             id: ObjectId::new(),
-            app_id,
+            repo_id,
             kind: input.kind,
             source_id: input.source_id,
             owner_user_id,
@@ -174,16 +174,16 @@ impl TempEnvRepo {
         Ok(row.into())
     }
 
-    pub async fn list_by_app(
+    pub async fn list_by_repo(
         &self,
-        app_id: &str,
+        repo_id: &str,
         skip: u64,
         limit: u64,
     ) -> Result<(Vec<TempEnvironment>, u64), ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
-        let filter = doc! {"app_id": app_id};
+        let filter = doc! {"repo_id": repo_id};
         let total = self
             .collection
             .count_documents(filter.clone())
@@ -401,7 +401,7 @@ impl TempEnvRepo {
 impl EnsureIndexes for TempEnvRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
         let by_app = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "created_at": -1})
+            .keys(doc! {"repo_id": 1, "created_at": -1})
             .options(
                 IndexOptions::builder()
                     .name("temp_env_app_created".to_string())
@@ -409,7 +409,7 @@ impl EnsureIndexes for TempEnvRepo {
             )
             .build();
         let by_owner = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "owner_user_id": 1, "state": 1})
+            .keys(doc! {"repo_id": 1, "owner_user_id": 1, "state": 1})
             .options(
                 IndexOptions::builder()
                     .name("temp_env_owner_state".to_string())

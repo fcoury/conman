@@ -59,7 +59,7 @@ pub struct AuditEvent {
 
     /// The app this event belongs to. None for cross-app actions (e.g., user
     /// notification preference changes).
-    pub app_id: Option<String>,
+    pub repo_id: Option<String>,
 
     /// The type of entity affected (e.g., "workspace", "changeset", "release",
     /// "deployment", "temp_environment", "app", "membership", "invite",
@@ -261,7 +261,7 @@ pub trait EmailSender: Send + Sync {
 /// resolve recipients and build template data.
 pub struct NotificationContext {
     /// The app where the event occurred.
-    pub app_id: String,
+    pub repo_id: String,
     pub app_name: String,
 
     /// The user who triggered the event (None for system events).
@@ -375,7 +375,7 @@ impl NotificationService {
             NotificationEvent::ChangesetSubmitted => {
                 self.membership_repo
                     .find_users_with_roles(
-                        &ctx.app_id,
+                        &ctx.repo_id,
                         &["reviewer", "config_manager", "admin"],
                     )
                     .await
@@ -408,7 +408,7 @@ impl NotificationService {
                 let mut recipients = self
                     .membership_repo
                     .find_users_with_roles(
-                        &ctx.app_id,
+                        &ctx.repo_id,
                         &["config_manager", "admin"],
                     )
                     .await?;
@@ -425,7 +425,7 @@ impl NotificationService {
             | NotificationEvent::DeploymentFailed => {
                 self.membership_repo
                     .find_users_with_roles(
-                        &ctx.app_id,
+                        &ctx.repo_id,
                         &["config_manager", "admin"],
                     )
                     .await
@@ -433,7 +433,7 @@ impl NotificationService {
             NotificationEvent::ReleasePublished
             | NotificationEvent::DeploymentSucceeded => {
                 self.membership_repo
-                    .find_all_members(&ctx.app_id)
+                    .find_all_members(&ctx.repo_id)
                     .await
             }
             NotificationEvent::TempEnvExpiryWarning
@@ -586,7 +586,7 @@ impl AuditRepo {
     /// (most recent first).
     pub async fn query(
         &self,
-        app_id: &str,
+        repo_id: &str,
         entity_type: Option<&str>,
         entity_id: Option<&str>,
         action: Option<&str>,
@@ -594,7 +594,7 @@ impl AuditRepo {
         skip: u64,
         limit: i64,
     ) -> Result<(Vec<AuditEvent>, u64), ConmanError> {
-        let mut filter = doc! { "app_id": app_id };
+        let mut filter = doc! { "repo_id": repo_id };
 
         if let Some(et) = entity_type {
             filter.insert("entity_type", et);
@@ -659,7 +659,7 @@ impl EnsureIndexes for AuditRepo {
             // Primary query pattern: audit events for a specific entity within an app.
             IndexModel::builder()
                 .keys(doc! {
-                    "app_id": 1,
+                    "repo_id": 1,
                     "entity_type": 1,
                     "entity_id": 1,
                     "occurred_at": -1,
@@ -678,7 +678,7 @@ impl EnsureIndexes for AuditRepo {
 
             // Filter by app + action (e.g., "all deployments in this app").
             IndexModel::builder()
-                .keys(doc! { "app_id": 1, "action": 1, "occurred_at": -1 })
+                .keys(doc! { "repo_id": 1, "action": 1, "occurred_at": -1 })
                 .build(),
         ];
 
@@ -851,7 +851,7 @@ Append-only. No update or delete operations are permitted on this collection.
 | `_id` | `ObjectId` | Primary key (auto-assigned) |
 | `occurred_at` | `DateTime` | BSON DateTime, when the action happened |
 | `actor_user_id` | `String?` | References `users._id` hex; null for system actions |
-| `app_id` | `String?` | References `apps._id` hex; null for cross-app actions |
+| `repo_id` | `String?` | References `apps._id` hex; null for cross-app actions |
 | `entity_type` | `String` | Category of affected entity |
 | `entity_id` | `String` | ID of the affected entity |
 | `action` | `String` | What was done (see section 6.3 for full list) |
@@ -866,7 +866,7 @@ Append-only. No update or delete operations are permitted on this collection.
 
 ```javascript
 // Entity-scoped query: "all audit events for changeset X in app Y"
-{ "app_id": 1, "entity_type": 1, "entity_id": 1, "occurred_at": -1 }
+{ "repo_id": 1, "entity_type": 1, "entity_id": 1, "occurred_at": -1 }
 
 // Actor query: "what did this user do recently?"
 { "actor_user_id": 1, "occurred_at": -1 }
@@ -875,7 +875,7 @@ Append-only. No update or delete operations are permitted on this collection.
 { "occurred_at": -1 }
 
 // Action filter: "all deployment events in app Y"
-{ "app_id": 1, "action": 1, "occurred_at": -1 }
+{ "repo_id": 1, "action": 1, "occurred_at": -1 }
 ```
 
 **Example document:**
@@ -885,7 +885,7 @@ Append-only. No update or delete operations are permitted on this collection.
   "_id": ObjectId("665a1b2c3d4e5f6a70b09040"),
   "occurred_at": ISODate("2025-07-15T14:32:10Z"),
   "actor_user_id": "664f1a2b3c4d5e6f70809001",
-  "app_id": "664f1a2b3c4d5e6f70809010",
+  "repo_id": "664f1a2b3c4d5e6f70809010",
   "entity_type": "changeset",
   "entity_id": "665a1b2c3d4e5f6a70b09030",
   "action": "submitted",
@@ -907,7 +907,7 @@ Append-only. No update or delete operations are permitted on this collection.
   "_id": ObjectId("665a1b2c3d4e5f6a70b09041"),
   "occurred_at": ISODate("2025-07-16T00:00:05Z"),
   "actor_user_id": null,
-  "app_id": "664f1a2b3c4d5e6f70809010",
+  "repo_id": "664f1a2b3c4d5e6f70809010",
   "entity_type": "temp_environment",
   "entity_id": "665a1b2c3d4e5f6a70b09035",
   "action": "expired",
@@ -1048,7 +1048,7 @@ Update the authenticated user's notification preferences.
 
 ---
 
-### 5.3 `GET /api/repos/:appId/audit?page=&limit=&entity_type=&entity_id=&action=&actor_user_id=`
+### 5.3 `GET /api/repos/:repoId/audit?page=&limit=&entity_type=&entity_id=&action=&actor_user_id=`
 
 Read-only paginated query of the audit log for an app.
 
@@ -1067,7 +1067,7 @@ Read-only paginated query of the audit log for an app.
       "id": "665a1b2c3d4e5f6a70b09040",
       "occurred_at": "2025-07-15T14:32:10Z",
       "actor_user_id": "664f1a2b3c4d5e6f70809001",
-      "app_id": "664f1a2b3c4d5e6f70809010",
+      "repo_id": "664f1a2b3c4d5e6f70809010",
       "entity_type": "changeset",
       "entity_id": "665a1b2c3d4e5f6a70b09030",
       "action": "submitted",
@@ -1172,8 +1172,8 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `workspace` | `created` | `POST /api/teams/:teamId/repos/:appId/workspaces` | E04 |
-| `workspace` | `updated` | `PATCH /api/repos/:appId/workspaces/:workspaceId` | E04 |
+| `workspace` | `created` | `POST /api/teams/:teamId/repos/:repoId/workspaces` | E04 |
+| `workspace` | `updated` | `PATCH /api/repos/:repoId/workspaces/:workspaceId` | E04 |
 | `workspace` | `reset` | `POST .../workspaces/:workspaceId/reset` | E04 |
 | `workspace` | `synced_integration` | `POST .../workspaces/:workspaceId/sync-integration` | E04 |
 
@@ -1189,7 +1189,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `changeset` | `created` | `POST /api/teams/:teamId/repos/:appId/changesets` | E05 |
+| `changeset` | `created` | `POST /api/teams/:teamId/repos/:repoId/changesets` | E05 |
 | `changeset` | `updated` | `PATCH .../changesets/:changesetId` | E05 |
 | `changeset` | `submitted` | `POST .../changesets/:changesetId/submit` | E05 |
 | `changeset` | `resubmitted` | `POST .../changesets/:changesetId/resubmit` | E05 |
@@ -1212,7 +1212,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `release` | `created` | `POST /api/teams/:teamId/repos/:appId/releases` | E08 |
+| `release` | `created` | `POST /api/teams/:teamId/repos/:repoId/releases` | E08 |
 | `release` | `changesets_modified` | `POST .../releases/:releaseId/changesets` | E08 |
 | `release` | `reordered` | `POST .../releases/:releaseId/reorder` | E08 |
 | `release` | `assembled` | `POST .../releases/:releaseId/assemble` | E08 |
@@ -1232,7 +1232,7 @@ mutation.
 
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
-| `temp_environment` | `created` | `POST /api/teams/:teamId/repos/:appId/temp-envs` | E10 |
+| `temp_environment` | `created` | `POST /api/teams/:teamId/repos/:repoId/temp-envs` | E10 |
 | `temp_environment` | `extended` | `POST .../temp-envs/:tempEnvId/extend` | E10 |
 | `temp_environment` | `expired` | TTL cleanup job | E10 |
 | `temp_environment` | `undo_expired` | `POST .../temp-envs/:tempEnvId/undo-expire` | E10 |
@@ -1243,8 +1243,8 @@ mutation.
 | entity_type | action | Handler | Emitting epic |
 |-------------|--------|---------|---------------|
 | `app` | `created` | `POST /api/teams/:teamId/repos` | E03 |
-| `app` | `settings_updated` | `PATCH /api/repos/:appId/settings` | E03 |
-| `app` | `environments_updated` | `PATCH /api/repos/:appId/environments` | E03 |
+| `app` | `settings_updated` | `PATCH /api/repos/:repoId/settings` | E03 |
+| `app` | `environments_updated` | `PATCH /api/repos/:repoId/environments` | E03 |
 
 **Membership and invites:**
 
@@ -1358,7 +1358,7 @@ from MongoDB (audit events and notification preferences) and the email provider.
 - [ ] Add `AuditRepo` to `conman-db` with `ensure_indexes()`
 - [ ] Implement `emit()`: insert-only, fire-and-forget error handling
 - [ ] Implement `query()`: filtered, paginated, ordered by occurred_at desc
-- [ ] Add `GET /api/repos/:appId/audit` handler with RBAC (`admin` only)
+- [ ] Add `GET /api/repos/:repoId/audit` handler with RBAC (`admin` only)
 - [ ] Add pagination and filter support (entity_type, entity_id, action, actor_user_id)
 - [ ] Verify `AuditRepo` has no public update or delete methods (code review gate)
 - [ ] Write unit test: `AuditEvent` serializes to expected JSON shape
@@ -1424,7 +1424,7 @@ from MongoDB (audit events and notification preferences) and the email provider.
 | 27 | Query audit events — action filter | Mix of actions | Filter `action=submitted` returns only submitted events |
 | 28 | Query audit events — pagination | 25 events, page=2, limit=10 | Returns events 11-20, total=25 |
 | 29 | Query audit events — non-admin | User with `user` role | Returns 403 `forbidden` |
-| 30 | Query audit events — unknown app | Non-existent app_id | Returns 404 `not_found` |
+| 30 | Query audit events — unknown app | Non-existent repo_id | Returns 404 `not_found` |
 | 31 | Notification fanout — changeset submitted | Submit changeset, 2 reviewers + 1 admin | 2 emails sent (admin + 1 reviewer; other reviewer is actor) |
 | 32 | Notification fanout — opted-out user | Submit changeset, 1 reviewer opted out | 0 emails to opted-out reviewer |
 | 33 | Notification fanout — deployment failed | Deployment fails, 1 config_manager + 1 admin | 2 emails sent |
@@ -1453,7 +1453,7 @@ from MongoDB (audit events and notification preferences) and the email provider.
   or a default with `email_enabled: true`.
 - [ ] `PATCH /api/me/notification-preferences` toggles the email preference and
   persists the change.
-- [ ] `GET /api/repos/:appId/audit` returns a paginated, filterable, read-only
+- [ ] `GET /api/repos/:repoId/audit` returns a paginated, filterable, read-only
   audit log accessible only to `admin` users.
 - [ ] Every mutation handler in the system (as enumerated in section 6.3) emits
   an `AuditEvent` with correct `entity_type`, `action`, and `before`/`after`

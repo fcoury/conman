@@ -13,7 +13,7 @@ use crate::EnsureIndexes;
 struct CommentDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     changeset_id: ObjectId,
     author_user_id: ObjectId,
     body: String,
@@ -28,7 +28,7 @@ impl From<CommentDoc> for ChangesetComment {
     fn from(value: CommentDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             changeset_id: value.changeset_id.to_hex(),
             author_user_id: value.author_user_id.to_hex(),
             body: value.body,
@@ -53,13 +53,13 @@ impl ChangesetCommentRepo {
 
     pub async fn create(
         &self,
-        app_id: &str,
+        repo_id: &str,
         changeset_id: &str,
         author_user_id: &str,
         body: &str,
     ) -> Result<ChangesetComment, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let changeset_id =
             ObjectId::parse_str(changeset_id).map_err(|e| ConmanError::Validation {
@@ -72,7 +72,7 @@ impl ChangesetCommentRepo {
         let now = Utc::now();
         let doc = CommentDoc {
             id: ObjectId::new(),
-            app_id,
+            repo_id,
             changeset_id,
             author_user_id,
             body: body.to_string(),

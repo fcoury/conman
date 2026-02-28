@@ -13,7 +13,7 @@ use crate::EnsureIndexes;
 struct WorkspaceDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     owner_user_id: ObjectId,
     branch_name: String,
     title: Option<String>,
@@ -31,7 +31,7 @@ impl From<WorkspaceDoc> for Workspace {
     fn from(value: WorkspaceDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             owner_user_id: value.owner_user_id.to_hex(),
             branch_name: value.branch_name,
             title: value.title,
@@ -52,7 +52,7 @@ pub struct WorkspaceRepo {
 
 #[derive(Debug, Clone)]
 pub struct CreateWorkspaceInput {
-    pub app_id: String,
+    pub repo_id: String,
     pub owner_user_id: String,
     pub branch_name: String,
     pub title: Option<String>,
@@ -70,8 +70,8 @@ impl WorkspaceRepo {
     }
 
     pub async fn create(&self, input: CreateWorkspaceInput) -> Result<Workspace, ConmanError> {
-        let app_id = ObjectId::parse_str(&input.app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(&input.repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let owner_user_id =
             ObjectId::parse_str(&input.owner_user_id).map_err(|e| ConmanError::Validation {
@@ -81,7 +81,7 @@ impl WorkspaceRepo {
         let now = Utc::now();
         let doc = WorkspaceDoc {
             id: ObjectId::new(),
-            app_id,
+            repo_id,
             owner_user_id,
             branch_name: input.branch_name,
             title: input.title,
@@ -102,13 +102,13 @@ impl WorkspaceRepo {
         Ok(doc.into())
     }
 
-    pub async fn list_by_app_owner(
+    pub async fn list_by_repo_owner(
         &self,
-        app_id: &str,
+        repo_id: &str,
         owner_user_id: &str,
     ) -> Result<Vec<Workspace>, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let owner_user_id =
             ObjectId::parse_str(owner_user_id).map_err(|e| ConmanError::Validation {
@@ -116,7 +116,7 @@ impl WorkspaceRepo {
             })?;
         let mut cursor = self
             .collection
-            .find(doc! {"app_id": app_id, "owner_user_id": owner_user_id})
+            .find(doc! {"repo_id": repo_id, "owner_user_id": owner_user_id})
             .sort(doc! {"is_default": -1, "updated_at": -1})
             .await
             .map_err(|e| ConmanError::Internal {
@@ -155,11 +155,11 @@ impl WorkspaceRepo {
 
     pub async fn find_default(
         &self,
-        app_id: &str,
+        repo_id: &str,
         owner_user_id: &str,
     ) -> Result<Option<Workspace>, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let owner_user_id =
             ObjectId::parse_str(owner_user_id).map_err(|e| ConmanError::Validation {
@@ -167,7 +167,7 @@ impl WorkspaceRepo {
             })?;
         let row = self
             .collection
-            .find_one(doc! {"app_id": app_id, "owner_user_id": owner_user_id, "is_default": true})
+            .find_one(doc! {"repo_id": repo_id, "owner_user_id": owner_user_id, "is_default": true})
             .await
             .map_err(|e| ConmanError::Internal {
                 message: format!("failed to find default workspace: {e}"),
@@ -232,7 +232,7 @@ impl WorkspaceRepo {
 impl EnsureIndexes for WorkspaceRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
         let uniq_branch = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "owner_user_id": 1, "branch_name": 1})
+            .keys(doc! {"repo_id": 1, "owner_user_id": 1, "branch_name": 1})
             .options(
                 IndexOptions::builder()
                     .name("workspace_app_owner_branch_unique".to_string())
@@ -241,7 +241,7 @@ impl EnsureIndexes for WorkspaceRepo {
             )
             .build();
         let by_owner = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "owner_user_id": 1, "is_default": -1, "updated_at": -1})
+            .keys(doc! {"repo_id": 1, "owner_user_id": 1, "is_default": -1, "updated_at": -1})
             .options(
                 IndexOptions::builder()
                     .name("workspace_app_owner_lookup".to_string())

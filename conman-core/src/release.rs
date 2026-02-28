@@ -16,7 +16,7 @@ pub enum ReleaseState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReleaseBatch {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub tag: String,
     pub state: ReleaseState,
     pub ordered_changeset_ids: Vec<String>,

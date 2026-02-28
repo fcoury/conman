@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Environment {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub name: String,
     pub position: u32,
     pub is_canonical: bool,

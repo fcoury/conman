@@ -36,12 +36,12 @@ pub enum EnvVarValue {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeProfile {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub name: String,
     pub kind: RuntimeProfileKind,
     pub base_url: String,
     #[serde(default)]
-    pub surface_endpoints: BTreeMap<String, String>,
+    pub app_endpoints: BTreeMap<String, String>,
     pub env_vars: BTreeMap<String, EnvVarValue>,
     pub secrets_encrypted: BTreeMap<String, String>,
     pub database_engine: String,

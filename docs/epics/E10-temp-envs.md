@@ -158,7 +158,7 @@ pub struct TempEnvironment {
     pub id: ObjectId,
 
     /// The app this temp environment belongs to.
-    pub app_id: ObjectId,
+    pub repo_id: ObjectId,
 
     /// Whether this environment was created from a workspace or changeset.
     pub kind: TempEnvKind,
@@ -223,7 +223,7 @@ API-facing types, distinct from the domain `TempEnvironment` struct.
 ```rust
 use serde::{Deserialize, Serialize};
 
-/// Request body for `POST /api/repos/:appId/temp-envs`.
+/// Request body for `POST /api/repos/:repoId/temp-envs`.
 ///
 /// Exactly one of `workspace_id` or `changeset_id` must be provided.
 /// The `kind` field is inferred from which ID is present.
@@ -254,7 +254,7 @@ pub struct CreateTempEnvRequest {
 #[derive(Debug, Serialize)]
 pub struct TempEnvResponse {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub workspace_id: Option<String>,
@@ -274,7 +274,7 @@ pub struct TempEnvResponse {
     pub updated_at: String,
 }
 
-/// Request body for `POST /api/repos/:appId/temp-envs/:tempEnvId/extend`.
+/// Request body for `POST /api/repos/:repoId/temp-envs/:tempEnvId/extend`.
 ///
 /// Allows the user to add additional hours to the current TTL.
 /// The extension is capped at 72h total from the original creation time
@@ -299,7 +299,7 @@ impl From<TempEnvironment> for TempEnvResponse {
     fn from(env: TempEnvironment) -> Self {
         Self {
             id: env.id.to_hex(),
-            app_id: env.app_id.to_hex(),
+            repo_id: env.repo_id.to_hex(),
             kind: env.kind.to_string(),
             workspace_id: env.workspace_id.map(|id| id.to_hex()),
             changeset_id: env.changeset_id.map(|id| id.to_hex()),
@@ -328,7 +328,7 @@ Stores one document per temp environment instance.
 | Field | BSON Type | Description |
 |-------|-----------|-------------|
 | `_id` | ObjectId | Primary key |
-| `app_id` | ObjectId | Parent app |
+| `repo_id` | ObjectId | Parent app |
 | `kind` | String | `"workspace"` or `"changeset"` |
 | `workspace_id` | ObjectId / null | Source workspace (when kind = workspace) |
 | `changeset_id` | ObjectId / null | Source changeset (when kind = changeset) |
@@ -376,7 +376,7 @@ impl TempEnvRepo {
 
             // List by app with pagination.
             IndexModel::builder()
-                .keys(doc! { "app_id": 1, "created_at": -1 })
+                .keys(doc! { "repo_id": 1, "created_at": -1 })
                 .options(
                     IndexOptions::builder()
                         .name("idx_app_id_created_at".to_string())
@@ -436,7 +436,7 @@ impl TempEnvRepo {
 ```json
 {
   "_id": { "$oid": "665a1b2c3d4e5f6a7b8c9d0e" },
-  "app_id": { "$oid": "664f0a1b2c3d4e5f6a7b8c9d" },
+  "repo_id": { "$oid": "664f0a1b2c3d4e5f6a7b8c9d" },
   "kind": "workspace",
   "workspace_id": { "$oid": "665012ab3c4d5e6f7a8b9c0d" },
   "changeset_id": null,
@@ -456,7 +456,7 @@ impl TempEnvRepo {
 ```json
 {
   "_id": { "$oid": "665b2c3d4e5f6a7b8c9d0e1f" },
-  "app_id": { "$oid": "664f0a1b2c3d4e5f6a7b8c9d" },
+  "repo_id": { "$oid": "664f0a1b2c3d4e5f6a7b8c9d" },
   "kind": "changeset",
   "workspace_id": null,
   "changeset_id": { "$oid": "665123bc4d5e6f7a8b9c0d1e" },
@@ -476,7 +476,7 @@ impl TempEnvRepo {
 ### 5.1 Create Temp Environment
 
 ```
-POST /api/repos/:appId/temp-envs
+POST /api/repos/:repoId/temp-envs
 ```
 
 **Auth:** Any role (`user`, `reviewer`, `config_manager`, `admin`).
@@ -509,7 +509,7 @@ or:
 {
   "data": {
     "id": "665a1b2c3d4e5f6a7b8c9d0e",
-    "app_id": "664f0a1b2c3d4e5f6a7b8c9d",
+    "repo_id": "664f0a1b2c3d4e5f6a7b8c9d",
     "kind": "workspace",
     "workspace_id": "665012ab3c4d5e6f7a8b9c0d",
     "db_name": "conman_temp_664f0a_665a1b",
@@ -536,7 +536,7 @@ or:
 ### 5.2 List Temp Environments
 
 ```
-GET /api/repos/:appId/temp-envs?page=&limit=
+GET /api/repos/:repoId/temp-envs?page=&limit=
 ```
 
 **Auth:** Any role.
@@ -550,7 +550,7 @@ GET /api/repos/:appId/temp-envs?page=&limit=
   "data": [
     {
       "id": "665a1b2c3d4e5f6a7b8c9d0e",
-      "app_id": "664f0a1b2c3d4e5f6a7b8c9d",
+      "repo_id": "664f0a1b2c3d4e5f6a7b8c9d",
       "kind": "workspace",
       "workspace_id": "665012ab3c4d5e6f7a8b9c0d",
       "db_name": "conman_temp_664f0a_665a1b",
@@ -574,7 +574,7 @@ GET /api/repos/:appId/temp-envs?page=&limit=
 ### 5.3 Extend TTL
 
 ```
-POST /api/repos/:appId/temp-envs/:tempEnvId/extend
+POST /api/repos/:repoId/temp-envs/:tempEnvId/extend
 ```
 
 **Auth:** Any role. The user must be the creator of the temp environment, or
@@ -617,7 +617,7 @@ hold `config_manager`/`admin` role on the app.
 ### 5.4 Undo Expire
 
 ```
-POST /api/repos/:appId/temp-envs/:tempEnvId/undo-expire
+POST /api/repos/:repoId/temp-envs/:tempEnvId/undo-expire
 ```
 
 **Auth:** Same as extend (creator, `config_manager`, or `admin`).
@@ -654,7 +654,7 @@ POST /api/repos/:appId/temp-envs/:tempEnvId/undo-expire
 ### 5.5 Delete Temp Environment
 
 ```
-DELETE /api/repos/:appId/temp-envs/:tempEnvId
+DELETE /api/repos/:repoId/temp-envs/:tempEnvId
 ```
 
 **Auth:** Creator, `config_manager`, or `admin`.
@@ -681,7 +681,7 @@ When a user requests a temp environment, the handler performs synchronous
 validation and inserts a document in `Provisioning` state. A
 `temp_env_provision` async job is enqueued to perform the heavy lifting:
 
-1. **Generate database name:** `conman_temp_{app_id[0..6]}_{temp_env_id[0..6]}`.
+1. **Generate database name:** `conman_temp_{repo_id[0..6]}_{temp_env_id[0..6]}`.
 2. **Create the isolated MongoDB database** by writing an init document (the
    MongoDB driver creates databases lazily on first write).
 3. **If workspace kind:** Copy the workspace's current file tree into the
@@ -1106,13 +1106,13 @@ run test (passes), commit.
   `From<TempEnvironment>` conversion. Write unit tests for serialization and
   validation (e.g., mutually exclusive workspace_id/changeset_id).
 
-- [ ] **E10-S04** -- Implement `POST /api/repos/:appId/temp-envs` handler.
+- [ ] **E10-S04** -- Implement `POST /api/repos/:repoId/temp-envs` handler.
   Validate input, check for existing active temp env, insert document, enqueue
   `temp_env_provision` job, emit audit event, return 201.
   Write integration tests: happy path (workspace), happy path (changeset),
   missing both IDs (400), duplicate active env (409), nonexistent source (404).
 
-- [ ] **E10-S05** -- Implement `GET /api/repos/:appId/temp-envs` handler.
+- [ ] **E10-S05** -- Implement `GET /api/repos/:repoId/temp-envs` handler.
   Query with pagination, exclude deleted. Write integration tests: empty list,
   populated list, pagination boundaries.
 
@@ -1540,9 +1540,9 @@ async fn touch_activity_extends_expiry() {
 ## 10. Acceptance Criteria
 
 1. **Temp environments can be created on demand from a workspace or changeset.**
-   - `POST /api/repos/:appId/temp-envs` with `workspace_id` creates a workspace
+   - `POST /api/repos/:repoId/temp-envs` with `workspace_id` creates a workspace
      temp env in `Provisioning` state and returns 201.
-   - `POST /api/repos/:appId/temp-envs` with `changeset_id` creates a changeset
+   - `POST /api/repos/:repoId/temp-envs` with `changeset_id` creates a changeset
      temp env in `Provisioning` state and returns 201.
    - The provisioning job creates an isolated database and (for workspace kind)
      a snapshot Git branch, then transitions state to `Active`.
@@ -1585,7 +1585,7 @@ async fn touch_activity_extends_expiry() {
    - Notifications respect the per-user toggle (E11).
 
 7. **Explicit delete tears down immediately.**
-   - `DELETE /api/repos/:appId/temp-envs/:tempEnvId` transitions state to
+   - `DELETE /api/repos/:repoId/temp-envs/:tempEnvId` transitions state to
      `Deleted` and enqueues a cleanup job.
    - Allowed from `Active` or `Expiring` state.
    - Returns 204 on success.

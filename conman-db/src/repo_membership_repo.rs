@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use conman_core::{AppMembership, ConmanError, Role};
+use conman_core::{RepoMembership, ConmanError, Role};
 use mongodb::{
     Collection, Database, IndexModel,
     bson::{doc, oid::ObjectId},
@@ -12,22 +12,22 @@ use serde::{Deserialize, Serialize};
 use crate::EnsureIndexes;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct MembershipDoc {
+struct RepoMembershipDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
     user_id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     role: Role,
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
 }
 
-impl From<MembershipDoc> for AppMembership {
-    fn from(value: MembershipDoc) -> Self {
+impl From<RepoMembershipDoc> for RepoMembership {
+    fn from(value: RepoMembershipDoc) -> Self {
         Self {
             id: value.id.to_hex(),
             user_id: value.user_id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             role: value.role,
             created_at: value.created_at,
         }
@@ -35,34 +35,34 @@ impl From<MembershipDoc> for AppMembership {
 }
 
 #[derive(Clone)]
-pub struct MembershipRepo {
-    collection: Collection<MembershipDoc>,
+pub struct RepoMembershipRepo {
+    collection: Collection<RepoMembershipDoc>,
 }
 
-impl MembershipRepo {
+impl RepoMembershipRepo {
     pub fn new(db: Database) -> Self {
         Self {
-            collection: db.collection("app_memberships"),
+            collection: db.collection("repo_memberships"),
         }
     }
 
     pub async fn insert(
         &self,
         user_id: &str,
-        app_id: &str,
+        repo_id: &str,
         role: Role,
-    ) -> Result<AppMembership, ConmanError> {
+    ) -> Result<RepoMembership, ConmanError> {
         let user_id = ObjectId::parse_str(user_id).map_err(|e| ConmanError::Validation {
             message: format!("invalid user_id: {e}"),
         })?;
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
 
-        let doc = MembershipDoc {
+        let doc = RepoMembershipDoc {
             id: ObjectId::new(),
             user_id,
-            app_id,
+            repo_id,
             role,
             created_at: Utc::now(),
         };
@@ -97,36 +97,36 @@ impl MembershipRepo {
         while cursor.advance().await.map_err(|e| ConmanError::Internal {
             message: format!("membership cursor error: {e}"),
         })? {
-            let doc: MembershipDoc =
+            let doc: RepoMembershipDoc =
                 cursor
                     .deserialize_current()
                     .map_err(|e| ConmanError::Internal {
                         message: format!("failed to deserialize membership: {e}"),
                     })?;
-            roles.insert(doc.app_id.to_hex(), doc.role);
+            roles.insert(doc.repo_id.to_hex(), doc.role);
         }
 
         Ok(roles)
     }
 
-    pub async fn list_by_app_id(&self, app_id: &str) -> Result<Vec<AppMembership>, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+    pub async fn list_by_repo_id(&self, repo_id: &str) -> Result<Vec<RepoMembership>, ConmanError> {
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
 
         let mut cursor = self
             .collection
-            .find(doc! {"app_id": app_id})
+            .find(doc! {"repo_id": repo_id})
             .await
             .map_err(|e| ConmanError::Internal {
-                message: format!("failed to query app memberships: {e}"),
+                message: format!("failed to query repo memberships: {e}"),
             })?;
 
         let mut rows = Vec::new();
         while cursor.advance().await.map_err(|e| ConmanError::Internal {
             message: format!("membership cursor error: {e}"),
         })? {
-            let doc: MembershipDoc =
+            let doc: RepoMembershipDoc =
                 cursor
                     .deserialize_current()
                     .map_err(|e| ConmanError::Internal {
@@ -140,17 +140,17 @@ impl MembershipRepo {
     pub async fn assign_role(
         &self,
         user_id: &str,
-        app_id: &str,
+        repo_id: &str,
         role: Role,
-    ) -> Result<AppMembership, ConmanError> {
+    ) -> Result<RepoMembership, ConmanError> {
         let user_id = ObjectId::parse_str(user_id).map_err(|e| ConmanError::Validation {
             message: format!("invalid user_id: {e}"),
         })?;
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
 
-        let filter = doc! {"user_id": user_id, "app_id": app_id};
+        let filter = doc! {"user_id": user_id, "repo_id": repo_id};
         let existing = self
             .collection
             .find_one(filter.clone())
@@ -170,28 +170,28 @@ impl MembershipRepo {
                     message: format!("failed to update membership role: {e}"),
                 })?;
 
-            return Ok(AppMembership {
+            return Ok(RepoMembership {
                 id: existing.id.to_hex(),
                 user_id: user_id.to_hex(),
-                app_id: app_id.to_hex(),
+                repo_id: repo_id.to_hex(),
                 role,
                 created_at: existing.created_at,
             });
         }
 
-        self.insert(&user_id.to_hex(), &app_id.to_hex(), role).await
+        self.insert(&user_id.to_hex(), &repo_id.to_hex(), role).await
     }
 }
 
 #[async_trait::async_trait]
-impl EnsureIndexes for MembershipRepo {
+impl EnsureIndexes for RepoMembershipRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
         let unique = IndexModel::builder()
-            .keys(doc! {"user_id": 1, "app_id": 1})
+            .keys(doc! {"user_id": 1, "repo_id": 1})
             .options(
                 IndexOptions::builder()
                     .unique(true)
-                    .name("membership_user_app_unique".to_string())
+                    .name("membership_user_repo_unique".to_string())
                     .build(),
             )
             .build();
@@ -203,17 +203,17 @@ impl EnsureIndexes for MembershipRepo {
                     .build(),
             )
             .build();
-        let by_app = IndexModel::builder()
-            .keys(doc! {"app_id": 1})
+        let by_repo = IndexModel::builder()
+            .keys(doc! {"repo_id": 1})
             .options(
                 IndexOptions::builder()
-                    .name("membership_app".to_string())
+                    .name("repo_membership_repo".to_string())
                     .build(),
             )
             .build();
 
         self.collection
-            .create_indexes(vec![unique, by_user, by_app])
+            .create_indexes(vec![unique, by_user, by_repo])
             .await
             .map_err(|e| ConmanError::Internal {
                 message: format!("failed to ensure membership indexes: {e}"),

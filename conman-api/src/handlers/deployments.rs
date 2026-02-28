@@ -60,7 +60,7 @@ fn role_is_privileged_for_exceptional(role: Role) -> bool {
 
 async fn validate_exceptional_approvals(
     state: &AppState,
-    app_id: &str,
+    repo_id: &str,
     is_skip_stage: bool,
     is_concurrent_batch: bool,
     approvals: &[String],
@@ -76,17 +76,17 @@ async fn validate_exceptional_approvals(
         });
     }
 
-    let membership_repo = conman_db::MembershipRepo::new(state.db.clone());
+    let repo_membership_repo = conman_db::RepoMembershipRepo::new(state.db.clone());
     let mut has_privileged_approver = false;
     for approver_user_id in unique {
-        let roles = membership_repo
+        let roles = repo_membership_repo
             .find_roles_by_user_id(&approver_user_id)
             .await?;
         let role = roles
-            .get(app_id)
+            .get(repo_id)
             .copied()
             .ok_or_else(|| ConmanError::Validation {
-                message: format!("approver {approver_user_id} is not a member of app {app_id}"),
+                message: format!("approver {approver_user_id} is not a member of app {repo_id}"),
             })?;
         if !role_can_approve_exceptional(role) {
             return Err(ConmanError::Validation {
@@ -109,14 +109,14 @@ async fn validate_exceptional_approvals(
 
 async fn enqueue_deploy_job(
     state: &AppState,
-    app_id: &str,
+    repo_id: &str,
     deployment_id: &str,
     payload: serde_json::Value,
     actor: &str,
 ) -> Result<Job, ConmanError> {
     conman_db::JobRepo::new(state.db.clone())
         .enqueue(conman_db::EnqueueJobInput {
-            app_id: app_id.to_string(),
+            repo_id: repo_id.to_string(),
             job_type: JobType::DeployRelease,
             entity_type: "deployment".to_string(),
             entity_id: deployment_id.to_string(),
@@ -131,14 +131,14 @@ async fn enqueue_deploy_job(
 pub async fn deploy_environment(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, env_id)): Path<(String, String)>,
+    Path((repo_id, env_id)): Path<(String, String)>,
     Json(req): Json<DeployRequest>,
 ) -> Result<Json<ApiResponse<DeploymentEnqueueResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::ConfigManager)?;
+    auth.require_role(&repo_id, Role::ConfigManager)?;
     counter!(DEPLOYMENTS_TOTAL, "action" => "deploy").increment(1);
     validate_exceptional_approvals(
         &state,
-        &app_id,
+        &repo_id,
         req.is_skip_stage,
         req.is_concurrent_batch,
         &req.approvals,
@@ -151,7 +151,7 @@ pub async fn deploy_environment(
             entity: "release",
             id: req.release_id.clone(),
         })?;
-    if release.app_id != app_id || release.state != ReleaseState::Published {
+    if release.repo_id != repo_id || release.state != ReleaseState::Published {
         return Err(ConmanError::Conflict {
             message: "release must be published before deployment".to_string(),
         }
@@ -161,7 +161,7 @@ pub async fn deploy_environment(
     let job_repo = conman_db::JobRepo::new(state.db.clone());
     let drift_gate = job_repo
         .latest_for_entity(
-            &app_id,
+            &repo_id,
             "environment",
             &env_id,
             JobType::RuntimeProfileDriftCheck,
@@ -184,7 +184,7 @@ pub async fn deploy_environment(
         None => {
             let job = job_repo
                 .enqueue(conman_db::EnqueueJobInput {
-                    app_id: app_id.clone(),
+                    repo_id: repo_id.clone(),
                     job_type: JobType::RuntimeProfileDriftCheck,
                     entity_type: "environment".to_string(),
                     entity_id: env_id.clone(),
@@ -210,7 +210,7 @@ pub async fn deploy_environment(
 
     let deploy_gate = job_repo
         .latest_for_entity(
-            &app_id,
+            &repo_id,
             "environment_release",
             &format!("{env_id}:{}", req.release_id),
             JobType::MsuiteDeploy,
@@ -233,7 +233,7 @@ pub async fn deploy_environment(
         None => {
             let job = job_repo
                 .enqueue(conman_db::EnqueueJobInput {
-                    app_id: app_id.clone(),
+                    repo_id: repo_id.clone(),
                     job_type: JobType::MsuiteDeploy,
                     entity_type: "environment_release".to_string(),
                     entity_id: format!("{env_id}:{}", req.release_id),
@@ -259,7 +259,7 @@ pub async fn deploy_environment(
 
     let deployment = conman_db::DeploymentRepo::new(state.db.clone())
         .create(conman_db::CreateDeploymentInput {
-            app_id: app_id.clone(),
+            repo_id: repo_id.clone(),
             environment_id: env_id.clone(),
             release_id: req.release_id.clone(),
             is_skip_stage: req.is_skip_stage,
@@ -271,7 +271,7 @@ pub async fn deploy_environment(
 
     let job = enqueue_deploy_job(
         &state,
-        &app_id,
+        &repo_id,
         &deployment.id,
         serde_json::json!({
             "environment_id": env_id,
@@ -289,7 +289,7 @@ pub async fn deploy_environment(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "deployment",
         &deployment.id,
         "created",
@@ -304,7 +304,7 @@ pub async fn deploy_environment(
     if let Err(err) = emit_notification(
         &state,
         &auth.user_id,
-        Some(&app_id),
+        Some(&repo_id),
         "deployment_started",
         "Deployment started",
         &format!(
@@ -326,13 +326,13 @@ pub async fn deploy_environment(
 pub async fn promote_environment(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, env_id)): Path<(String, String)>,
+    Path((repo_id, env_id)): Path<(String, String)>,
     Json(req): Json<DeployRequest>,
 ) -> Result<Json<ApiResponse<DeploymentEnqueueResponse>>, ApiConmanError> {
     deploy_environment(
         State(state),
         Extension(auth),
-        Path((app_id, env_id)),
+        Path((repo_id, env_id)),
         Json(DeployRequest {
             release_id: req.release_id,
             is_skip_stage: req.is_skip_stage,
@@ -346,12 +346,12 @@ pub async fn promote_environment(
 pub async fn rollback_environment(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, env_id)): Path<(String, String)>,
+    Path((repo_id, env_id)): Path<(String, String)>,
     Json(req): Json<RollbackRequest>,
 ) -> Result<Json<ApiResponse<DeploymentEnqueueResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::ConfigManager)?;
+    auth.require_role(&repo_id, Role::ConfigManager)?;
     counter!(DEPLOYMENTS_TOTAL, "action" => "rollback").increment(1);
-    validate_exceptional_approvals(&state, &app_id, true, false, &req.approvals).await?;
+    validate_exceptional_approvals(&state, &repo_id, true, false, &req.approvals).await?;
     let release = conman_db::ReleaseRepo::new(state.db.clone())
         .find_by_id(&req.release_id)
         .await?
@@ -359,7 +359,7 @@ pub async fn rollback_environment(
             entity: "release",
             id: req.release_id.clone(),
         })?;
-    if release.app_id != app_id || release.state != ReleaseState::Published {
+    if release.repo_id != repo_id || release.state != ReleaseState::Published {
         return Err(ConmanError::Conflict {
             message: "rollback requires a published release".to_string(),
         }
@@ -367,7 +367,7 @@ pub async fn rollback_environment(
     }
     let deployment = conman_db::DeploymentRepo::new(state.db.clone())
         .create(conman_db::CreateDeploymentInput {
-            app_id: app_id.clone(),
+            repo_id: repo_id.clone(),
             environment_id: env_id.clone(),
             release_id: req.release_id.clone(),
             is_skip_stage: true,
@@ -378,7 +378,7 @@ pub async fn rollback_environment(
         .await?;
     let job = enqueue_deploy_job(
         &state,
-        &app_id,
+        &repo_id,
         &deployment.id,
         serde_json::json!({
             "environment_id": env_id,
@@ -395,7 +395,7 @@ pub async fn rollback_environment(
     if let Err(err) = emit_audit(
         &state,
         Some(&auth.user_id),
-        Some(&app_id),
+        Some(&repo_id),
         "deployment",
         &deployment.id,
         "rollback_started",
@@ -416,13 +416,13 @@ pub async fn rollback_environment(
 pub async fn list_deployments(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<ApiResponse<Vec<Deployment>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let pagination = pagination.validate()?;
     let (rows, total) = conman_db::DeploymentRepo::new(state.db.clone())
-        .list_by_app(&app_id, pagination.skip(), pagination.limit)
+        .list_by_repo(&repo_id, pagination.skip(), pagination.limit)
         .await?;
     Ok(Json(ApiResponse::paginated(
         rows,

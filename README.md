@@ -25,6 +25,7 @@ plan are documented and continuously refined in `docs/`.
 ## Source of Truth
 
 - Scope: [docs/conman-v1-scope.md](docs/conman-v1-scope.md)
+- Entity diagram: [docs/entity-relationship-diagram.md](docs/entity-relationship-diagram.md)
 - Implementation guide: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 - Backlog: [docs/conman-v1-backlog.md](docs/conman-v1-backlog.md)
 - Runtime profiles draft: [docs/runtime-profiles-draft.md](docs/runtime-profiles-draft.md)

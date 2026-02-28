@@ -15,7 +15,7 @@ struct NotificationDoc {
     id: ObjectId,
     user_id: ObjectId,
     recipient_email: String,
-    app_id: Option<ObjectId>,
+    repo_id: Option<ObjectId>,
     event_type: String,
     subject: String,
     body: String,
@@ -33,7 +33,7 @@ impl From<NotificationDoc> for NotificationEvent {
             id: value.id.to_hex(),
             user_id: value.user_id.to_hex(),
             recipient_email: value.recipient_email,
-            app_id: value.app_id.map(|v| v.to_hex()),
+            repo_id: value.repo_id.map(|v| v.to_hex()),
             event_type: value.event_type,
             subject: value.subject,
             body: value.body,
@@ -61,7 +61,7 @@ impl NotificationEventRepo {
         &self,
         user_id: &str,
         recipient_email: &str,
-        app_id: Option<&str>,
+        repo_id: Option<&str>,
         event_type: &str,
         subject: &str,
         body: &str,
@@ -69,19 +69,19 @@ impl NotificationEventRepo {
         let user_id = ObjectId::parse_str(user_id).map_err(|e| ConmanError::Validation {
             message: format!("invalid user_id: {e}"),
         })?;
-        let app_id =
-            app_id
+        let repo_id =
+            repo_id
                 .map(ObjectId::parse_str)
                 .transpose()
                 .map_err(|e| ConmanError::Validation {
-                    message: format!("invalid app_id: {e}"),
+                    message: format!("invalid repo_id: {e}"),
                 })?;
         let now = Utc::now();
         let row = NotificationDoc {
             id: ObjectId::new(),
             user_id,
             recipient_email: recipient_email.to_string(),
-            app_id,
+            repo_id,
             event_type: event_type.to_string(),
             subject: subject.to_string(),
             body: body.to_string(),

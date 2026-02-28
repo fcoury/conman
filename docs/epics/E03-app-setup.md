@@ -7,14 +7,14 @@ pipeline metadata, and membership listing/role assignment. After this epic, an
 authenticated admin can create a team, create a repository under that
 team, define apps, configure baseline mode, define the environment
 promotion pipeline, and manage team membership. This epic also establishes
-runtime profiles (including per-surface endpoints) and links them to
+runtime profiles (including per-app endpoints) and links them to
 environments.
 
 **Issues:**
 
 - E03-01: `teams` create/list/get.
 - E03-02: `repos` create under team + list/get.
-- E03-03: `app_surfaces` create/list/update per repository app.
+- E03-03: `apps` create/list/update per repository app.
 - E03-04: Settings API for baseline mode, canonical env, commit mode default,
   blocked paths, file size limit.
 - E03-05: Environment stage CRUD with canonical user-facing environment flag.
@@ -23,7 +23,7 @@ environments.
   profile approval policy settings.
 - E03-08: Runtime profile typed env-var validation + secret visibility policy
   (`admin` reveal, others masked).
-- E03-09: Runtime profile `surface_endpoints` validation against app
+- E03-09: Runtime profile `app_endpoints` validation against app
   keys.
 - E03-10: Direct app-admin runtime profile emergency edits (audited).
 
@@ -81,7 +81,7 @@ impl Default for CommitMode {
 
 /// App-level settings that control workspace and changeset behavior.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppSettings {
+pub struct RepoSettings {
     pub baseline_mode: BaselineMode,
     /// References an Environment id. None until first environment is created.
     pub canonical_env_id: Option<String>,
@@ -92,7 +92,7 @@ pub struct AppSettings {
     pub file_size_limit_bytes: u64,
 }
 
-impl Default for AppSettings {
+impl Default for RepoSettings {
     fn default() -> Self {
         Self {
             baseline_mode: BaselineMode::default(),
@@ -122,7 +122,7 @@ pub struct App {
     /// Integration branch name. Defaults to "main" in v1.
     pub integration_branch: String,
     /// Embedded settings document.
-    pub settings: AppSettings,
+    pub settings: RepoSettings,
     /// User who created the app.
     pub created_by: String,
     pub created_at: DateTime<Utc>,
@@ -156,12 +156,12 @@ pub enum EnvVarValue {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeProfile {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub name: String,
     pub kind: RuntimeProfileKind,
     pub base_url: String,
-    /// App-surface endpoint map (surface_key -> base URL).
-    pub surface_endpoints: std::collections::BTreeMap<String, String>,
+    /// App endpoint map (app_key -> base URL).
+    pub app_endpoints: std::collections::BTreeMap<String, String>,
     pub env_vars: std::collections::BTreeMap<String, EnvVarValue>,
     pub secrets_encrypted: std::collections::BTreeMap<String, String>,
     pub database_engine: String, // mongodb in v1
@@ -187,7 +187,7 @@ use serde::{Deserialize, Serialize};
 pub struct Environment {
     /// MongoDB ObjectId hex string.
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     /// Unique within the app (e.g. "Development", "QA", "UAT", "Production").
     pub name: String,
     /// 0-based position in the promotion pipeline.
@@ -279,7 +279,7 @@ pub struct EnvironmentEntry {
 #[derive(Debug, Serialize)]
 pub struct EnvironmentResponse {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub name: String,
     pub position: u32,
     pub is_canonical: bool,
@@ -360,7 +360,7 @@ pub struct UpdateMemberRoleRequest {
 | Field | Type | Description |
 |-------|------|-------------|
 | `_id` | `ObjectId` | Primary key |
-| `app_id` | `ObjectId` | References `apps._id` |
+| `repo_id` | `ObjectId` | References `apps._id` |
 | `name` | `String` | Stage name, unique within app |
 | `position` | `i32` | 0-based pipeline order, unique within app |
 | `is_canonical` | `bool` | At most one per app is `true` |
@@ -371,13 +371,13 @@ pub struct UpdateMemberRoleRequest {
 
 ```javascript
 // Unique environment name per app
-{ "app_id": 1, "name": 1 }  // unique: true
+{ "repo_id": 1, "name": 1 }  // unique: true
 
 // Unique position per app
-{ "app_id": 1, "position": 1 }  // unique: true
+{ "repo_id": 1, "position": 1 }  // unique: true
 
 // Canonical lookup (partial index: only where is_canonical == true)
-{ "app_id": 1, "is_canonical": 1 }  // partialFilterExpression: { "is_canonical": true }, unique: true
+{ "repo_id": 1, "is_canonical": 1 }  // partialFilterExpression: { "is_canonical": true }, unique: true
 ```
 
 **Example document:**
@@ -385,7 +385,7 @@ pub struct UpdateMemberRoleRequest {
 ```json
 {
   "_id": ObjectId("664f1a2b3c4d5e6f70809020"),
-  "app_id": ObjectId("664f1a2b3c4d5e6f70809010"),
+  "repo_id": ObjectId("664f1a2b3c4d5e6f70809010"),
   "name": "Production",
   "position": 3,
   "is_canonical": true,
@@ -494,7 +494,7 @@ Create a new app and register its Git repository.
 1. Verify repo exists via gitaly `RepositoryExists`. If not, create it via
    `CreateRepository` with `default_branch = app.integration_branch`.
 2. Insert `apps` document with default settings.
-3. Insert `app_memberships` record: caller as `admin`.
+3. Insert `repo_memberships` record: caller as `admin`.
 4. Insert default environment pipeline: Development (0), QA (1), UAT (2),
    Production (3, `is_canonical: true`).
 5. Set `settings.canonical_env_id` to the Production environment id.
@@ -510,7 +510,7 @@ Create a new app and register its Git repository.
 
 ---
 
-### 5.3 `GET /api/repos/:appId`
+### 5.3 `GET /api/repos/:repoId`
 
 Get a single app by id.
 
@@ -532,7 +532,7 @@ Same shape as individual item in `GET /api/repos` list.
 
 ---
 
-### 5.4 `PATCH /api/repos/:appId/settings`
+### 5.4 `PATCH /api/repos/:repoId/settings`
 
 Update app settings. Partial update — only supplied fields are changed.
 
@@ -564,7 +564,7 @@ Update app settings. Partial update — only supplied fields are changed.
 
 **Response 200:**
 
-Full updated app object (same shape as `GET /api/repos/:appId`).
+Full updated app object (same shape as `GET /api/repos/:repoId`).
 
 **Side effects:**
 
@@ -580,7 +580,7 @@ Full updated app object (same shape as `GET /api/repos/:appId`).
 
 ---
 
-### 5.5 `GET /api/repos/:appId/environments`
+### 5.5 `GET /api/repos/:repoId/environments`
 
 List environments for an app, ordered by position.
 
@@ -596,7 +596,7 @@ List environments for an app, ordered by position.
   "data": [
     {
       "id": "664f1a2b3c4d5e6f70809021",
-      "app_id": "664f1a2b3c4d5e6f70809010",
+      "repo_id": "664f1a2b3c4d5e6f70809010",
       "name": "Development",
       "position": 0,
       "is_canonical": false,
@@ -605,7 +605,7 @@ List environments for an app, ordered by position.
     },
     {
       "id": "664f1a2b3c4d5e6f70809022",
-      "app_id": "664f1a2b3c4d5e6f70809010",
+      "repo_id": "664f1a2b3c4d5e6f70809010",
       "name": "QA",
       "position": 1,
       "is_canonical": false,
@@ -614,7 +614,7 @@ List environments for an app, ordered by position.
     },
     {
       "id": "664f1a2b3c4d5e6f70809023",
-      "app_id": "664f1a2b3c4d5e6f70809010",
+      "repo_id": "664f1a2b3c4d5e6f70809010",
       "name": "UAT",
       "position": 2,
       "is_canonical": false,
@@ -623,7 +623,7 @@ List environments for an app, ordered by position.
     },
     {
       "id": "664f1a2b3c4d5e6f70809020",
-      "app_id": "664f1a2b3c4d5e6f70809010",
+      "repo_id": "664f1a2b3c4d5e6f70809010",
       "name": "Production",
       "position": 3,
       "is_canonical": true,
@@ -643,7 +643,7 @@ List environments for an app, ordered by position.
 
 ---
 
-### 5.6 `PATCH /api/repos/:appId/environments`
+### 5.6 `PATCH /api/repos/:repoId/environments`
 
 Replace the full environment pipeline. Supports add, rename, reorder, remove,
 and canonical flag reassignment in a single atomic operation.
@@ -699,7 +699,7 @@ Full list of environments after update (same shape as `GET .../environments`).
 
 ---
 
-### 5.7 `GET /api/repos/:appId/members?page=&limit=`
+### 5.7 `GET /api/repos/:repoId/members?page=&limit=`
 
 List members of an app with their roles.
 
@@ -769,7 +769,7 @@ List members of an app with their roles.
 ```
 1. Validate each supplied field.
 2. If canonical_env_id is supplied:
-   a. Query environments collection for that id + this app_id.
+   a. Query environments collection for that id + this repo_id.
    b. If not found → return NotFound.
 3. If baseline_mode is supplied:
    a. Validate enum variant.
@@ -989,15 +989,15 @@ impl GitalyClient {
 
 ### E03-02: App model
 
-- [ ] Add `AppSurface` model and `AppSurfaceRepo` (`repo_id + key` unique).
-- [ ] Add `GET/POST /api/teams/:teamId/repos/:appId/apps` and
-  `PATCH /api/repos/:appId/apps/:surfaceId` handlers.
+- [ ] Add `App` model and `AppRepo` (`repo_id + key` unique).
+- [ ] Add `GET/POST /api/teams/:teamId/repos/:repoId/apps` and
+  `PATCH /api/repos/:repoId/apps/:appId` handlers.
 - [ ] Enforce `surface.key` validation and repo ownership checks.
 - [ ] Emit audit events for surface create/update.
 
 ### E03-03: Repository settings API
 
-- [ ] Add `PATCH /api/repos/:appId/settings` handler.
+- [ ] Add `PATCH /api/repos/:repoId/settings` handler.
 - [ ] Validate `canonical_env_id` references an existing environment in this
   repository.
 - [ ] Validate `baseline_mode` + `canonical_env_id` consistency.
@@ -1006,19 +1006,19 @@ impl GitalyClient {
 
 ### E03-04: Environment stage CRUD
 
-- [ ] Add/maintain `Environment` repo with unique `(app_id, name)` and
-  `(app_id, position)` indexes.
-- [ ] Add `GET /api/repos/:appId/environments`.
-- [ ] Add `PATCH /api/repos/:appId/environments` (full replacement).
+- [ ] Add/maintain `Environment` repo with unique `(repo_id, name)` and
+  `(repo_id, position)` indexes.
+- [ ] Add `GET /api/repos/:repoId/environments`.
+- [ ] Add `PATCH /api/repos/:repoId/environments` (full replacement).
 - [ ] Validate contiguous positions, unique names, exactly one canonical env.
 - [ ] Auto-update `app.settings.canonical_env_id` on canonical changes.
 
 ### E03-05: Membership and runtime profiles
 
-- [ ] Add `GET /api/repos/:appId/members` and member assignment APIs.
+- [ ] Add `GET /api/repos/:repoId/members` and member assignment APIs.
 - [ ] Add runtime profile CRUD/revision APIs with typed env vars and masked
   secret previews.
-- [ ] Validate runtime profile `surface_endpoints` keys against existing app
+- [ ] Validate runtime profile `app_endpoints` keys against existing app
   surfaces.
 - [ ] Add app-admin secret reveal endpoint and direct emergency profile-edit
   audit path.
@@ -1033,8 +1033,8 @@ impl GitalyClient {
 |---|------|-----------|
 | 1 | `BaselineMode::default()` | Returns `CanonicalEnvRelease` |
 | 2 | `CommitMode::default()` | Returns `SubmitCommit` |
-| 3 | `AppSettings::default()` blocked_paths | Contains `.git/**`, `.gitignore`, `.github/**` |
-| 4 | `AppSettings::default()` file_size_limit | Equals 5242880 |
+| 3 | `RepoSettings::default()` blocked_paths | Contains `.git/**`, `.gitignore`, `.github/**` |
+| 4 | `RepoSettings::default()` file_size_limit | Equals 5242880 |
 | 5 | Validate app name with special chars | Rejects names with spaces, `@`, `/` |
 | 6 | Validate app name within length | Accepts 1-128 alphanumeric + hyphen + underscore |
 | 7 | Validate file_size_limit_bytes = 0 | Returns Validation error |

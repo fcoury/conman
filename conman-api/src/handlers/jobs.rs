@@ -19,13 +19,13 @@ pub struct JobDetailResponse {
 pub async fn list_jobs(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path(app_id): Path<String>,
+    Path(repo_id): Path<String>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<ApiResponse<Vec<Job>>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let pagination = pagination.validate()?;
     let (jobs, total) = conman_db::JobRepo::new(state.db.clone())
-        .list_by_app(&app_id, pagination.skip(), pagination.limit)
+        .list_by_repo(&repo_id, pagination.skip(), pagination.limit)
         .await?;
     Ok(Json(ApiResponse::paginated(
         jobs,
@@ -38,9 +38,9 @@ pub async fn list_jobs(
 pub async fn get_job(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
-    Path((app_id, job_id)): Path<(String, String)>,
+    Path((repo_id, job_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<JobDetailResponse>>, ApiConmanError> {
-    auth.require_role(&app_id, Role::Member)?;
+    auth.require_role(&repo_id, Role::Member)?;
     let repo = conman_db::JobRepo::new(state.db.clone());
     let job = repo
         .get(&job_id)
@@ -49,7 +49,7 @@ pub async fn get_job(
             entity: "job",
             id: job_id.clone(),
         })?;
-    if job.app_id != app_id {
+    if job.repo_id != repo_id {
         return Err(ConmanError::Forbidden {
             message: "job does not belong to app".to_string(),
         }

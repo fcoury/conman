@@ -84,7 +84,7 @@ pub struct Job {
     pub id: String,
 
     /// App this job belongs to.
-    pub app_id: String,
+    pub repo_id: String,
 
     /// What kind of work this job performs.
     pub job_type: JobType,
@@ -359,11 +359,11 @@ use conman_core::{JobType, JobState, LogLevel};
 
 // ── API Response DTOs ───────────────────────────────────────────────────
 
-/// GET /api/repos/:appId/jobs/:jobId response body.
+/// GET /api/repos/:repoId/jobs/:jobId response body.
 #[derive(Debug, Serialize)]
 pub struct JobResponse {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub job_type: JobType,
     pub state: JobState,
     pub entity_type: String,
@@ -390,7 +390,7 @@ pub struct JobLogResponse {
     pub timestamp: DateTime<Utc>,
 }
 
-/// Query parameters for GET /api/repos/:appId/jobs
+/// Query parameters for GET /api/repos/:repoId/jobs
 #[derive(Debug, Deserialize)]
 pub struct ListJobsQuery {
     #[serde(default = "default_page")]
@@ -422,7 +422,7 @@ fn default_limit() -> u64 { 20 }
 | Field | Type | Description |
 |-------|------|-------------|
 | `_id` | `ObjectId` | Primary key |
-| `app_id` | `ObjectId` | Owning app |
+| `repo_id` | `ObjectId` | Owning app |
 | `job_type` | `String` | Enum discriminator (snake_case) |
 | `state` | `String` | Lifecycle state (snake_case) |
 | `entity_type` | `String` | Domain entity type acted upon |
@@ -444,10 +444,10 @@ fn default_limit() -> u64 { 20 }
 { "state": 1, "created_at": 1 }
 
 // Look up jobs for a specific entity (e.g. all jobs for a changeset)
-{ "app_id": 1, "entity_type": 1, "entity_id": 1 }
+{ "repo_id": 1, "entity_type": 1, "entity_id": 1 }
 
 // Gate hook: find the latest job of a given type+state for an entity
-{ "app_id": 1, "job_type": 1, "state": 1 }
+{ "repo_id": 1, "job_type": 1, "state": 1 }
 ```
 
 **Example document:**
@@ -455,7 +455,7 @@ fn default_limit() -> u64 { 20 }
 ```json
 {
   "_id": ObjectId("665a1b2c3d4e5f6a7b8c9d0e"),
-  "app_id": ObjectId("665a0001aabbccddee000001"),
+  "repo_id": ObjectId("665a0001aabbccddee000001"),
   "job_type": "msuite_submit",
   "state": "queued",
   "entity_type": "changeset",
@@ -516,7 +516,7 @@ fn default_limit() -> u64 { 20 }
 
 ## 5. API Endpoints
 
-### `GET /api/repos/:appId/jobs/:jobId`
+### `GET /api/repos/:repoId/jobs/:jobId`
 
 Retrieve a single job by ID, including its current state, result, and error.
 
@@ -526,7 +526,7 @@ Retrieve a single job by ID, including its current state, result, and error.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `appId` | `ObjectId` hex | App scope |
+| `repoId` | `ObjectId` hex | App scope |
 | `jobId` | `ObjectId` hex | Job to retrieve |
 
 **Response:** `200 OK`
@@ -535,7 +535,7 @@ Retrieve a single job by ID, including its current state, result, and error.
 {
   "data": {
     "id": "665a1b2c3d4e5f6a7b8c9d0e",
-    "app_id": "665a0001aabbccddee000001",
+    "repo_id": "665a0001aabbccddee000001",
     "job_type": "msuite_submit",
     "state": "succeeded",
     "entity_type": "changeset",
@@ -560,7 +560,7 @@ Retrieve a single job by ID, including its current state, result, and error.
 | 404 | `not_found` | Job does not exist or belongs to a different app |
 | 403 | `forbidden` | User is not a member of the app |
 
-### `GET /api/repos/:appId/jobs?page=&limit=&type=&state=`
+### `GET /api/repos/:repoId/jobs?page=&limit=&type=&state=`
 
 List jobs for an app with optional filters and pagination.
 
@@ -677,13 +677,13 @@ successfully before allowing the workflow transition.
 /// required job has not succeeded.
 pub async fn require_job_success(
     job_repo: &JobRepo,
-    app_id: &str,
+    repo_id: &str,
     entity_type: &str,
     entity_id: &str,
     job_type: JobType,
 ) -> Result<(), ConmanError> {
     let filter = doc! {
-        "app_id": ObjectId::parse_str(app_id)?,
+        "repo_id": ObjectId::parse_str(repo_id)?,
         "entity_type": entity_type,
         "entity_id": ObjectId::parse_str(entity_id)?,
         "job_type": job_type.as_str(),
@@ -709,10 +709,10 @@ Gate hook integration points:
 
 | Flow | Gate check |
 |------|-----------|
-| Changeset submit | `require_job_success(app_id, "changeset", changeset_id, MsuiteSubmit)` |
-| Changeset queue | `require_job_success(app_id, "changeset", changeset_id, MsuiteSubmit)` |
-| Release publish | `require_job_success(app_id, "release", release_id, MsuiteMerge)` |
-| Deploy release | `require_job_success(app_id, "deployment", deployment_id, MsuiteDeploy)` |
+| Changeset submit | `require_job_success(repo_id, "changeset", changeset_id, MsuiteSubmit)` |
+| Changeset queue | `require_job_success(repo_id, "changeset", changeset_id, MsuiteSubmit)` |
+| Release publish | `require_job_success(repo_id, "release", release_id, MsuiteMerge)` |
+| Deploy release | `require_job_success(repo_id, "deployment", deployment_id, MsuiteDeploy)` |
 
 Note: The submit handler first *creates* the `MsuiteSubmit` job. The gate hook
 is checked on the *next* transition (e.g. moving from `submitted` to
@@ -827,8 +827,8 @@ E09).
 ### E06-04: API endpoints
 
 - [ ] Add `JobResponse`, `JobLogResponse`, `ListJobsQuery` to `conman-api`
-- [ ] Implement `GET /api/repos/:appId/jobs/:jobId` handler
-- [ ] Implement `GET /api/repos/:appId/jobs` handler with filters + pagination
+- [ ] Implement `GET /api/repos/:repoId/jobs/:jobId` handler
+- [ ] Implement `GET /api/repos/:repoId/jobs` handler with filters + pagination
 - [ ] Add routes to Axum router
 - [ ] Integration test: get job by id returns correct response
 - [ ] Integration test: list jobs with type/state filters
@@ -873,7 +873,7 @@ E09).
    and `LogLevel` variant to JSON and deserialize back, verifying equality.
 
 4. **Gate hook passes when successful job exists.** Given a `JobRepo` containing
-   a `Succeeded` job matching `(app_id, entity_type, entity_id, job_type)`,
+   a `Succeeded` job matching `(repo_id, entity_type, entity_id, job_type)`,
    `require_job_success` returns `Ok(())`.
 
 5. **Gate hook fails when no successful job exists.** Given an empty collection
@@ -924,11 +924,11 @@ E09).
     Request `GET /api/repos/:app_b/jobs/:jobId`. Verify 404.
 
 16. **API: list jobs with type filter.** Create 3 jobs (2 MsuiteSubmit, 1
-    DeployRelease). Request `GET /api/repos/:appId/jobs?type=msuite_submit`.
+    DeployRelease). Request `GET /api/repos/:repoId/jobs?type=msuite_submit`.
     Verify 2 results.
 
 17. **API: list jobs with state filter.** Create 3 jobs (1 Queued, 1 Running, 1
-    Succeeded). Request `GET /api/repos/:appId/jobs?state=queued`. Verify 1
+    Succeeded). Request `GET /api/repos/:repoId/jobs?state=queued`. Verify 1
     result.
 
 18. **API: list jobs pagination.** Create 25 jobs. Request with
@@ -951,7 +951,7 @@ E09).
    has not succeeded. Workflow transitions are blocked until the mandatory
    check passes.
 
-4. **Pollable status.** Clients can poll `GET /api/repos/:appId/jobs/:jobId` to
+4. **Pollable status.** Clients can poll `GET /api/repos/:repoId/jobs/:jobId` to
    observe job progress and retrieve the terminal result/error.
 
 5. **Structured logs.** Workers emit real-time log entries to `job_logs`.

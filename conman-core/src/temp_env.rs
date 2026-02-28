@@ -21,7 +21,7 @@ pub enum TempEnvState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TempEnvironment {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub kind: TempEnvKind,
     pub source_id: String,
     pub owner_user_id: String,

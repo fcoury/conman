@@ -1,5 +1,4 @@
 pub mod app;
-pub mod app_surface;
 pub mod audit;
 pub mod auth_types;
 pub mod changeset;
@@ -12,16 +11,16 @@ pub mod job;
 pub mod notification;
 pub mod notification_event;
 pub mod rbac;
+pub mod repo;
 pub mod release;
 pub mod runtime_profile;
 pub mod team;
 pub mod temp_env;
 pub mod workspace;
 
-pub use app::{App, AppSettings, BaselineMode, CommitMode, ProfileApprovalPolicy};
-pub use app_surface::{AppSurface, SurfaceBranding};
+pub use app::{App, AppBranding};
 pub use audit::{AuditEvent, AuditRequestContext};
-pub use auth_types::{AppMembership, Invite, PasswordResetToken, TeamMembership, User};
+pub use auth_types::{Invite, PasswordResetToken, RepoMembership, TeamMembership, User};
 pub use changeset::{
     Approval, Changeset, ChangesetAction, ChangesetComment, ChangesetCommentEdit, ChangesetState,
     transition as transition_changeset,
@@ -35,6 +34,7 @@ pub use job::{Job, JobLogLine, JobState, JobType};
 pub use notification::NotificationPreference;
 pub use notification_event::{NotificationEvent, NotificationState};
 pub use rbac::{Capability, Role};
+pub use repo::{BaselineMode, CommitMode, ProfileApprovalPolicy, Repo, RepoSettings};
 pub use release::{ReleaseBatch, ReleaseState};
 pub use runtime_profile::{EnvVarValue, RuntimeProfile, RuntimeProfileKind, mask_secret};
 pub use team::Team;

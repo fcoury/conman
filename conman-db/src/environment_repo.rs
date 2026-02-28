@@ -13,7 +13,7 @@ use crate::EnsureIndexes;
 struct EnvironmentDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     name: String,
     position: u32,
     is_canonical: bool,
@@ -28,7 +28,7 @@ impl From<EnvironmentDoc> for Environment {
     fn from(value: EnvironmentDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             name: value.name,
             position: value.position,
             is_canonical: value.is_canonical,
@@ -59,14 +59,14 @@ impl EnvironmentRepo {
         }
     }
 
-    pub async fn list_by_app(&self, app_id: &str) -> Result<Vec<Environment>, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+    pub async fn list_by_repo(&self, repo_id: &str) -> Result<Vec<Environment>, ConmanError> {
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
 
         let mut cursor = self
             .collection
-            .find(doc! {"app_id": app_id})
+            .find(doc! {"repo_id": repo_id})
             .sort(doc! {"position": 1})
             .await
             .map_err(|e| ConmanError::Internal {
@@ -91,11 +91,11 @@ impl EnvironmentRepo {
 
     pub async fn replace_all(
         &self,
-        app_id: &str,
+        repo_id: &str,
         entries: &[EnvironmentInput],
     ) -> Result<Vec<Environment>, ConmanError> {
-        let app_id_obj = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let app_id_obj = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
 
         let canonical_count = entries.iter().filter(|e| e.is_canonical).count();
@@ -106,7 +106,7 @@ impl EnvironmentRepo {
         }
 
         self.collection
-            .delete_many(doc! {"app_id": app_id_obj})
+            .delete_many(doc! {"repo_id": app_id_obj})
             .await
             .map_err(|e| ConmanError::Internal {
                 message: format!("failed to clear existing environments: {e}"),
@@ -122,7 +122,7 @@ impl EnvironmentRepo {
                     .and_then(|id| ObjectId::parse_str(id).ok());
                 EnvironmentDoc {
                     id: ObjectId::new(),
-                    app_id: app_id_obj,
+                    repo_id: app_id_obj,
                     name: entry.name.clone(),
                     position: entry.position,
                     is_canonical: entry.is_canonical,
@@ -142,7 +142,7 @@ impl EnvironmentRepo {
                 })?;
         }
 
-        self.list_by_app(app_id).await
+        self.list_by_repo(repo_id).await
     }
 }
 
@@ -150,7 +150,7 @@ impl EnvironmentRepo {
 impl EnsureIndexes for EnvironmentRepo {
     async fn ensure_indexes(&self) -> Result<(), ConmanError> {
         let by_app = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "position": 1})
+            .keys(doc! {"repo_id": 1, "position": 1})
             .options(
                 IndexOptions::builder()
                     .name("environments_app_position".to_string())
@@ -158,7 +158,7 @@ impl EnsureIndexes for EnvironmentRepo {
             )
             .build();
         let uniq_name = IndexModel::builder()
-            .keys(doc! {"app_id": 1, "name": 1})
+            .keys(doc! {"repo_id": 1, "name": 1})
             .options(
                 IndexOptions::builder()
                     .name("environments_app_name_unique".to_string())

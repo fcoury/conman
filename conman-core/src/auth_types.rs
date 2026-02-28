@@ -14,10 +14,10 @@ pub struct User {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppMembership {
+pub struct RepoMembership {
     pub id: String,
     pub user_id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub role: Role,
     pub created_at: DateTime<Utc>,
 }

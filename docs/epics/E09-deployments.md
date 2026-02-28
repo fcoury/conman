@@ -112,7 +112,7 @@ pub struct Deployment {
     pub id: ObjectId,
 
     /// The app this deployment belongs to.
-    pub app_id: ObjectId,
+    pub repo_id: ObjectId,
 
     /// Target environment for the deployment.
     pub environment_id: ObjectId,
@@ -223,7 +223,7 @@ impl DeployApproval {
 use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-/// POST /api/repos/:appId/environments/:envId/deploy
+/// POST /api/repos/:repoId/environments/:envId/deploy
 ///
 /// Deploy a published release to the specified environment.
 #[derive(Debug, Deserialize)]
@@ -248,7 +248,7 @@ pub struct DeployApprovalInput {
     pub user_id: ObjectId,
 }
 
-/// POST /api/repos/:appId/environments/:envId/promote
+/// POST /api/repos/:repoId/environments/:envId/promote
 ///
 /// Promote the currently deployed release to the next environment in
 /// the pipeline. The release artifact is immutable; only the target
@@ -267,7 +267,7 @@ pub struct PromoteRequest {
     pub approvals: Vec<DeployApprovalInput>,
 }
 
-/// POST /api/repos/:appId/environments/:envId/rollback
+/// POST /api/repos/:repoId/environments/:envId/rollback
 ///
 /// Roll back the environment to a previous state.
 #[derive(Debug, Deserialize)]
@@ -284,7 +284,7 @@ pub struct RollbackRequest {
 #[derive(Debug, Serialize)]
 pub struct DeploymentResponse {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub environment_id: String,
     pub release_id: String,
     pub state: DeploymentState,
@@ -303,7 +303,7 @@ impl From<Deployment> for DeploymentResponse {
     fn from(d: Deployment) -> Self {
         Self {
             id: d.id.to_hex(),
-            app_id: d.app_id.to_hex(),
+            repo_id: d.repo_id.to_hex(),
             environment_id: d.environment_id.to_hex(),
             release_id: d.release_id.to_hex(),
             state: d.state,
@@ -333,7 +333,7 @@ are immutable records.
 | Field | Type | Description |
 |-------|------|-------------|
 | `_id` | `ObjectId` | Primary key |
-| `app_id` | `ObjectId` | Parent app |
+| `repo_id` | `ObjectId` | Parent app |
 | `environment_id` | `ObjectId` | Target environment |
 | `release_id` | `ObjectId` | Release being deployed |
 | `state` | `string` | One of: `pending`, `running`, `succeeded`, `failed`, `canceled` |
@@ -354,12 +354,12 @@ async fn ensure_indexes(&self) -> Result<(), ConmanError> {
     let collection = self.collection();
 
     // Index 1: Environment lock check -- find active deployments per env.
-    // Query pattern: { app_id, environment_id, state: { $in: ["pending", "running"] } }
+    // Query pattern: { repo_id, environment_id, state: { $in: ["pending", "running"] } }
     collection
         .create_index(
             IndexModel::builder()
                 .keys(doc! {
-                    "app_id": 1,
+                    "repo_id": 1,
                     "environment_id": 1,
                     "state": 1,
                 })
@@ -387,7 +387,7 @@ async fn ensure_indexes(&self) -> Result<(), ConmanError> {
     collection
         .create_index(
             IndexModel::builder()
-                .keys(doc! { "app_id": 1, "created_at": -1 })
+                .keys(doc! { "repo_id": 1, "created_at": -1 })
                 .build(),
         )
         .await
@@ -406,7 +406,7 @@ Normal deployment:
 ```json
 {
   "_id": ObjectId("664a1b2c3d4e5f6a7b8c9d0e"),
-  "app_id": ObjectId("664a0001000000000000000a"),
+  "repo_id": ObjectId("664a0001000000000000000a"),
   "environment_id": ObjectId("664a0002000000000000000b"),
   "release_id": ObjectId("664a0003000000000000000c"),
   "state": "succeeded",
@@ -427,7 +427,7 @@ Skip-stage deployment with approvals:
 ```json
 {
   "_id": ObjectId("664a2b3c4d5e6f7a8b9c0d1e"),
-  "app_id": ObjectId("664a0001000000000000000a"),
+  "repo_id": ObjectId("664a0001000000000000000a"),
   "environment_id": ObjectId("664a0004000000000000000d"),
   "release_id": ObjectId("664a0003000000000000000c"),
   "state": "running",
@@ -451,7 +451,7 @@ Rollback via redeploy prior tag:
 ```json
 {
   "_id": ObjectId("664a3c4d5e6f7a8b9c0d1e2f"),
-  "app_id": ObjectId("664a0001000000000000000a"),
+  "repo_id": ObjectId("664a0001000000000000000a"),
   "environment_id": ObjectId("664a0002000000000000000b"),
   "release_id": ObjectId("664a0007000000000000001a"),
   "state": "succeeded",
@@ -472,7 +472,7 @@ Rollback via redeploy prior tag:
 ### 5.1 Deploy Release
 
 ```
-POST /api/repos/:appId/environments/:envId/deploy
+POST /api/repos/:repoId/environments/:envId/deploy
 ```
 
 **Auth:** `config_manager` or `admin` on the app.
@@ -493,7 +493,7 @@ POST /api/repos/:appId/environments/:envId/deploy
 {
   "data": {
     "id": "664a1b2c3d4e5f6a7b8c9d0e",
-    "app_id": "664a0001000000000000000a",
+    "repo_id": "664a0001000000000000000a",
     "environment_id": "664a0002000000000000000b",
     "release_id": "664a0003000000000000000c",
     "state": "pending",
@@ -523,7 +523,7 @@ POST /api/repos/:appId/environments/:envId/deploy
 ### 5.2 Promote Release
 
 ```
-POST /api/repos/:appId/environments/:envId/promote
+POST /api/repos/:repoId/environments/:envId/promote
 ```
 
 **Auth:** `config_manager` or `admin` on the app.
@@ -560,7 +560,7 @@ POST /api/repos/:appId/environments/:envId/promote
 ### 5.3 Rollback
 
 ```
-POST /api/repos/:appId/environments/:envId/rollback
+POST /api/repos/:repoId/environments/:envId/rollback
 ```
 
 **Auth:** `config_manager` or `admin` on the app.
@@ -598,7 +598,7 @@ POST /api/repos/:appId/environments/:envId/rollback
 ### 5.4 List Deployments
 
 ```
-GET /api/repos/:appId/deployments?page=&limit=
+GET /api/repos/:repoId/deployments?page=&limit=
 ```
 
 **Auth:** Any member of the app (read access).
@@ -624,7 +624,7 @@ Returns deployments sorted by `created_at` descending (newest first).
    `deployed_partial`, or `deployed_full` state. Releases in earlier states
    (`draft_release`, `assembling`, `validated`) cannot be deployed.
 2. **Check environment lock.** Query `deployments` for any document matching
-   `{ app_id, environment_id, state: { $in: ["pending", "running"] } }`. If one
+   `{ repo_id, environment_id, state: { $in: ["pending", "running"] } }`. If one
    exists, return `ConmanError::Conflict` -- only one active deployment per
    environment.
 3. **Validate skip-stage approvals (if applicable).** When `skip_stage` is true,
@@ -659,7 +659,7 @@ Skip-stage is not a separate endpoint; it is a modifier on deploy/promote. When
 `skip_stage: true`:
 
 1. The caller must supply `approvals` with at least 2 entries.
-2. Each approval `user_id` is verified against `app_memberships` to confirm they
+2. Each approval `user_id` is verified against `repo_memberships` to confirm they
    are current members of the app.
 3. `DeployApproval::validate_approvals()` enforces:
    - At least 2 approvals.
@@ -689,11 +689,11 @@ The lock is implemented via a query guard, not a separate lock collection:
 /// exists on the environment.
 async fn check_environment_lock(
     deployment_repo: &DeploymentRepo,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     environment_id: ObjectId,
 ) -> Result<(), ConmanError> {
     let active = deployment_repo
-        .find_active_deployment(app_id, environment_id)
+        .find_active_deployment(repo_id, environment_id)
         .await?;
 
     if let Some(existing) = active {
@@ -712,7 +712,7 @@ async fn check_environment_lock(
 ```
 
 The `find_active_deployment` query uses the compound index on
-`(app_id, environment_id, state)` to efficiently check for `pending` or
+`(repo_id, environment_id, state)` to efficiently check for `pending` or
 `running` deployments.
 
 **Race condition mitigation:** Use MongoDB's `findOneAndUpdate` with a filter
@@ -1183,12 +1183,12 @@ run test (passes), commit.
   otherwise.
 
 - [ ] **E09-S06** -- Implement deploy handler and worker.
-  Add `POST /api/repos/:appId/environments/:envId/deploy` handler. Create the
+  Add `POST /api/repos/:repoId/environments/:envId/deploy` handler. Create the
   `deploy_release` job worker in `conman-jobs`. Write integration tests
   covering: successful deploy, lock conflict, invalid release state.
 
 - [ ] **E09-S07** -- Implement promote handler.
-  Add `POST /api/repos/:appId/environments/:envId/promote` handler. Write
+  Add `POST /api/repos/:repoId/environments/:envId/promote` handler. Write
   integration tests covering: valid sequential promotion, skip-stage with
   approvals, promotion without prior deployment (error).
 
@@ -1198,7 +1198,7 @@ run test (passes), commit.
   no privileged user (error), < 2 approvals (error).
 
 - [ ] **E09-S09** -- Implement rollback mode B (redeploy prior tag).
-  Add `POST /api/repos/:appId/environments/:envId/rollback` handler for
+  Add `POST /api/repos/:repoId/environments/:envId/rollback` handler for
   `redeploy_prior_tag` mode. Write integration tests: valid rollback, tag
   not found (error), no prior deployment (error).
 
@@ -1208,7 +1208,7 @@ run test (passes), commit.
   integration tests: successful revert, conflict on revert (error).
 
 - [ ] **E09-S11** -- Implement list deployments endpoint.
-  Add `GET /api/repos/:appId/deployments` handler with pagination. Write
+  Add `GET /api/repos/:repoId/deployments` handler with pagination. Write
   integration tests for filtering and ordering.
 
 - [ ] **E09-S12** -- Add release state transitions for deployment events.
@@ -1587,7 +1587,7 @@ async fn deploy_emits_audit_event() {
 
     let events = list_audit_events(&state, "deployment", "created").await;
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].app_id, Some(app.id));
+    assert_eq!(events[0].repo_id, Some(app.id));
     assert_eq!(events[0].action, "created");
 }
 ```
@@ -1595,7 +1595,7 @@ async fn deploy_emits_audit_event() {
 ## 10. Acceptance Criteria
 
 1. **Deploy creates an async job and records the deployment.**
-   - `POST /api/repos/:appId/environments/:envId/deploy` with a valid published
+   - `POST /api/repos/:repoId/environments/:envId/deploy` with a valid published
      release returns 201 with a deployment in `pending` state.
    - The `deploy_release` job is enqueued and the deployment transitions through
      `pending -> running -> succeeded` (or `failed`).

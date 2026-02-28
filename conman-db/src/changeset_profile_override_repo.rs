@@ -12,7 +12,7 @@ use crate::EnsureIndexes;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangesetProfileOverride {
     pub id: String,
-    pub app_id: String,
+    pub repo_id: String,
     pub changeset_id: String,
     pub key: String,
     pub value: EnvVarValue,
@@ -25,7 +25,7 @@ pub struct ChangesetProfileOverride {
 struct OverrideDoc {
     #[serde(rename = "_id")]
     id: ObjectId,
-    app_id: ObjectId,
+    repo_id: ObjectId,
     changeset_id: ObjectId,
     key: String,
     value: EnvVarValue,
@@ -40,7 +40,7 @@ impl From<OverrideDoc> for ChangesetProfileOverride {
     fn from(value: OverrideDoc) -> Self {
         Self {
             id: value.id.to_hex(),
-            app_id: value.app_id.to_hex(),
+            repo_id: value.repo_id.to_hex(),
             changeset_id: value.changeset_id.to_hex(),
             key: value.key,
             value: value.value,
@@ -72,12 +72,12 @@ impl ChangesetProfileOverrideRepo {
 
     pub async fn replace_for_changeset(
         &self,
-        app_id: &str,
+        repo_id: &str,
         changeset_id: &str,
         overrides: &[OverrideInput],
     ) -> Result<Vec<ChangesetProfileOverride>, ConmanError> {
-        let app_id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
-            message: format!("invalid app_id: {e}"),
+        let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid repo_id: {e}"),
         })?;
         let changeset_id =
             ObjectId::parse_str(changeset_id).map_err(|e| ConmanError::Validation {
@@ -104,7 +104,7 @@ impl ChangesetProfileOverrideRepo {
                 })?;
             docs.push(OverrideDoc {
                 id: ObjectId::new(),
-                app_id,
+                repo_id,
                 changeset_id,
                 key: entry.key.clone(),
                 value: entry.value.clone(),
