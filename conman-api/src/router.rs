@@ -28,6 +28,7 @@ use crate::handlers::health::health_check;
 use crate::handlers::jobs::{get_job, list_jobs};
 use crate::handlers::me::{get_notification_preferences, update_notification_preferences};
 use crate::handlers::metrics::scrape_metrics;
+use crate::handlers::onboarding::create_instance;
 use crate::handlers::releases::{
     assemble_release, create_release, get_release, list_releases, publish_release,
     reorder_release_changesets, set_release_changesets,
@@ -64,6 +65,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/auth/forgot-password", post(forgot_password))
         .route("/api/auth/reset-password", post(reset_password))
         .route("/api/auth/accept-invite", post(accept_invite))
+        .route("/api/onboarding/instance", post(create_instance))
         .route("/api/teams", get(list_teams).post(create_team))
         .route("/api/teams/{teamId}", get(get_team))
         .route("/api/teams/{teamId}/repos", post(create_repo_under_team))

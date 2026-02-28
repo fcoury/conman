@@ -102,7 +102,7 @@ export function MembersPage(): React.ReactElement {
   };
 
   if (!repoId) {
-    return <Page title="Members">Bind a repo first in Setup.</Page>;
+    return <Page title="Members">Complete instance setup first.</Page>;
   }
 
   return (

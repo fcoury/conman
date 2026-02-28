@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,29 +7,46 @@ import { ApiError } from "@/api/client";
 
 interface AppStepProps {
   repoId: string;
+  instanceSlug: string;
   onNext: () => void;
-  onBack: () => void;
 }
 
-export function AppStep({ repoId, onNext, onBack }: AppStepProps): React.ReactElement {
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function AppStep({ repoId, instanceSlug, onNext }: AppStepProps): React.ReactElement {
   const api = useApi();
   const [key, setKey] = useState("portal");
   const [title, setTitle] = useState("Primary App");
-  const [domain, setDomain] = useState("portal.example.test");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const hostnamePreview = useMemo(() => {
+    const effectiveKey = slugify(key) || "app";
+    return `${effectiveKey}--${instanceSlug}.dxflow-app.com`;
+  }, [key, instanceSlug]);
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    const normalizedKey = slugify(key);
+    if (!normalizedKey) {
+      setError("App key is required.");
+      return;
+    }
     setLoading(true);
     try {
       await api.data(`/api/repos/${repoId}/apps`, {
         method: "POST",
         body: JSON.stringify({
-          key,
+          key: normalizedKey,
           title,
-          domains: domain ? [domain] : [],
+          domains: [hostnamePreview],
         }),
       });
       onNext();
@@ -44,7 +61,9 @@ export function AppStep({ repoId, onNext, onBack }: AppStepProps): React.ReactEl
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold font-heading">First App</h2>
-        <p className="text-sm text-muted-foreground">Create your first application, or skip this step.</p>
+        <p className="text-sm text-muted-foreground">
+          Create your first app for this instance, or skip this step.
+        </p>
       </div>
 
       {error && (
@@ -57,9 +76,10 @@ export function AppStep({ repoId, onNext, onBack }: AppStepProps): React.ReactEl
         <form className="space-y-3" onSubmit={(e) => void handleCreate(e)}>
           <Input label="App key" id="app-key" value={key} onChange={(e) => setKey(e.target.value)} required />
           <Input label="Title" id="app-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-          <Input label="Domain" id="app-domain" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="optional" />
+          <p className="text-xs text-muted-foreground">
+            URL format: <span className="font-medium text-foreground">{hostnamePreview}</span>
+          </p>
           <div className="flex justify-between">
-            <Button variant="ghost" onClick={onBack} type="button">Back</Button>
             <div className="flex gap-2">
               <Button variant="secondary" onClick={onNext} type="button">Skip</Button>
               <Button type="submit" disabled={loading}>

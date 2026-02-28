@@ -2,10 +2,11 @@ import { CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface CompleteStepProps {
+  error?: string | null;
   onGoToDashboard: () => void;
 }
 
-export function CompleteStep({ onGoToDashboard }: CompleteStepProps): React.ReactElement {
+export function CompleteStep({ error, onGoToDashboard }: CompleteStepProps): React.ReactElement {
   return (
     <div className="space-y-6 text-center">
       <div className="flex justify-center">
@@ -22,6 +23,9 @@ export function CompleteStep({ onGoToDashboard }: CompleteStepProps): React.Reac
       <Button onClick={onGoToDashboard} size="lg" className="mx-auto">
         Go to Dashboard
       </Button>
+      {error ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : null}
     </div>
   );
 }

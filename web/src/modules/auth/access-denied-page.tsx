@@ -17,7 +17,7 @@ export function AccessDeniedPage({ message }: { message?: string }): React.React
           </div>
           <p className="text-muted-foreground text-sm">
             {message ??
-              "Your account does not have membership on the repo currently bound to this Conman instance."}
+              "Your account does not have membership on the instance currently selected in this console."}
           </p>
           <div className="flex gap-3">
             <Link to="/login" className="text-primary text-sm hover:underline">

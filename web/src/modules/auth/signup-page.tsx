@@ -40,7 +40,7 @@ export function SignupPage(): React.ReactElement {
   };
 
   return (
-    <AuthLayout title="Create account" subtitle="Bootstrap your first Conman team and repository.">
+    <AuthLayout title="Create account" subtitle="Create your account and start onboarding your first instance.">
       <form className="space-y-3" onSubmit={onSubmit}>
         <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" required />
         <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" required />

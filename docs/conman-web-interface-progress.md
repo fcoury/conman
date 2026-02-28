@@ -9,6 +9,7 @@
 - [x] M6 Backend-served SPA routes (`/app`, `/app/*`) and frontend E2E/unit tests baseline
 - [x] M7 Route migration: serve web UI from root (`/`) with API isolation
 - [x] M8 Setup wizard hardening (explicit selection, scoped repo selection, post-bind redirect)
+- [x] M9 Explicit onboarding flow (`instance` first) with `<app>--<instance>.dxflow-app.com`
 
 ## Completed
 ### M1 Backend foundation for single-repo UI context
@@ -56,6 +57,11 @@
   - Repo step scopes list to selected team and requires explicit selection.
   - Bind step requires explicit repo selection; no auto-first fallback.
   - Completion CTA now lands on `/workspaces`.
+- Explicit onboarding checks (agent-browser): ✅
+  - Signup no longer auto-creates a repo; setup starts at instance naming.
+  - Instance creation issues a refreshed token and proceeds to first-app step.
+  - App URL preview/creation follows `<app>--<instance>.dxflow-app.com`.
+  - Final setup action binds created instance and lands on `/workspaces`.
 
 ## Notes
 - `.aidocs` is locally ignored via global gitignore; this progress log is intentionally local unless ignore rules change.

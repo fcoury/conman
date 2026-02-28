@@ -1,89 +1,84 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { ApiError } from "@/api/client";
+import { useApi } from "@/hooks/use-api";
+import { useAuth } from "@/hooks/use-auth";
+import { useRepoContextQuery } from "@/hooks/use-repo-context";
 import { WizardLayout } from "./wizard-layout";
-import { WelcomeStep } from "./steps/welcome-step";
-import { TeamStep } from "./steps/team-step";
-import { RepoStep } from "./steps/repo-step";
+import { InstanceStep } from "./steps/instance-step";
 import { AppStep } from "./steps/app-step";
-import { BindStep } from "./steps/bind-step";
 import { CompleteStep } from "./steps/complete-step";
 
 export function SetupWizard(): React.ReactElement {
+  const api = useApi();
   const navigate = useNavigate();
+  const { setToken } = useAuth();
+  const contextQuery = useRepoContextQuery();
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(0);
-  const [selectedTeamId, setSelectedTeamId] = useState("");
-  const [selectedRepoId, setSelectedRepoId] = useState("");
-  // "bind existing" path skips directly to the bind step
-  const [fastTrack, setFastTrack] = useState(false);
+  const [instanceRepoId, setInstanceRepoId] = useState("");
+  const [instanceSlug, setInstanceSlug] = useState("");
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
 
   const goToDashboard = async () => {
+    if (!instanceRepoId) return;
+    setFinalizeError(null);
+    await api.data("/api/repo", {
+      method: "PATCH",
+      body: JSON.stringify({ repo_id: instanceRepoId }),
+    });
     await queryClient.invalidateQueries({ queryKey: ["repo-context"] });
     navigate("/workspaces", { replace: true });
   };
 
-  const handleBound = () => {
-    setCurrentStep(5);
+  const handleInstanceCreated = (payload: {
+    token: string;
+    repoId: string;
+    instanceSlug: string;
+  }) => {
+    setToken(payload.token);
+    setInstanceRepoId(payload.repoId);
+    setInstanceSlug(payload.instanceSlug);
+    setFinalizeError(null);
+    setCurrentStep(1);
   };
 
-  const handleTeamSelect = (teamId: string) => {
-    setSelectedTeamId(teamId);
-    // Team changes invalidate any prior repo choice.
-    setSelectedRepoId("");
-  };
+  useEffect(() => {
+    if (
+      currentStep === 0 &&
+      !instanceRepoId &&
+      contextQuery.data?.status === "bound"
+    ) {
+      navigate("/workspaces", { replace: true });
+    }
+  }, [contextQuery.data?.status, currentStep, instanceRepoId, navigate]);
 
   return (
-    <WizardLayout currentStep={currentStep}>
+    <WizardLayout
+      currentStep={currentStep}
+      steps={["Instance", "First App", "Complete"]}
+    >
       {currentStep === 0 && (
-        <WelcomeStep
-          onNewProject={() => {
-            setFastTrack(false);
-            setCurrentStep(1);
-          }}
-          onBindExisting={() => {
-            setFastTrack(true);
-            setSelectedTeamId("");
-            setSelectedRepoId("");
-            setCurrentStep(4);
-          }}
-        />
+        <InstanceStep onCreated={handleInstanceCreated} />
       )}
       {currentStep === 1 && (
-        <TeamStep
-          selectedTeamId={selectedTeamId}
-          onSelect={handleTeamSelect}
+        <AppStep
+          repoId={instanceRepoId}
+          instanceSlug={instanceSlug}
           onNext={() => setCurrentStep(2)}
-          onBack={() => setCurrentStep(0)}
         />
       )}
       {currentStep === 2 && (
-        <RepoStep
-          teamId={selectedTeamId}
-          selectedRepoId={selectedRepoId}
-          onSelect={setSelectedRepoId}
-          onNext={() => setCurrentStep(3)}
-          onBack={() => setCurrentStep(1)}
+        <CompleteStep
+          error={finalizeError}
+          onGoToDashboard={() => {
+            void goToDashboard().catch((cause) => {
+              setFinalizeError(cause instanceof ApiError ? cause.message : "Failed to finish setup");
+            });
+          }}
         />
-      )}
-      {currentStep === 3 && (
-        <AppStep
-          repoId={selectedRepoId}
-          onNext={() => setCurrentStep(4)}
-          onBack={() => setCurrentStep(2)}
-        />
-      )}
-      {currentStep === 4 && (
-        <BindStep
-          selectedRepoId={selectedRepoId}
-          onSelect={setSelectedRepoId}
-          onBind={handleBound}
-          onBack={() => setCurrentStep(fastTrack ? 0 : 3)}
-        />
-      )}
-      {currentStep === 5 && (
-        <CompleteStep onGoToDashboard={() => void goToDashboard()} />
       )}
     </WizardLayout>
   );

@@ -28,27 +28,27 @@ export function SettingsPage(): React.ReactElement {
         body: JSON.stringify({ repo_id: repoId }),
       });
       await queryClient.invalidateQueries({ queryKey: ["repo-context"] });
-      setStatus("Bound repo updated");
+      setStatus("Bound instance updated");
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : "failed to update bound repo");
+      setError(cause instanceof ApiError ? cause.message : "failed to update bound instance");
     }
   };
 
   return (
-    <Page title="Settings" description="Rebind this UI instance to a different repository when required.">
+    <Page title="Settings" description="Rebind this console to a different instance when required.">
       <Card>
-        <CardTitle>Current Binding</CardTitle>
+        <CardTitle>Current Instance</CardTitle>
         <CardDescription>
-          {context?.repo ? `${context.repo.name} (${context.repo.id})` : "No repository currently bound"}
+          {context?.repo ? `${context.repo.name} (${context.repo.id})` : "No instance currently bound"}
         </CardDescription>
       </Card>
 
       <Card>
-        <CardTitle>Rebind Repository</CardTitle>
+        <CardTitle>Rebind Instance</CardTitle>
         <form className="mt-3 space-y-3" onSubmit={(event) => void onSubmit(event)}>
-          <Input value={repoId} onChange={(event) => setRepoId(event.target.value)} placeholder="repo id" required />
+          <Input value={repoId} onChange={(event) => setRepoId(event.target.value)} placeholder="instance id" required />
           <Button type="submit" disabled={!context?.can_rebind}>
-            Apply binding
+            Apply instance binding
           </Button>
         </form>
       </Card>

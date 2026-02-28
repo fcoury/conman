@@ -4,6 +4,7 @@ pub mod health;
 pub mod jobs;
 pub mod me;
 pub mod metrics;
+pub mod onboarding;
 pub mod repos;
 pub mod releases;
 pub mod teams;

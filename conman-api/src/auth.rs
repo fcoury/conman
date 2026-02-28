@@ -80,7 +80,8 @@ pub struct SignupResponse {
     pub token: String,
     pub user: UserSummary,
     pub team: TeamSummary,
-    pub repo: RepoSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repo: Option<RepoSummary>,
 }
 
 #[derive(Debug, Serialize)]
@@ -187,7 +188,6 @@ pub async fn signup(
     let users = conman_db::UserRepo::new(state.db.clone());
     let team_repo = conman_db::TeamRepo::new(state.db.clone());
     let team_memberships = conman_db::TeamMembershipRepo::new(state.db.clone());
-    let app_repo = conman_db::RepoStore::new(state.db.clone());
     let memberships = conman_db::RepoMembershipRepo::new(state.db.clone());
 
     if users.find_by_email(&req.email).await?.is_some() {
@@ -215,34 +215,6 @@ pub async fn signup(
         .assign_role(&user.id, &team.id, Role::Owner)
         .await?;
 
-    let repo_base_name = format!("{}'s Team Configuration", first);
-    let repo_base_path = format!(
-        "{}-configuration-{}",
-        slugify(&first),
-        &Uuid::now_v7().to_string()[..8]
-    );
-
-    let mut repo_name = repo_base_name.clone();
-    let mut repo_path = repo_base_path.clone();
-    let repo = loop {
-        match app_repo
-            .insert_for_team(&team.id, &repo_name, &repo_path, "main", &user.id)
-            .await
-        {
-            Ok(app) => break app,
-            Err(ConmanError::Conflict { .. }) => {
-                let suffix = &Uuid::now_v7().to_string()[..8];
-                repo_name = format!("{} {}", repo_base_name, suffix);
-                repo_path = format!("{}-{}", repo_base_path, suffix);
-            }
-            Err(err) => return Err(err.into()),
-        }
-    };
-
-    memberships
-        .assign_role(&user.id, &repo.id, Role::Owner)
-        .await?;
-
     if let Err(err) = emit_audit(
         &state,
         Some(&user.id),
@@ -258,22 +230,6 @@ pub async fn signup(
     {
         tracing::warn!(error = %err, "failed to write audit event");
     }
-    if let Err(err) = emit_audit(
-        &state,
-        Some(&user.id),
-        Some(&repo.id),
-        "repo",
-        &repo.id,
-        "created",
-        None,
-        serde_json::to_value(&repo).ok(),
-        None,
-    )
-    .await
-    {
-        tracing::warn!(error = %err, "failed to write audit event");
-    }
-
     let roles = memberships.find_roles_by_user_id(&user.id).await?;
     let token = issue_token(
         &user.id,
@@ -295,12 +251,7 @@ pub async fn signup(
             name: team.name,
             slug: team.slug,
         },
-        repo: RepoSummary {
-            id: repo.id,
-            name: repo.name,
-            repo_path: repo.repo_path,
-            integration_branch: repo.integration_branch,
-        },
+        repo: None,
     })))
 }
 
@@ -528,6 +479,7 @@ fn is_protected_path(path: &str) -> bool {
     path.starts_with("/api/repo")
         || path.starts_with("/api/repos")
         || path.starts_with("/api/teams")
+        || path.starts_with("/api/onboarding")
         || path.starts_with("/api/me")
 }
 

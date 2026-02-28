@@ -38,7 +38,7 @@ const ROUTES: &[RouteDoc] = &[
     RouteDoc {
         method: "post",
         path: "/api/auth/signup",
-        summary: "Sign up and bootstrap first team + repo",
+        summary: "Sign up and bootstrap first team",
         tag: "auth",
         protected: false,
     },
@@ -69,6 +69,13 @@ const ROUTES: &[RouteDoc] = &[
         summary: "Accept team invite",
         tag: "auth",
         protected: false,
+    },
+    RouteDoc {
+        method: "post",
+        path: "/api/onboarding/instance",
+        summary: "Create instance repository and refresh auth token",
+        tag: "onboarding",
+        protected: true,
     },
     RouteDoc {
         method: "get",
