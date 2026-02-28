@@ -133,6 +133,10 @@
     - Apps page now uses labeled forms, consistent success/error feedback, and advanced payload disclosure.
     - Notifications page now uses labeled controls, clearer copy, and live-region success feedback.
     - Jobs page now includes queue snapshot metrics and keeps raw payloads behind advanced disclosure.
+  - Expanded Playwright workflow journeys:
+    - apps create + rename flow,
+    - notification preference update flow,
+    - jobs queue snapshot/detail visibility checks.
   - Updated Playwright config with `webServer` startup to make `test:e2e` self-contained.
 
 ## Verification
@@ -167,7 +171,7 @@
   - `pnpm --dir web lint`: ✅
   - `pnpm --dir web test -- --run`: ✅ (5 files, 8 tests)
   - `pnpm --dir web build`: ✅
-  - `pnpm --dir web test:e2e`: ✅ (8 tests passing)
+  - `pnpm --dir web test:e2e`: ✅ (11 tests passing)
 
 ## Notes
 - `.aidocs` is locally ignored via global gitignore; this progress log is intentionally local unless ignore rules change.

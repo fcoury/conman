@@ -97,6 +97,64 @@ async function setupApiMock(page: Page, options?: { role?: MockRole; canRebind?:
       updated_at: "2026-02-28T00:00:00Z",
     },
   ];
+  let apps = [
+    {
+      id: "app-1",
+      repo_id: "repo-1",
+      key: "portal",
+      title: "Portal",
+      domains: ["portal--main-instance.dxflow-app.com"],
+      created_at: "2026-02-20T00:00:00Z",
+      updated_at: "2026-02-20T00:00:00Z",
+    },
+  ];
+  let notificationPreference = {
+    id: "pref-1",
+    user_id: "owner-1",
+    email_enabled: true,
+    created_at: "2026-02-01T00:00:00Z",
+    updated_at: "2026-02-01T00:00:00Z",
+  };
+  const jobs = [
+    {
+      id: "job-1",
+      repo_id: "repo-1",
+      job_type: "release_assemble",
+      state: "running",
+      entity_type: "release",
+      entity_id: "rel-1",
+      payload: { release_id: "rel-1" },
+      result: null,
+      error_message: null,
+      retry_count: 0,
+      max_retries: 3,
+      timeout_ms: 60000,
+      created_by: "owner-1",
+      created_at: "2026-02-28T00:00:00Z",
+      started_at: "2026-02-28T00:00:01Z",
+      finished_at: null,
+      updated_at: "2026-02-28T00:00:02Z",
+    },
+    {
+      id: "job-2",
+      repo_id: "repo-1",
+      job_type: "deploy_start",
+      state: "failed",
+      entity_type: "deployment",
+      entity_id: "dep-fail",
+      payload: { deployment_id: "dep-fail" },
+      result: null,
+      error_message: "deploy failed",
+      retry_count: 1,
+      max_retries: 3,
+      timeout_ms: 60000,
+      created_by: "owner-1",
+      created_at: "2026-02-28T00:00:03Z",
+      started_at: "2026-02-28T00:00:04Z",
+      finished_at: "2026-02-28T00:00:05Z",
+      updated_at: "2026-02-28T00:00:05Z",
+    },
+  ];
 
   const deployments = [
     {
@@ -246,6 +304,57 @@ async function setupApiMock(page: Page, options?: { role?: MockRole; canRebind?:
 
     if (pathname === "/api/repos/repo-1/changesets" && method === "GET") {
       return json(route, 200, ok(changesets, { page: 1, limit: 200, total: changesets.length }));
+    }
+
+    if (pathname === "/api/repos/repo-1/apps" && method === "GET") {
+      return json(route, 200, ok(apps));
+    }
+
+    if (pathname === "/api/repos/repo-1/apps" && method === "POST") {
+      const body = JSON.parse(request.postData() || "{}");
+      const created = {
+        id: `app-${apps.length + 1}`,
+        repo_id: "repo-1",
+        key: String(body.key || `app-${apps.length + 1}`),
+        title: String(body.title || "Untitled"),
+        domains: Array.isArray(body.domains) ? body.domains : [],
+        created_at: "2026-02-28T00:00:00Z",
+        updated_at: "2026-02-28T00:00:00Z",
+      };
+      apps = [created, ...apps];
+      return json(route, 200, ok(created));
+    }
+
+    if (pathname.match(/^\/api\/repos\/repo-1\/apps\/[^/]+$/) && method === "PATCH") {
+      const appId = pathname.split("/").pop();
+      const body = JSON.parse(request.postData() || "{}");
+      apps = apps.map((app) => (app.id === appId ? { ...app, title: String(body.title || app.title) } : app));
+      const updated = apps.find((app) => app.id === appId);
+      return json(route, 200, ok(updated ?? { success: true }));
+    }
+
+    if (pathname === "/api/me/notification-preferences" && method === "GET") {
+      return json(route, 200, ok(notificationPreference));
+    }
+
+    if (pathname === "/api/me/notification-preferences" && method === "PATCH") {
+      const body = JSON.parse(request.postData() || "{}");
+      notificationPreference = {
+        ...notificationPreference,
+        email_enabled: Boolean(body.email_enabled),
+        updated_at: "2026-02-28T00:00:00Z",
+      };
+      return json(route, 200, ok(notificationPreference));
+    }
+
+    if (pathname === "/api/repos/repo-1/jobs" && method === "GET") {
+      return json(route, 200, ok(jobs, { page: 1, limit: 100, total: jobs.length }));
+    }
+
+    if (pathname.match(/^\/api\/repos\/repo-1\/jobs\/[^/]+$/) && method === "GET") {
+      const jobId = pathname.split("/").pop();
+      const job = jobs.find((item) => item.id === jobId);
+      return json(route, 200, ok(job ?? jobs[0]));
     }
 
     if (pathname.startsWith("/api/repos/repo-1/changesets/") && pathname.endsWith("/diff") && method === "GET") {
@@ -429,4 +538,47 @@ test("member cannot open release routes", async ({ page }) => {
   await page.goto("/review");
   await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
   await expect(page.getByText("requires reviewer role or higher")).toBeVisible();
+});
+
+test("apps page supports create and rename flows", async ({ page }) => {
+  await setupApiMock(page, { role: "owner" });
+  await authenticate(page);
+  await page.goto("/apps");
+
+  await expect(page.getByRole("heading", { name: "Apps", exact: true })).toBeVisible();
+
+  await page.getByLabel("App key").fill("billing");
+  await page.getByLabel("App title").fill("Billing Console");
+  await page.getByRole("button", { name: "Create app" }).click();
+  await expect(page.getByText("App created.")).toBeVisible();
+  await expect(page.locator("p.text-sm.font-semibold", { hasText: "Billing Console" }).first()).toBeVisible();
+
+  await page.getByLabel("App", { exact: true }).selectOption("app-2");
+  await page.getByLabel("New title").fill("Billing Portal");
+  await page.getByRole("button", { name: "Update app" }).click();
+  await expect(page.getByText("App updated.")).toBeVisible();
+  await expect(page.locator("p.text-sm.font-semibold", { hasText: "Billing Portal" }).first()).toBeVisible();
+});
+
+test("notification preference can be updated", async ({ page }) => {
+  await setupApiMock(page, { role: "member", canRebind: false });
+  await authenticate(page);
+  await page.goto("/notifications");
+
+  await expect(page.getByRole("heading", { name: "Notification Preferences" })).toBeVisible();
+  await page.getByLabel("Email delivery").selectOption("false");
+  await page.getByRole("button", { name: "Save preference" }).click();
+  await expect(page.getByText("Notification preference saved.")).toBeVisible();
+});
+
+test("jobs page shows queue snapshot and selected detail", async ({ page }) => {
+  await setupApiMock(page, { role: "owner" });
+  await authenticate(page);
+  await page.goto("/jobs");
+
+  await expect(page.getByRole("heading", { name: "Jobs" })).toBeVisible();
+  await expect(page.getByText("total 2")).toBeVisible();
+  await expect(page.getByText("running 1")).toBeVisible();
+  await expect(page.getByText("failed 1")).toBeVisible();
+  await expect(page.getByText("retry 0 of 3")).toBeVisible();
 });

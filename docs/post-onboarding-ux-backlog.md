@@ -134,4 +134,5 @@ Legend:
 2. Role-specific Playwright journey tests and reviewer-flow polish are now completed.
 3. Performance cleanup for polling-heavy pages is now completed.
 4. Final visual consistency pass across dashboard cards/forms is now completed.
-5. Next recommended sprint: add journey tests for Apps/Notifications/Jobs interactions and API error-state UX.
+5. Journey tests for Apps/Notifications/Jobs interactions are now completed.
+6. Next recommended sprint: add API error-state UX regression tests for admin and operator flows.
