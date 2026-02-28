@@ -16,6 +16,7 @@ pub mod release;
 pub mod runtime_profile;
 pub mod team;
 pub mod temp_env;
+pub mod ui;
 pub mod workspace;
 
 pub use app::{App, AppBranding};
@@ -39,4 +40,5 @@ pub use release::{ReleaseBatch, ReleaseState};
 pub use runtime_profile::{EnvVarValue, RuntimeProfile, RuntimeProfileKind, mask_secret};
 pub use team::Team;
 pub use temp_env::{TempEnvKind, TempEnvState, TempEnvironment};
+pub use ui::UiConfig;
 pub use workspace::{BaseRefType, ConflictStatus, FileEntry, FileEntryType, Workspace};

@@ -22,6 +22,7 @@ pub mod team_membership_repo;
 pub mod team_repo;
 pub mod temp_env_repo;
 pub mod user_repo;
+pub mod ui_config_repo;
 pub mod workspace_repo;
 
 pub use app_repo::{AppRepo, CreateAppInput, UpdateAppInput};
@@ -45,6 +46,7 @@ pub use team_membership_repo::TeamMembershipRepo;
 pub use team_repo::TeamRepo;
 pub use temp_env_repo::{CreateTempEnvInput, TempEnvRepo};
 pub use user_repo::UserRepo;
+pub use ui_config_repo::UiConfigRepo;
 pub use workspace_repo::{CreateWorkspaceInput, WorkspaceRepo};
 pub use repo_repo::RepoStore;
 

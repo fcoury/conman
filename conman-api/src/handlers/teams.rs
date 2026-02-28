@@ -380,6 +380,26 @@ pub async fn create_team_invite(
     Ok(Json(ApiResponse::ok(invite)))
 }
 
+pub async fn list_team_invites(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path(team_id): Path<String>,
+    Query(pagination): Query<Pagination>,
+) -> Result<Json<ApiResponse<Vec<Invite>>>, ApiConmanError> {
+    require_team_admin(&state, &auth.user_id, &team_id).await?;
+    let pagination = pagination.validate()?;
+    let (rows, total) = conman_db::InviteRepo::new(state.db.clone())
+        .list_active_by_team(&team_id, pagination.skip(), pagination.limit)
+        .await?;
+
+    Ok(Json(ApiResponse::paginated(
+        rows,
+        pagination.page,
+        pagination.limit,
+        total,
+    )))
+}
+
 pub async fn resend_team_invite(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,

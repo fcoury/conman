@@ -8,4 +8,5 @@ pub mod repos;
 pub mod releases;
 pub mod teams;
 pub mod temp_envs;
+pub mod ui;
 pub mod workspaces;

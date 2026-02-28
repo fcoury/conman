@@ -78,6 +78,7 @@ async fn serve() -> Result<(), String> {
         .map_err(|err| format!("failed to connect to MongoDB: {err}"))?;
 
     let user_repo = conman_db::UserRepo::new(db.clone());
+    let ui_config_repo = conman_db::UiConfigRepo::new(db.clone());
     let repo_membership_repo = conman_db::RepoMembershipRepo::new(db.clone());
     let team_repo = conman_db::TeamRepo::new(db.clone());
     let team_membership_repo = conman_db::TeamMembershipRepo::new(db.clone());
@@ -100,6 +101,7 @@ async fn serve() -> Result<(), String> {
     let notification_event_repo = conman_db::NotificationEventRepo::new(db.clone());
     conman_db::bootstrap_indexes(&[
         &user_repo,
+        &ui_config_repo,
         &repo_membership_repo,
         &team_repo,
         &team_membership_repo,

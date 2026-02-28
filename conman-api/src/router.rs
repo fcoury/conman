@@ -34,12 +34,13 @@ use crate::handlers::releases::{
 };
 use crate::handlers::teams::{
     create_repo_app, create_repo_under_team, create_team, create_team_invite,
-    delete_team_invite, get_team, list_repo_apps, list_teams, resend_team_invite,
-    update_repo_app,
+    delete_team_invite, get_team, list_repo_apps, list_team_invites, list_teams,
+    resend_team_invite, update_repo_app,
 };
 use crate::handlers::temp_envs::{
     create_temp_env, delete_temp_env, extend_temp_env, list_temp_envs, undo_expire_temp_env,
 };
+use crate::handlers::ui::{get_bound_repo, update_bound_repo};
 use crate::handlers::workspaces::{
     create_workspace, create_workspace_checkpoint, delete_workspace_file, get_workspace,
     get_workspace_file_or_tree, list_workspaces, reset_workspace, sync_workspace_integration,
@@ -65,6 +66,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/teams", get(list_teams).post(create_team))
         .route("/api/teams/{teamId}", get(get_team))
         .route("/api/teams/{teamId}/repos", post(create_repo_under_team))
+        .route("/api/repo", get(get_bound_repo).patch(update_bound_repo))
         .route(
             "/api/repos/{repoId}/apps",
             get(list_repo_apps).post(create_repo_app),
@@ -80,7 +82,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/repos/{repoId}/members",
             get(list_members).post(assign_member),
         )
-        .route("/api/teams/{teamId}/invites", post(create_team_invite))
+        .route(
+            "/api/teams/{teamId}/invites",
+            get(list_team_invites).post(create_team_invite),
+        )
         .route(
             "/api/teams/{teamId}/invites/{inviteId}/resend",
             post(resend_team_invite),

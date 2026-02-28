@@ -131,6 +131,56 @@ impl InviteRepo {
         Ok(invite.map(Into::into))
     }
 
+    pub async fn list_active_by_team(
+        &self,
+        team_id: &str,
+        skip: u64,
+        limit: u64,
+    ) -> Result<(Vec<Invite>, u64), ConmanError> {
+        let team_id = ObjectId::parse_str(team_id).map_err(|e| ConmanError::Validation {
+            message: format!("invalid team_id: {e}"),
+        })?;
+        let now = Utc::now();
+        let filter = doc! {
+            "team_id": team_id,
+            "accepted_at": null,
+            "expires_at": {"$gt": now},
+        };
+
+        let total = self
+            .collection
+            .count_documents(filter.clone())
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to count invites: {e}"),
+            })?;
+
+        let mut cursor = self
+            .collection
+            .find(filter)
+            .sort(doc! {"created_at": -1})
+            .skip(skip)
+            .limit(limit as i64)
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to list invites: {e}"),
+            })?;
+
+        let mut invites = Vec::new();
+        while cursor.advance().await.map_err(|e| ConmanError::Internal {
+            message: format!("failed iterating invites cursor: {e}"),
+        })? {
+            let invite: InviteDoc = cursor
+                .deserialize_current()
+                .map_err(|e| ConmanError::Internal {
+                    message: format!("failed to deserialize invite: {e}"),
+                })?;
+            invites.push(invite.into());
+        }
+
+        Ok((invites, total))
+    }
+
     pub async fn resend(
         &self,
         team_id: &str,

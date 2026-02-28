@@ -525,7 +525,10 @@ fn is_protected_path(path: &str) -> bool {
         return true;
     }
 
-    path.starts_with("/api/repos") || path.starts_with("/api/teams") || path.starts_with("/api/me")
+    path.starts_with("/api/repo")
+        || path.starts_with("/api/repos")
+        || path.starts_with("/api/teams")
+        || path.starts_with("/api/me")
 }
 
 fn bearer_token(headers: &axum::http::HeaderMap) -> Result<&str, ConmanError> {
@@ -551,6 +554,7 @@ mod tests {
     fn protected_path_logic() {
         assert!(is_protected_path("/api/repos"));
         assert!(is_protected_path("/api/repos/abc"));
+        assert!(is_protected_path("/api/repo"));
         assert!(is_protected_path("/api/teams"));
         assert!(is_protected_path("/api/teams/abc"));
         assert!(is_protected_path("/api/me/notification-preferences"));

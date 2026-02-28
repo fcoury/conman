@@ -99,6 +99,27 @@ const ROUTES: &[RouteDoc] = &[
         protected: true,
     },
     RouteDoc {
+        method: "get",
+        path: "/api/repo",
+        summary: "Get bound repository context",
+        tag: "repo-context",
+        protected: true,
+    },
+    RouteDoc {
+        method: "patch",
+        path: "/api/repo",
+        summary: "Update bound repository context",
+        tag: "repo-context",
+        protected: true,
+    },
+    RouteDoc {
+        method: "get",
+        path: "/api/teams/{teamId}/invites",
+        summary: "List active team invites",
+        tag: "teams",
+        protected: true,
+    },
+    RouteDoc {
         method: "post",
         path: "/api/teams/{teamId}/invites",
         summary: "Create team invite",
