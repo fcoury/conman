@@ -54,10 +54,20 @@ export function NotificationsPage(): React.ReactElement {
         </CardDescription>
       </Card>
       {error ? <Card className="border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</Card> : null}
-      {saved ? <Card className="border-success/40 bg-success/40 p-3 text-sm">{saved}</Card> : null}
+      {saved ? (
+        <Card className="border-success/40 bg-success/40 p-3 text-sm" aria-live="polite">
+          {saved}
+        </Card>
+      ) : null}
       <Card className="space-y-3">
         <CardTitle>Email Notifications</CardTitle>
-        <Select value={emailEnabled} onChange={(event) => setEmailEnabled(event.target.value)}>
+        <CardDescription>Toggle email fanout for review, release, and deployment events.</CardDescription>
+        <Select
+          id="notification-email-enabled"
+          label="Email delivery"
+          value={emailEnabled}
+          onChange={(event) => setEmailEnabled(event.target.value)}
+        >
           <option value="true">Enabled</option>
           <option value="false">Disabled</option>
         </Select>

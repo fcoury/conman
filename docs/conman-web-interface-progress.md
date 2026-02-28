@@ -129,6 +129,10 @@
   - Reduced polling overhead on heavy pages:
     - changesets/deployments now use active-state-aware refetch intervals,
     - jobs/changesets/deployments disable background-tab refetching.
+  - Final dashboard consistency sweep:
+    - Apps page now uses labeled forms, consistent success/error feedback, and advanced payload disclosure.
+    - Notifications page now uses labeled controls, clearer copy, and live-region success feedback.
+    - Jobs page now includes queue snapshot metrics and keeps raw payloads behind advanced disclosure.
   - Updated Playwright config with `webServer` startup to make `test:e2e` self-contained.
 
 ## Verification

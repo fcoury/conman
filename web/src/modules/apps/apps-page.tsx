@@ -33,6 +33,7 @@ export function AppsPage(): React.ReactElement {
   const [domains, setDomains] = useState("");
   const [selectedAppId, setSelectedAppId] = useState("");
   const [updateTitle, setUpdateTitle] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const canManageApps = canManageAdministration(role);
@@ -63,6 +64,7 @@ export function AppsPage(): React.ReactElement {
     event.preventDefault();
     if (!repoId || !canManageApps) return;
     setError(null);
+    setStatus(null);
     const normalizedKey = slugify(appKey);
     if (!normalizedKey) {
       setError("App key is required.");
@@ -84,6 +86,7 @@ export function AppsPage(): React.ReactElement {
       });
       setDomains("");
       await refresh();
+      setStatus("App created.");
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : "failed to create app");
     }
@@ -93,6 +96,7 @@ export function AppsPage(): React.ReactElement {
     event.preventDefault();
     if (!repoId || !selectedAppId || !canManageApps) return;
     setError(null);
+    setStatus(null);
     try {
       await api.data(`/api/repos/${repoId}/apps/${selectedAppId}`, {
         method: "PATCH",
@@ -100,6 +104,7 @@ export function AppsPage(): React.ReactElement {
       });
       setUpdateTitle("");
       await refresh();
+      setStatus("App updated.");
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : "failed to update app");
     }
@@ -115,6 +120,11 @@ export function AppsPage(): React.ReactElement {
       description="Define app surfaces and routing domains. Most users only need this once during setup."
     >
       {error ? <Card className="border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</Card> : null}
+      {status ? (
+        <Card className="border-success/40 bg-success/40 p-3 text-sm" aria-live="polite">
+          {status}
+        </Card>
+      ) : null}
 
       {!canManageApps ? (
         <Card>
@@ -131,9 +141,19 @@ export function AppsPage(): React.ReactElement {
             <CardTitle>Create App</CardTitle>
             <CardDescription>New apps are typically mapped to {previewDomain}.</CardDescription>
             <form className="mt-3 space-y-2" onSubmit={(event) => void createApp(event)}>
-              <Input value={appKey} onChange={(event) => setAppKey(event.target.value)} placeholder="app key" required />
-              <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="app title" required />
+              <label className="text-xs text-muted-foreground" htmlFor="app-key-input">
+                App key
+              </label>
+              <Input id="app-key-input" value={appKey} onChange={(event) => setAppKey(event.target.value)} placeholder="app key" required />
+              <label className="text-xs text-muted-foreground" htmlFor="app-title-input">
+                App title
+              </label>
+              <Input id="app-title-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="app title" required />
+              <label className="text-xs text-muted-foreground" htmlFor="app-domains-input">
+                Custom domains
+              </label>
               <Input
+                id="app-domains-input"
                 value={domains}
                 onChange={(event) => setDomains(event.target.value)}
                 placeholder="optional custom domains (comma-separated)"
@@ -147,7 +167,12 @@ export function AppsPage(): React.ReactElement {
             <CardTitle>Rename App</CardTitle>
             <CardDescription>Update display titles without changing app key or domains.</CardDescription>
             <form className="mt-3 space-y-2" onSubmit={(event) => void updateApp(event)}>
-              <Select value={selectedAppId} onChange={(event) => setSelectedAppId(event.target.value)}>
+              <Select
+                id="app-select"
+                label="App"
+                value={selectedAppId}
+                onChange={(event) => setSelectedAppId(event.target.value)}
+              >
                 <option value="">Select app...</option>
                 {appsQuery.data?.map((app) => (
                   <option key={app.id} value={app.id}>
@@ -155,7 +180,15 @@ export function AppsPage(): React.ReactElement {
                   </option>
                 ))}
               </Select>
-              <Input value={updateTitle} onChange={(event) => setUpdateTitle(event.target.value)} placeholder="new title" />
+              <label className="text-xs text-muted-foreground" htmlFor="app-rename-title-input">
+                New title
+              </label>
+              <Input
+                id="app-rename-title-input"
+                value={updateTitle}
+                onChange={(event) => setUpdateTitle(event.target.value)}
+                placeholder="new title"
+              />
               <Button type="submit" disabled={!selectedAppId}>
                 Update app
               </Button>
@@ -166,6 +199,7 @@ export function AppsPage(): React.ReactElement {
 
       <Card>
         <CardTitle>Current Apps</CardTitle>
+        <CardDescription>Configured app surfaces and effective domains.</CardDescription>
         <div className="mt-3 space-y-2">
           {(appsQuery.data ?? []).map((app) => (
             <div key={app.id} className="rounded-md border border-border bg-muted/30 p-3">
@@ -180,7 +214,12 @@ export function AppsPage(): React.ReactElement {
         </div>
       </Card>
 
-      <RawDataPanel title="Advanced app payload" value={appsQuery.data ?? []} />
+      <details>
+        <summary className="cursor-pointer text-xs text-muted-foreground">Advanced app payload</summary>
+        <div className="mt-2">
+          <RawDataPanel title="App payload" value={appsQuery.data ?? []} />
+        </div>
+      </details>
     </Page>
   );
 }

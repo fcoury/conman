@@ -133,4 +133,5 @@ Legend:
 1. Backlog execution completed for E1-E6 in this branch.
 2. Role-specific Playwright journey tests and reviewer-flow polish are now completed.
 3. Performance cleanup for polling-heavy pages is now completed.
-4. Next recommended sprint: final visual consistency pass across all dashboard cards/forms.
+4. Final visual consistency pass across dashboard cards/forms is now completed.
+5. Next recommended sprint: add journey tests for Apps/Notifications/Jobs interactions and API error-state UX.

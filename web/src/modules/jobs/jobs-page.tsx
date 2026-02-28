@@ -38,6 +38,17 @@ export function JobsPage(): React.ReactElement {
     () => jobsQuery.data?.find((job) => job.id === selectedJobId) ?? jobsQuery.data?.[0] ?? null,
     [jobsQuery.data, selectedJobId],
   );
+  const counts = useMemo(() => {
+    const summary = { total: 0, queued: 0, running: 0, failed: 0 };
+    for (const job of jobsQuery.data ?? []) {
+      summary.total += 1;
+      const state = job.state.toLowerCase();
+      if (state === "queued") summary.queued += 1;
+      if (state === "running") summary.running += 1;
+      if (state === "failed") summary.failed += 1;
+    }
+    return summary;
+  }, [jobsQuery.data]);
 
   const jobDetailQuery = useQuery({
     queryKey: ["job", repoId, selectedJob?.id],
@@ -61,6 +72,15 @@ export function JobsPage(): React.ReactElement {
         <p className="text-sm text-muted-foreground">
           You are signed in as {formatRoleLabel(role)}. Jobs are visible to help diagnose flow status.
         </p>
+      </Card>
+      <Card className="space-y-2">
+        <CardTitle>Queue Snapshot</CardTitle>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <StatusPill label={`total ${counts.total}`} />
+          <StatusPill label={`queued ${counts.queued}`} />
+          <StatusPill label={`running ${counts.running}`} />
+          <StatusPill label={`failed ${counts.failed}`} />
+        </div>
       </Card>
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
         <Card className="space-y-2">
@@ -88,12 +108,30 @@ export function JobsPage(): React.ReactElement {
 
         <Card className="space-y-3">
           <CardTitle>Job Detail</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Select a job to inspect full payload and result details.
-          </p>
+          {!selectedJob ? (
+            <p className="text-sm text-muted-foreground">Select a job to inspect details.</p>
+          ) : (
+            <>
+              <div className="rounded-md border border-border bg-muted/30 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">{selectedJob.job_type}</p>
+                  <StatusPill label={selectedJob.state} />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{selectedJob.id}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  retry {selectedJob.retry_count} of {selectedJob.max_retries}
+                </p>
+              </div>
+              <details>
+                <summary className="cursor-pointer text-xs text-muted-foreground">Advanced job payload</summary>
+                <div className="mt-2">
+                  <RawDataPanel title="Job detail payload" value={jobDetailQuery.data ?? selectedJob} />
+                </div>
+              </details>
+            </>
+          )}
         </Card>
       </div>
-      <RawDataPanel title="Job detail payload" value={jobDetailQuery.data ?? selectedJob ?? { message: "Select a job" }} />
     </Page>
   );
 }
