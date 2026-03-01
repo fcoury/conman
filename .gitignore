@@ -2,3 +2,5 @@
 /docs/site/dist
 .env
 .env.local
+ops/local-domains/certs/
+tests/e2e/results/*.json
