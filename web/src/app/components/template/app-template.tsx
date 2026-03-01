@@ -64,21 +64,28 @@ export default function AppTemplate() {
       <AppSidebar />
       <SidebarInset>
         {/* Sticky header with backdrop blur */}
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-30 flex h-14 min-w-0 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <SidebarTrigger className="-ml-1" />
 
-          <Breadcrumb className="ml-2">
-            <BreadcrumbList>
+          <Breadcrumb className="ml-2 min-w-0 flex-1 overflow-hidden">
+            <BreadcrumbList className="min-w-0 flex-nowrap overflow-hidden whitespace-nowrap">
               {breadcrumbs.map((crumb, idx) => {
                 const isLast = idx === breadcrumbs.length - 1;
                 return (
-                  <BreadcrumbItem key={crumb.href}>
+                  <BreadcrumbItem
+                    key={crumb.href}
+                    className={isLast ? 'min-w-0' : 'shrink-0'}
+                  >
                     {idx > 0 && <BreadcrumbSeparator />}
                     {isLast ? (
-                      <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                      <BreadcrumbPage className="block truncate">
+                        {crumb.label}
+                      </BreadcrumbPage>
                     ) : (
-                      <BreadcrumbLink asChild>
-                        <Link to={crumb.href}>{crumb.label}</Link>
+                      <BreadcrumbLink asChild className="shrink-0">
+                        <Link to={crumb.href} className="block truncate">
+                          {crumb.label}
+                        </Link>
                       </BreadcrumbLink>
                     )}
                   </BreadcrumbItem>
