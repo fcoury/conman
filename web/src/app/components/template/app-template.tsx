@@ -39,6 +39,7 @@ function useBreadcrumbs() {
 function segmentLabel(segment: string): string {
   const labels: Record<string, string> = {
     workspaces: 'Workspaces',
+    changesets: 'My Changes',
     instances: 'Instances',
   };
   return labels[segment] ?? segment;

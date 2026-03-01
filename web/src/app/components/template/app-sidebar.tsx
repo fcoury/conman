@@ -7,13 +7,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { FolderCode, LayoutDashboard, Moon, Sun } from 'lucide-react';
+import { FileDiff, FolderCode, LayoutDashboard, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
   { label: 'Workspaces', href: '/workspaces', icon: FolderCode },
+  { label: 'My Changes', href: '/changesets', icon: FileDiff },
 ];
 
 export default function AppSidebar() {

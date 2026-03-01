@@ -267,6 +267,27 @@ const ROUTES: &[RouteDoc] = &[
         protected: true,
     },
     RouteDoc {
+        method: "get",
+        path: "/api/repos/{repoId}/workspaces/{workspaceId}/changes",
+        summary: "Get workspace change summary",
+        tag: "workspaces",
+        protected: true,
+    },
+    RouteDoc {
+        method: "get",
+        path: "/api/repos/{repoId}/workspaces/{workspaceId}/changes/patch",
+        summary: "Get workspace patch for a changed file",
+        tag: "workspaces",
+        protected: true,
+    },
+    RouteDoc {
+        method: "get",
+        path: "/api/repos/{repoId}/workspaces/{workspaceId}/open-changeset",
+        summary: "Get open changeset for workspace",
+        tag: "workspaces",
+        protected: true,
+    },
+    RouteDoc {
         method: "post",
         path: "/api/repos/{repoId}/workspaces/{workspaceId}/checkpoints",
         summary: "Create workspace checkpoint",
@@ -737,6 +758,7 @@ mod tests {
             .expect("paths object");
         assert!(paths.contains_key("/api/auth/login"));
         assert!(paths.contains_key("/api/repos/{repoId}/changesets/{changesetId}/submit"));
+        assert!(paths.contains_key("/api/repos/{repoId}/workspaces/{workspaceId}/changes"));
         assert!(paths.contains_key("/api/repos/{repoId}/releases/{releaseId}/publish"));
     }
 

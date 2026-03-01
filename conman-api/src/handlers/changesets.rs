@@ -598,6 +598,12 @@ pub async fn get_changeset_diff(
             id: repo_id.clone(),
         })?;
     let changeset = find_changeset_or_404(&state, &changeset_id).await?;
+    if changeset.repo_id != repo_id {
+        return Err(ConmanError::Forbidden {
+            message: "changeset does not belong to app".to_string(),
+        }
+        .into());
+    }
 
     let git_repo = conman_core::GitRepo {
         storage_name: "default".to_string(),
@@ -643,6 +649,13 @@ pub async fn list_changeset_comments(
     Path((repo_id, changeset_id)): Path<(String, String)>,
 ) -> Result<Json<ApiResponse<Vec<conman_core::ChangesetComment>>>, ApiConmanError> {
     auth.require_role(&repo_id, Role::Member)?;
+    let changeset = find_changeset_or_404(&state, &changeset_id).await?;
+    if changeset.repo_id != repo_id {
+        return Err(ConmanError::Forbidden {
+            message: "changeset does not belong to app".to_string(),
+        }
+        .into());
+    }
     let rows = conman_db::ChangesetCommentRepo::new(state.db.clone())
         .list_by_changeset(&changeset_id)
         .await?;
@@ -656,6 +669,13 @@ pub async fn create_changeset_comment(
     Json(req): Json<CreateCommentRequest>,
 ) -> Result<Json<ApiResponse<conman_core::ChangesetComment>>, ApiConmanError> {
     auth.require_role(&repo_id, Role::Member)?;
+    let changeset = find_changeset_or_404(&state, &changeset_id).await?;
+    if changeset.repo_id != repo_id {
+        return Err(ConmanError::Forbidden {
+            message: "changeset does not belong to app".to_string(),
+        }
+        .into());
+    }
     if req.body.trim().is_empty() {
         return Err(ConmanError::Validation {
             message: "comment body is required".to_string(),

@@ -44,7 +44,8 @@ use crate::handlers::ui::{get_bound_repo, update_bound_repo};
 use crate::handlers::web::{serve_app_asset, serve_app_index};
 use crate::handlers::workspaces::{
     create_workspace, create_workspace_checkpoint, delete_workspace_file, get_workspace,
-    get_workspace_file_or_tree, list_workspaces, reset_workspace, sync_workspace_integration,
+    get_workspace_change_patch, get_workspace_changes, get_workspace_file_or_tree,
+    get_workspace_open_changeset, list_workspaces, reset_workspace, sync_workspace_integration,
     update_workspace, write_workspace_file,
 };
 use crate::openapi::{openapi_docs, openapi_json};
@@ -114,6 +115,18 @@ pub fn build_router(state: AppState) -> Router {
             get(get_workspace_file_or_tree)
                 .put(write_workspace_file)
                 .delete(delete_workspace_file),
+        )
+        .route(
+            "/api/repos/{repoId}/workspaces/{workspaceId}/changes",
+            get(get_workspace_changes),
+        )
+        .route(
+            "/api/repos/{repoId}/workspaces/{workspaceId}/changes/patch",
+            get(get_workspace_change_patch),
+        )
+        .route(
+            "/api/repos/{repoId}/workspaces/{workspaceId}/open-changeset",
+            get(get_workspace_open_changeset),
         )
         .route(
             "/api/repos/{repoId}/workspaces/{workspaceId}/checkpoints",

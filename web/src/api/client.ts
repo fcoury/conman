@@ -3,14 +3,16 @@ import type { ApiErrorEnvelope, ApiResponseEnvelope } from '~/types/api';
 const TOKEN_KEY = 'conman.auth.token';
 
 export class ApiError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public requestId: string,
-    public status: number,
-  ) {
+  code: string;
+  requestId: string;
+  status: number;
+
+  constructor(code: string, message: string, requestId: string, status: number) {
     super(message);
     this.name = 'ApiError';
+    this.code = code;
+    this.requestId = requestId;
+    this.status = status;
   }
 }
 

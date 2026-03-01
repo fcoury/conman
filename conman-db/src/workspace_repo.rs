@@ -20,6 +20,8 @@ struct WorkspaceDoc {
     is_default: bool,
     base_ref_type: BaseRefType,
     base_ref_value: String,
+    #[serde(default)]
+    base_sha: String,
     head_sha: String,
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
@@ -38,6 +40,7 @@ impl From<WorkspaceDoc> for Workspace {
             is_default: value.is_default,
             base_ref_type: value.base_ref_type,
             base_ref_value: value.base_ref_value,
+            base_sha: value.base_sha,
             head_sha: value.head_sha,
             created_at: value.created_at,
             updated_at: value.updated_at,
@@ -59,6 +62,7 @@ pub struct CreateWorkspaceInput {
     pub is_default: bool,
     pub base_ref_type: BaseRefType,
     pub base_ref_value: String,
+    pub base_sha: String,
     pub head_sha: String,
 }
 
@@ -88,6 +92,7 @@ impl WorkspaceRepo {
             is_default: input.is_default,
             base_ref_type: input.base_ref_type,
             base_ref_value: input.base_ref_value,
+            base_sha: input.base_sha,
             head_sha: input.head_sha,
             created_at: now,
             updated_at: now,
@@ -218,6 +223,32 @@ impl WorkspaceRepo {
             .await
             .map_err(|e| ConmanError::Internal {
                 message: format!("failed to update workspace head: {e}"),
+            })?;
+        self.find_by_id(&workspace_id.to_hex())
+            .await?
+            .ok_or_else(|| ConmanError::NotFound {
+                entity: "workspace",
+                id: workspace_id.to_hex(),
+            })
+    }
+
+    pub async fn update_base_sha(
+        &self,
+        workspace_id: &str,
+        base_sha: &str,
+    ) -> Result<Workspace, ConmanError> {
+        let workspace_id =
+            ObjectId::parse_str(workspace_id).map_err(|e| ConmanError::Validation {
+                message: format!("invalid workspace_id: {e}"),
+            })?;
+        self.collection
+            .update_one(
+                doc! {"_id": workspace_id},
+                doc! {"$set": {"base_sha": base_sha, "updated_at": Utc::now()}},
+            )
+            .await
+            .map_err(|e| ConmanError::Internal {
+                message: format!("failed to update workspace base sha: {e}"),
             })?;
         self.find_by_id(&workspace_id.to_hex())
             .await?

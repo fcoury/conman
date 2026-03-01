@@ -7,6 +7,7 @@ export interface Workspace {
   is_default: boolean;
   base_ref_type: string;
   base_ref_value: string;
+  base_sha: string;
   head_sha: string;
   created_at: string;
   updated_at: string;

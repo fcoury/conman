@@ -5,8 +5,8 @@ use axum::{
 use base64::{Engine, engine::general_purpose::STANDARD};
 use conman_auth::AuthUser;
 use conman_core::{
-    BaseRefType, CommitMode, ConflictStatus, ConmanError, FileAction, FileEntry, FileEntryType,
-    GitRepo, GitTreeEntryType, GitUser, Repo, Role, Workspace,
+    BaseRefType, Changeset, CommitMode, ConflictStatus, ConmanError, FileAction, FileEntry,
+    FileEntryType, GitRepo, GitTreeEntryType, GitUser, Repo, Role, Workspace,
 };
 use conman_db::CreateWorkspaceInput;
 use serde::{Deserialize, Serialize};
@@ -30,6 +30,11 @@ pub struct FilePathQuery {
     pub path: String,
     #[serde(default)]
     pub recursive: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WorkspacePatchQuery {
+    pub path: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,6 +92,43 @@ pub struct SyncIntegrationResponse {
     pub head_sha: String,
     pub conflicting_paths: Vec<String>,
     pub message: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkspaceChangesEntry {
+    pub path: String,
+    pub old_path: Option<String>,
+    pub additions: i32,
+    pub deletions: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkspaceChangesResponse {
+    pub workspace_id: String,
+    pub base_sha: String,
+    pub head_sha: String,
+    pub has_changes: bool,
+    pub files_changed: usize,
+    pub additions: i32,
+    pub deletions: i32,
+    pub entries: Vec<WorkspaceChangesEntry>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkspacePatchResponse {
+    pub workspace_id: String,
+    pub base_sha: String,
+    pub head_sha: String,
+    pub path: String,
+    pub patch: String,
+    pub binary: bool,
+    pub lines_added: i32,
+    pub lines_removed: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OpenWorkspaceChangesetResponse {
+    pub changeset: Option<Changeset>,
 }
 
 fn git_repo(repo: &Repo) -> GitRepo {
@@ -176,6 +218,58 @@ fn normalize_path(path: &str) -> Result<String, ConmanError> {
     Ok(normalized)
 }
 
+fn normalize_diff_path(path: &str) -> String {
+    path.trim_start_matches('/')
+        .trim_start_matches("./")
+        .trim_start_matches("a/")
+        .trim_start_matches("b/")
+        .to_string()
+}
+
+fn diff_path_matches(candidate: &str, wanted: &str) -> bool {
+    normalize_diff_path(candidate) == normalize_diff_path(wanted)
+}
+
+fn extract_patch_for_path(raw_diff: &[u8], wanted_path: &str) -> Option<String> {
+    let wanted = normalize_diff_path(wanted_path);
+    let text = String::from_utf8_lossy(raw_diff);
+
+    let mut current_chunk = String::new();
+    let mut current_matches = false;
+    let mut result: Option<String> = None;
+
+    for line in text.lines() {
+        if line.starts_with("diff --git ") {
+            if current_matches && !current_chunk.is_empty() {
+                result = Some(std::mem::take(&mut current_chunk));
+                break;
+            }
+
+            current_chunk = String::new();
+
+            // Expected format: diff --git a/path b/path
+            let mut parts = line.split_whitespace();
+            let _ = parts.next();
+            let _ = parts.next();
+            let left = parts.next().unwrap_or_default();
+            let right = parts.next().unwrap_or_default();
+
+            let left = left.strip_prefix("a/").unwrap_or(left);
+            let right = right.strip_prefix("b/").unwrap_or(right);
+            current_matches = normalize_diff_path(left) == wanted || normalize_diff_path(right) == wanted;
+        }
+
+        current_chunk.push_str(line);
+        current_chunk.push('\n');
+    }
+
+    if result.is_none() && current_matches && !current_chunk.is_empty() {
+        result = Some(current_chunk);
+    }
+
+    result
+}
+
 fn is_unimplemented_git(err: &ConmanError) -> bool {
     matches!(err, ConmanError::Git { message } if message.contains("not implemented"))
 }
@@ -188,6 +282,24 @@ fn is_missing_revision_git(err: &ConmanError) -> bool {
                 || message.contains("bad revision")
                 || message.contains("Not a valid object name")
     )
+}
+
+fn resolve_workspace_base_sha(workspace: &Workspace, repo: &Repo) -> String {
+    if !workspace.base_sha.trim().is_empty() {
+        return workspace.base_sha.clone();
+    }
+
+    if matches!(workspace.base_ref_type, BaseRefType::Commit)
+        && !workspace.base_ref_value.trim().is_empty()
+    {
+        return workspace.base_ref_value.clone();
+    }
+
+    if !workspace.base_ref_value.trim().is_empty() {
+        return workspace.base_ref_value.clone();
+    }
+
+    repo.integration_branch.clone()
 }
 
 async fn find_repo(state: &AppState, repo_id: &str) -> Result<Repo, ApiConmanError> {
@@ -220,6 +332,26 @@ async fn find_workspace_for_owner(
         .into());
     }
     Ok(workspace)
+}
+
+async fn ensure_workspace_branch_exists(
+    state: &AppState,
+    repo: &GitRepo,
+    user: &GitUser,
+    workspace: &Workspace,
+    integration_branch: &str,
+) -> Result<(), ApiConmanError> {
+    let branch = state
+        .git_adapter
+        .find_branch(repo, &workspace.branch_name)
+        .await?;
+    if branch.is_none() {
+        state
+            .git_adapter
+            .create_branch(repo, user, &workspace.branch_name, integration_branch)
+            .await?;
+    }
+    Ok(())
 }
 
 async fn audit_workspace_event(
@@ -320,6 +452,7 @@ async fn create_workspace_entry(
             is_default,
             base_ref_type: BaseRefType::Branch,
             base_ref_value: repo.integration_branch.clone(),
+            base_sha: head_sha.clone(),
             head_sha,
         })
         .await?;
@@ -386,6 +519,172 @@ pub async fn get_workspace(
         .into());
     }
     Ok(Json(ApiResponse::ok(workspace)))
+}
+
+pub async fn get_workspace_changes(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
+) -> Result<Json<ApiResponse<WorkspaceChangesResponse>>, ApiConmanError> {
+    auth.require_role(&repo_id, Role::Member)?;
+    let repo = find_repo(&state, &repo_id).await?;
+    let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
+    if workspace.repo_id != repo_id {
+        return Err(ConmanError::Forbidden {
+            message: "workspace does not belong to repo".to_string(),
+        }
+        .into());
+    }
+
+    let git_repo = git_repo(&repo);
+    let base_sha = resolve_workspace_base_sha(&workspace, &repo);
+    let head_sha = workspace.head_sha.clone();
+    let stats = state
+        .git_adapter
+        .diff_stats(&git_repo, &base_sha, &head_sha)
+        .await?;
+
+    let additions = stats.iter().map(|entry| entry.additions).sum::<i32>();
+    let deletions = stats.iter().map(|entry| entry.deletions).sum::<i32>();
+    let entries = stats
+        .into_iter()
+        .map(|entry| WorkspaceChangesEntry {
+            path: entry.path,
+            old_path: entry.old_path,
+            additions: entry.additions,
+            deletions: entry.deletions,
+        })
+        .collect::<Vec<_>>();
+
+    let response = WorkspaceChangesResponse {
+        workspace_id: workspace.id,
+        base_sha,
+        head_sha,
+        has_changes: !entries.is_empty(),
+        files_changed: entries.len(),
+        additions,
+        deletions,
+        entries,
+    };
+
+    Ok(Json(ApiResponse::ok(response)))
+}
+
+pub async fn get_workspace_change_patch(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
+    Query(query): Query<WorkspacePatchQuery>,
+) -> Result<Json<ApiResponse<WorkspacePatchResponse>>, ApiConmanError> {
+    auth.require_role(&repo_id, Role::Member)?;
+    let repo = find_repo(&state, &repo_id).await?;
+    let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
+    if workspace.repo_id != repo_id {
+        return Err(ConmanError::Forbidden {
+            message: "workspace does not belong to repo".to_string(),
+        }
+        .into());
+    }
+
+    let path = normalize_path(&query.path)?;
+    if path.is_empty() {
+        return Err(ConmanError::Validation {
+            message: "path is required".to_string(),
+        }
+        .into());
+    }
+
+    let git_repo = git_repo(&repo);
+    let base_sha = resolve_workspace_base_sha(&workspace, &repo);
+    let head_sha = workspace.head_sha.clone();
+    let entries = state
+        .git_adapter
+        .commit_diff(&git_repo, &base_sha, &head_sha)
+        .await?;
+
+    let matched = entries
+        .into_iter()
+        .find(|entry| diff_path_matches(&entry.to_path, &path) || diff_path_matches(&entry.from_path, &path));
+
+    if let Some(entry) = matched {
+        let response = WorkspacePatchResponse {
+            workspace_id: workspace.id,
+            base_sha,
+            head_sha,
+            path,
+            patch: String::from_utf8_lossy(&entry.patch).to_string(),
+            binary: entry.binary,
+            lines_added: entry.lines_added,
+            lines_removed: entry.lines_removed,
+        };
+
+        return Ok(Json(ApiResponse::ok(response)));
+    }
+
+    // Fallback for gitaly setups where commit_diff entries don't map paths reliably.
+    let raw = state.git_adapter.raw_diff(&git_repo, &base_sha, &head_sha).await?;
+    let patch = extract_patch_for_path(&raw, &path).ok_or_else(|| ConmanError::NotFound {
+        entity: "workspace change",
+        id: path.clone(),
+    })?;
+
+    let stats = state
+        .git_adapter
+        .diff_stats(&git_repo, &base_sha, &head_sha)
+        .await?
+        .into_iter()
+        .find(|entry| {
+            diff_path_matches(&entry.path, &path)
+                || entry
+                    .old_path
+                    .as_deref()
+                    .map(|value| diff_path_matches(value, &path))
+                    .unwrap_or(false)
+        });
+
+    let response = WorkspacePatchResponse {
+        workspace_id: workspace.id,
+        base_sha,
+        head_sha,
+        path,
+        binary: patch.contains("GIT binary patch") || patch.contains("Binary files"),
+        patch,
+        lines_added: stats.as_ref().map(|value| value.additions).unwrap_or(0),
+        lines_removed: stats.as_ref().map(|value| value.deletions).unwrap_or(0),
+    };
+
+    Ok(Json(ApiResponse::ok(response)))
+}
+
+pub async fn get_workspace_open_changeset(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Path((repo_id, workspace_id)): Path<(String, String)>,
+) -> Result<Json<ApiResponse<OpenWorkspaceChangesetResponse>>, ApiConmanError> {
+    auth.require_role(&repo_id, Role::Member)?;
+    let workspace = find_workspace_for_owner(&state, &workspace_id, &auth.user_id).await?;
+    if workspace.repo_id != repo_id {
+        return Err(ConmanError::Forbidden {
+            message: "workspace does not belong to repo".to_string(),
+        }
+        .into());
+    }
+
+    let changeset = conman_db::ChangesetRepo::new(state.db.clone())
+        .find_open_by_workspace(&workspace.id)
+        .await?;
+    if let Some(value) = changeset.as_ref() {
+        if value.repo_id != repo_id {
+            return Err(ConmanError::Forbidden {
+                message: "changeset does not belong to repo".to_string(),
+            }
+            .into());
+        }
+    }
+
+    Ok(Json(ApiResponse::ok(OpenWorkspaceChangesetResponse {
+        changeset,
+    })))
 }
 
 pub async fn update_workspace(
@@ -535,6 +834,8 @@ pub async fn write_workspace_file(
     let message = req.message.unwrap_or_else(|| format!("update {path}"));
     let git_repo = git_repo(&repo);
     let git_user = git_user(&auth);
+    ensure_workspace_branch_exists(&state, &git_repo, &git_user, &workspace, &repo.integration_branch)
+        .await?;
     let file_action = match state
         .git_adapter
         .get_blob(&git_repo, &workspace.branch_name, &path)
@@ -564,7 +865,7 @@ pub async fn write_workspace_file(
             &git_repo,
             &git_user,
             &workspace.branch_name,
-            Some(&repo.integration_branch),
+            None,
             &message,
             vec![file_action],
         )
@@ -622,13 +923,15 @@ pub async fn delete_workspace_file(
     let message = req.message.unwrap_or_else(|| format!("delete {path}"));
     let git_repo = git_repo(&repo);
     let git_user = git_user(&auth);
+    ensure_workspace_branch_exists(&state, &git_repo, &git_user, &workspace, &repo.integration_branch)
+        .await?;
     let result = state
         .git_adapter
         .commit_files(
             &git_repo,
             &git_user,
             &workspace.branch_name,
-            Some(&repo.integration_branch),
+            None,
             &message,
             vec![FileAction::Delete { path: path.clone() }],
         )
@@ -688,9 +991,13 @@ pub async fn sync_workspace_integration(
         .await
     {
         Ok(head_sha) => {
-            conman_db::WorkspaceRepo::new(state.db.clone())
-                .update_head(&workspace.id, &head_sha)
-                .await?;
+            let workspace_repo = conman_db::WorkspaceRepo::new(state.db.clone());
+            workspace_repo.update_head(&workspace.id, &head_sha).await?;
+            if workspace.base_sha.trim().is_empty() {
+                workspace_repo
+                    .update_base_sha(&workspace.id, &head_sha)
+                    .await?;
+            }
             ConflictStatus {
                 clean: true,
                 head_sha,
@@ -759,9 +1066,13 @@ pub async fn reset_workspace(
         Err(err) => return Err(err.into()),
     };
 
-    conman_db::WorkspaceRepo::new(state.db.clone())
-        .update_head(&workspace.id, &head_sha)
-        .await?;
+    let workspace_repo = conman_db::WorkspaceRepo::new(state.db.clone());
+    workspace_repo.update_head(&workspace.id, &head_sha).await?;
+    if workspace.base_sha.trim().is_empty() {
+        workspace_repo
+            .update_base_sha(&workspace.id, &head_sha)
+            .await?;
+    }
 
     audit_workspace_event(
         &state,

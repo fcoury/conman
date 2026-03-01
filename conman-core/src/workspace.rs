@@ -19,6 +19,7 @@ pub struct Workspace {
     pub is_default: bool,
     pub base_ref_type: BaseRefType,
     pub base_ref_value: String,
+    pub base_sha: String,
     pub head_sha: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

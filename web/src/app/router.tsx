@@ -6,6 +6,7 @@ import SignupPage from '~/modules/auth/signup-page';
 import { PublicOnlyRoute, RequireAuthRoute } from '~/modules/auth/auth-routes';
 import WorkspacesPage from '~/modules/workspaces/workspaces-page';
 import WorkspaceView from '~/modules/workspaces/workspace-view';
+import ChangesetsPage from '~/modules/changesets/changesets-page';
 import { TeamContextLayout } from '~/modules/teams/team-context';
 import RequireTeamSelectionRoute from '~/modules/teams/require-team-selection-route';
 import TeamPickerPage from '~/modules/teams/team-picker-page';
@@ -29,6 +30,7 @@ export default function Router() {
               <Route index element={<DashboardPage />} />
               <Route path="workspaces" element={<WorkspacesPage />} />
               <Route path="workspaces/:workspaceId" element={<WorkspaceView />} />
+              <Route path="changesets" element={<ChangesetsPage />} />
               {/* Backwards-compat redirects */}
               <Route path="instances" element={<Navigate to="/workspaces" replace />} />
               <Route path="repos" element={<Navigate to="/workspaces" replace />} />

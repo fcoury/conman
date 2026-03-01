@@ -266,6 +266,9 @@ api_auth PUT "/api/repos/$REPO_ID/workspaces/$WORKSPACE_ID/files" -d "{
 }" | jq
 
 api_auth GET "/api/repos/$REPO_ID/workspaces/$WORKSPACE_ID/files?path=config/app.yaml" | jq
+api_auth GET "/api/repos/$REPO_ID/workspaces/$WORKSPACE_ID/changes" | jq
+api_auth GET "/api/repos/$REPO_ID/workspaces/$WORKSPACE_ID/changes/patch?path=config/app.yaml" | jq
+api_auth GET "/api/repos/$REPO_ID/workspaces/$WORKSPACE_ID/open-changeset" | jq
 api_auth POST "/api/repos/$REPO_ID/workspaces/$WORKSPACE_ID/checkpoints" -d '{"message":"checkpoint 1"}' | jq
 ```
 
@@ -365,7 +368,7 @@ This sequence covers:
 - Teams: list/create/get/invite and repository creation under team
 - Repositories: list/get/settings/members
 - Apps (surfaces): list/create/update
-- Workspaces: list/create/get/update/reset/sync/files/checkpoints
+- Workspaces: list/create/get/update/reset/sync/files/changes/patch/open-changeset/checkpoints
 - Changesets: list/create/get/update/submit/resubmit/review/queue/move-to-draft/diff/comments
 - Releases: list/create/get/changesets/reorder/assemble/publish
 - Environments + runtime profiles
