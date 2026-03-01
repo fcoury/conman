@@ -12,6 +12,7 @@ import {
   syntaxHighlighting,
 } from '@codemirror/language';
 import { toml as tomlMode } from '@codemirror/legacy-modes/mode/toml';
+import { terraform } from 'codemirror-lang-terraform';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { useTheme } from 'next-themes';
 
@@ -47,6 +48,10 @@ function getLanguageExtension(filePath: string) {
       return markdown();
     case 'toml':
       return StreamLanguage.define(tomlMode);
+    case 'tf':
+    case 'tfvars':
+    case 'hcl':
+      return terraform();
     default:
       return null;
   }

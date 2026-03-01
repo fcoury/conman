@@ -17,6 +17,7 @@ const DEDUPE_PACKAGES = [
   '@codemirror/lang-css',
   '@codemirror/lang-yaml',
   '@codemirror/legacy-modes',
+  'codemirror-lang-terraform',
 ];
 
 export default defineConfig({
