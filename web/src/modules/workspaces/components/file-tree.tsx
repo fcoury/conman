@@ -13,6 +13,25 @@ interface FileTreeProps {
   onFileSelect: (path: string) => void;
 }
 
+function isMissingRevisionError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.code === 'git_error' &&
+    (error.message.includes('Needed a single revision') ||
+      error.message.includes('bad revision') ||
+      error.message.includes('Not a valid object name'))
+  );
+}
+
+function isTreeUnsupportedError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.code === 'git_error' &&
+    error.message.includes('get_tree_entries') &&
+    error.message.includes('not implemented')
+  );
+}
+
 // Build a nested tree from the flat list of file entries
 function buildTree(entries: FileEntry[]): TreeNode[] {
   const root: TreeNode[] = [];
@@ -80,11 +99,7 @@ export default function FileTree({
     queryKey: ['file-tree', repoId, workspaceId],
     queryFn: () => getFileTree(repoId, workspaceId, '', true),
     retry(failureCount, error) {
-      if (
-        error instanceof ApiError &&
-        error.code === 'git_error' &&
-        error.message.includes('not implemented')
-      ) {
+      if (isTreeUnsupportedError(error) || isMissingRevisionError(error)) {
         return false;
       }
       return failureCount < 2;
@@ -92,9 +107,12 @@ export default function FileTree({
   });
 
   const tree = useMemo(() => {
+    if (isMissingRevisionError(treeQuery.error)) {
+      return [];
+    }
     if (!treeQuery.data?.entries) return [];
     return buildTree(treeQuery.data.entries);
-  }, [treeQuery.data]);
+  }, [treeQuery.data, treeQuery.error]);
 
   if (treeQuery.isLoading) {
     return (
@@ -107,19 +125,29 @@ export default function FileTree({
   }
 
   if (treeQuery.error) {
-    let message = 'Failed to load file tree';
-    if (
-      treeQuery.error instanceof ApiError &&
-      treeQuery.error.code === 'git_error' &&
-      treeQuery.error.message.includes('not implemented')
-    ) {
-      message = 'File tree unavailable: backend get_tree_entries is not implemented yet';
-    } else if (treeQuery.error instanceof Error) {
-      message = treeQuery.error.message;
+    if (isMissingRevisionError(treeQuery.error)) {
+      return (
+        <div className="p-3 text-sm text-muted-foreground">
+          No files in this workspace
+        </div>
+      );
     }
 
+    if (isTreeUnsupportedError(treeQuery.error)) {
+      return (
+        <div className="p-3 text-xs leading-relaxed text-muted-foreground">
+          File browser is unavailable in this environment.
+        </div>
+      );
+    }
+
+    const message =
+      treeQuery.error instanceof Error
+        ? treeQuery.error.message
+        : 'Failed to load file tree';
+
     return (
-      <div className="p-3 text-sm text-destructive">{message}</div>
+      <div className="break-words p-3 text-sm text-destructive">{message}</div>
     );
   }
 
