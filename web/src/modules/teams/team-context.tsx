@@ -82,6 +82,9 @@ function TeamContextProvider({ children }: { children: ReactNode }) {
 
   const teams = teamsQuery.data ?? [];
   const instances = instancesQuery.data ?? [];
+  const boundTeamId = boundContextQuery.data?.repo?.team_id ?? null;
+  const refetchBoundContext = boundContextQuery.refetch;
+  const mutateBoundInstance = bindInstanceMutation.mutateAsync;
 
   const persistSelectedTeam = useCallback((teamId: string | null) => {
     writeSelectedTeamId(teamId);
@@ -90,8 +93,7 @@ function TeamContextProvider({ children }: { children: ReactNode }) {
 
   const ensureBindingForTeam = useCallback(
     async (teamId: string) => {
-      const currentlyBound = boundContextQuery.data?.repo;
-      if (currentlyBound?.team_id === teamId) {
+      if (boundTeamId === teamId) {
         return;
       }
 
@@ -103,10 +105,10 @@ function TeamContextProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      await bindInstanceMutation.mutateAsync({ repo_id: teamInstances[0].id });
-      await boundContextQuery.refetch();
+      await mutateBoundInstance({ repo_id: teamInstances[0].id });
+      await refetchBoundContext();
     },
-    [bindInstanceMutation, boundContextQuery, instances],
+    [boundTeamId, instances, mutateBoundInstance, refetchBoundContext],
   );
 
   useEffect(() => {
@@ -136,6 +138,10 @@ function TeamContextProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (boundTeamId === selectedTeamId) {
+      return;
+    }
+
     let isCanceled = false;
     setIsEnsuringBinding(true);
     ensureBindingForTeam(selectedTeamId)
@@ -152,6 +158,7 @@ function TeamContextProvider({ children }: { children: ReactNode }) {
       isCanceled = true;
     };
   }, [
+    boundTeamId,
     boundContextQuery.data,
     ensureBindingForTeam,
     instancesQuery.data,
@@ -198,26 +205,27 @@ function TeamContextProvider({ children }: { children: ReactNode }) {
         await ensureBindingForTeam(teamId);
       },
       async setActiveInstance(instanceId) {
-        await bindInstanceMutation.mutateAsync({ repo_id: instanceId });
-        await boundContextQuery.refetch();
+        await mutateBoundInstance({ repo_id: instanceId });
+        await refetchBoundContext();
       },
       async refresh() {
         await Promise.all([
           teamsQuery.refetch(),
           instancesQuery.refetch(),
-          boundContextQuery.refetch(),
+          refetchBoundContext(),
         ]);
       },
     };
   }, [
     activeInstance,
     bindInstanceMutation,
-    boundContextQuery,
     ensureBindingForTeam,
     instances,
     instancesQuery,
     isEnsuringBinding,
+    mutateBoundInstance,
     persistSelectedTeam,
+    refetchBoundContext,
     selectedTeam,
     selectedTeamId,
     selectedTeamInstances,
