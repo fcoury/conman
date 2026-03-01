@@ -35,6 +35,11 @@ export interface FileWriteResponse {
   path: string;
 }
 
+export interface PendingCreation {
+  type: 'file' | 'folder';
+  parentPath: string; // '' for root
+}
+
 // Client-side tree structure built from the flat FileEntry list
 export interface TreeNode {
   name: string;
