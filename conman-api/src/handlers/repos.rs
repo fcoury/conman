@@ -13,7 +13,11 @@ use conman_db::{EnvironmentInput, RuntimeProfileInput, RuntimeProfileUpdate};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    error::ApiConmanError, events::emit_audit, extractors::Pagination, response::ApiResponse,
+    error::ApiConmanError,
+    events::emit_audit,
+    extractors::Pagination,
+    repo_provisioning::{cleanup_created_repo, ensure_repo_provisioned},
+    response::ApiResponse,
     state::AppState,
 };
 
@@ -263,14 +267,35 @@ pub async fn create_repo(
 
     let repo_store = conman_db::RepoStore::new(state.db.clone());
     let repo_membership_repo = conman_db::RepoMembershipRepo::new(state.db.clone());
-    let repo = repo_store
+    let provisioning = ensure_repo_provisioned(
+        &state,
+        &auth,
+        req.repo_path.trim(),
+        &integration_branch,
+        req.name.trim(),
+    )
+    .await?;
+    let repo_result = repo_store
         .insert(
             &req.name,
             &req.repo_path,
             &integration_branch,
             &auth.user_id,
         )
-        .await?;
+        .await;
+    let repo = match repo_result {
+        Ok(repo) => repo,
+        Err(err) => {
+            if let Err(cleanup_err) = cleanup_created_repo(&state, &provisioning).await {
+                tracing::warn!(
+                    error = %cleanup_err,
+                    repo_path = req.repo_path.trim(),
+                    "failed to rollback provisioned repository after insert error"
+                );
+            }
+            return Err(err.into());
+        }
+    };
 
     repo_membership_repo
         .assign_role(&auth.user_id, &repo.id, Role::Admin)

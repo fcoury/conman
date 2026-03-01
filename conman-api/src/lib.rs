@@ -6,6 +6,7 @@ pub mod handlers;
 pub mod metrics;
 pub mod openapi;
 pub mod rate_limit;
+pub mod repo_provisioning;
 pub mod request_context;
 pub mod response;
 pub mod router;

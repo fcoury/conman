@@ -18,7 +18,12 @@ const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefi
 
 // Resolve the single repo from the team context
 function useResolvedRepo() {
-  const { selectedTeamInstances } = useTeamContext();
+  const { activeInstance, selectedTeamInstances } = useTeamContext();
+
+  // Prefer currently bound instance from `/api/repo`.
+  if (activeInstance) {
+    return { repoId: activeInstance.id, repoName: activeInstance.name, error: null };
+  }
 
   if (selectedTeamInstances.length === 0) {
     return { repoId: null, repoName: null, error: 'No repositories found for this team' };

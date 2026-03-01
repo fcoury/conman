@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EditorState } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
+import { EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
+import { css } from '@codemirror/lang-css';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
-import { css } from '@codemirror/lang-css';
 import { yaml } from '@codemirror/lang-yaml';
+import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { useTheme } from 'next-themes';
 
 interface FileEditorProps {
   content: string;
@@ -15,7 +17,6 @@ interface FileEditorProps {
   onSave: () => void;
 }
 
-// Detect language extension from file path
 function getLanguageExtension(filePath: string) {
   const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
   switch (ext) {
@@ -47,65 +48,121 @@ export default function FileEditor({
   onChange,
   onSave,
 }: FileEditorProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const [fallbackMode, setFallbackMode] = useState(false);
+  const [fallbackValue, setFallbackValue] = useState(content);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-  // Track the latest callbacks without recreating the editor
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    setFallbackValue(content);
+    setFallbackMode(false);
+  }, [content, filePath, isDark]);
 
-    const langExt = getLanguageExtension(filePath);
-    const extensions = [
-      lineNumbers(),
-      highlightActiveLine(),
-      oneDark,
-      // Cmd/Ctrl+S to save
-      keymap.of([
-        {
-          key: 'Mod-s',
-          run: () => {
-            onSaveRef.current();
-            return true;
-          },
-        },
-      ]),
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
-          onChangeRef.current(update.state.doc.toString());
-        }
-      }),
-    ];
+  useEffect(() => {
+    if (!containerRef.current || fallbackMode) return;
 
-    if (langExt) extensions.push(langExt);
-    if (readOnly) extensions.push(EditorState.readOnly.of(true));
+    try {
+      const languageExtension = getLanguageExtension(filePath);
+      const state = EditorState.create({
+        doc: content,
+        extensions: [
+          lineNumbers(),
+          highlightActiveLine(),
+          ...(isDark ? [oneDark] : []),
+          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          keymap.of([
+            {
+              key: 'Mod-s',
+              run: () => {
+                onSaveRef.current();
+                return true;
+              },
+            },
+          ]),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              onChangeRef.current(update.state.doc.toString());
+            }
+          }),
+          EditorView.theme({
+            '&': { height: '100%' },
+            '.cm-scroller': { overflow: 'auto', fontFamily: 'monospace' },
+            '.cm-content': {
+              fontFamily:
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace',
+              fontSize: '0.875rem',
+            },
+            '.cm-gutters': {
+              backgroundColor: 'var(--muted)',
+              color: 'var(--muted-foreground)',
+              borderRight: '1px solid var(--border)',
+            },
+            '.cm-activeLineGutter': {
+              backgroundColor: 'var(--accent)',
+            },
+            '.cm-activeLine': {
+              backgroundColor: 'color-mix(in oklab, var(--accent) 40%, transparent)',
+            },
+            '.cm-cursor, .cm-dropCursor': {
+              borderLeftColor: 'var(--foreground)',
+            },
+            '&.cm-focused': {
+              outline: 'none',
+            },
+          }),
+          ...(languageExtension ? [languageExtension] : []),
+          ...(readOnly ? [EditorState.readOnly.of(true)] : []),
+        ],
+      });
 
-    const state = EditorState.create({
-      doc: content,
-      extensions,
-    });
+      const view = new EditorView({
+        state,
+        parent: containerRef.current,
+      });
+      viewRef.current = view;
 
-    const view = new EditorView({
-      state,
-      parent: containerRef.current,
-    });
-    viewRef.current = view;
+      return () => {
+        view.destroy();
+        viewRef.current = null;
+      };
+    } catch {
+      setFallbackMode(true);
+      return;
+    }
+  }, [content, filePath, readOnly, fallbackMode, isDark]);
 
-    return () => {
-      view.destroy();
-      viewRef.current = null;
-    };
-    // Re-create editor when file path or content changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filePath, content, readOnly]);
+  if (!fallbackMode) {
+    return (
+      <div
+        ref={containerRef}
+        className="h-full overflow-auto [&_.cm-editor]:h-full [&_.cm-scroller]:overflow-auto"
+      />
+    );
+  }
 
   return (
-    <div
-      ref={containerRef}
-      className="h-full overflow-auto [&_.cm-editor]:h-full [&_.cm-scroller]:overflow-auto"
+    <textarea
+      value={fallbackValue}
+      readOnly={readOnly}
+      onChange={(event) => {
+        const next = event.target.value;
+        setFallbackValue(next);
+        onChange(next);
+      }}
+      onKeyDown={(event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+          event.preventDefault();
+          onSave();
+        }
+      }}
+      className="h-full w-full resize-none bg-background p-3 font-mono text-sm text-foreground outline-none"
+      spellCheck={false}
     />
   );
 }

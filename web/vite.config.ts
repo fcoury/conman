@@ -3,6 +3,20 @@ import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 
+const DEDUPE_PACKAGES = [
+  'react',
+  'react-dom',
+  '@codemirror/state',
+  '@codemirror/view',
+  '@codemirror/language',
+  '@codemirror/autocomplete',
+  '@codemirror/theme-one-dark',
+  '@codemirror/lang-javascript',
+  '@codemirror/lang-json',
+  '@codemirror/lang-css',
+  '@codemirror/lang-yaml',
+];
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
@@ -24,8 +38,7 @@ export default defineConfig({
       ),
       '~': path.resolve(__dirname, './src'),
     },
-    dedupe: ['react', 'react-dom'],
-    preserveSymlinks: true,
+    dedupe: DEDUPE_PACKAGES,
   },
   optimizeDeps: {
     exclude: ['gistia-design-system'],

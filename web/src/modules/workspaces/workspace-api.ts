@@ -19,9 +19,24 @@ export function getFileTree(
   const params = new URLSearchParams();
   if (path) params.set('path', path);
   if (recursive) params.set('recursive', 'true');
-  return apiData<FileTreeResponse>(
-    `/api/repos/${repoId}/workspaces/${wsId}/files?${params.toString()}`,
-  );
+  return apiData<{
+    path: string;
+    entries: Array<{
+      path: string;
+      type?: 'file' | 'dir';
+      entry_type?: 'file' | 'dir';
+      size: number;
+      oid: string;
+    }>;
+  }>(`/api/repos/${repoId}/workspaces/${wsId}/files?${params.toString()}`).then((raw) => ({
+    path: raw.path,
+    entries: raw.entries.map((entry) => ({
+      path: entry.path,
+      entry_type: entry.entry_type ?? entry.type ?? 'file',
+      size: entry.size,
+      oid: entry.oid,
+    })),
+  }));
 }
 
 export function getFileContent(

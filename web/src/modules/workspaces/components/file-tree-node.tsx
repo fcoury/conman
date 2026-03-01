@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   ChevronRight,
   File,
@@ -25,6 +24,8 @@ import FileTreeInput from './file-tree-input';
 interface FileTreeNodeProps {
   node: TreeNode;
   depth: number;
+  isPathExpanded: (path: string) => boolean;
+  onToggleDir: (path: string) => void;
   selectedFile: string | null;
   onFileSelect: (path: string) => void;
   pendingCreation: PendingCreation | null;
@@ -76,6 +77,8 @@ function fileIcon(name: string) {
 export default function FileTreeNode({
   node,
   depth,
+  isPathExpanded,
+  onToggleDir,
   selectedFile,
   onFileSelect,
   pendingCreation,
@@ -84,17 +87,16 @@ export default function FileTreeNode({
   onCreateCancel,
   onDelete,
 }: FileTreeNodeProps) {
-  const [expanded, setExpanded] = useState(depth < 1);
   const isDir = node.type === 'dir';
   const isSelected = !isDir && node.path === selectedFile;
 
   // Auto-expand folder when it's the target of a pending creation
   const isCreationTarget = pendingCreation?.parentPath === node.path && isDir;
-  const isExpanded = expanded || isCreationTarget;
+  const expanded = isPathExpanded(node.path) || isCreationTarget;
 
   function handleClick() {
     if (isDir) {
-      setExpanded((prev) => !prev);
+      onToggleDir(node.path);
     } else {
       onFileSelect(node.path);
     }
@@ -110,7 +112,7 @@ export default function FileTreeNode({
   }
 
   const Icon = isDir
-    ? isExpanded
+    ? expanded
       ? FolderOpen
       : Folder
     : fileIcon(node.name);
@@ -125,7 +127,7 @@ export default function FileTreeNode({
     >
       {isDir ? (
         <ChevronRight
-          className={`size-3.5 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+          className={`size-3.5 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
         />
       ) : (
         <span className="w-3.5 shrink-0" />
@@ -165,7 +167,7 @@ export default function FileTreeNode({
         {contextMenuContent}
       </ContextMenu>
 
-      {isDir && isExpanded && (
+      {isDir && expanded && (
         <div>
           {/* Inline input for creating inside this folder */}
           {isCreationTarget && pendingCreation && (
@@ -181,6 +183,8 @@ export default function FileTreeNode({
               key={child.path}
               node={child}
               depth={depth + 1}
+              isPathExpanded={isPathExpanded}
+              onToggleDir={onToggleDir}
               selectedFile={selectedFile}
               onFileSelect={onFileSelect}
               pendingCreation={pendingCreation}

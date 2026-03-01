@@ -40,7 +40,7 @@ function isTextFile(path: string): boolean {
   const textExts = new Set([
     'yaml', 'yml', 'json', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss',
     'html', 'htm', 'xml', 'svg', 'md', 'txt', 'toml', 'ini', 'cfg',
-    'sh', 'bash', 'zsh', 'fish', 'env', 'gitignore', 'dockerignore',
+    'sh', 'bash', 'zsh', 'fish', 'env', 'tf', 'gitignore', 'dockerignore',
     'dockerfile', 'makefile', 'rs', 'go', 'py', 'rb', 'lua',
   ]);
   // Also consider files with no extension as text

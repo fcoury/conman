@@ -3,7 +3,13 @@ use conman_auth::{AuthUser, issue_token};
 use conman_core::{ConmanError, Repo, Role, Team};
 use serde::{Deserialize, Serialize};
 
-use crate::{error::ApiConmanError, events::emit_audit, response::ApiResponse, state::AppState};
+use crate::{
+    error::ApiConmanError,
+    events::emit_audit,
+    repo_provisioning::{cleanup_created_repo, ensure_repo_provisioned},
+    response::ApiResponse,
+    state::AppState,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateInstanceRequest {
@@ -105,6 +111,14 @@ pub async fn create_instance(
 
     let repo_store = conman_db::RepoStore::new(state.db.clone());
     let repo_membership_repo = conman_db::RepoMembershipRepo::new(state.db.clone());
+    let provisioning = ensure_repo_provisioned(
+        &state,
+        &auth,
+        &instance_slug,
+        &integration_branch,
+        instance_name,
+    )
+    .await?;
     let repo = match repo_store
         .insert_for_team(
             &team.id,
@@ -119,6 +133,13 @@ pub async fn create_instance(
         Err(ConmanError::Conflict { message })
             if message.contains("repos_name_unique") || message.contains("dup key: { name:") =>
         {
+            if let Err(cleanup_err) = cleanup_created_repo(&state, &provisioning).await {
+                tracing::warn!(
+                    error = %cleanup_err,
+                    repo_path = instance_slug,
+                    "failed to rollback provisioned repository after insert error"
+                );
+            }
             return Err(ConmanError::Conflict {
                 message: "instance_name is already in use".to_string(),
             }
@@ -128,12 +149,28 @@ pub async fn create_instance(
             if message.contains("repos_repo_path_unique")
                 || message.contains("dup key: { repo_path:") =>
         {
+            if let Err(cleanup_err) = cleanup_created_repo(&state, &provisioning).await {
+                tracing::warn!(
+                    error = %cleanup_err,
+                    repo_path = instance_slug,
+                    "failed to rollback provisioned repository after insert error"
+                );
+            }
             return Err(ConmanError::Conflict {
                 message: "instance_slug is already in use".to_string(),
             }
             .into());
         }
-        Err(err) => return Err(err.into()),
+        Err(err) => {
+            if let Err(cleanup_err) = cleanup_created_repo(&state, &provisioning).await {
+                tracing::warn!(
+                    error = %cleanup_err,
+                    repo_path = instance_slug,
+                    "failed to rollback provisioned repository after insert error"
+                );
+            }
+            return Err(err.into());
+        }
     };
 
     let team_members = team_membership_repo.list_by_team_id(&team.id).await?;

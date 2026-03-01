@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
-use tonic::{Status, transport::Channel};
+use tonic::{Code, Status, transport::Channel};
 
 use conman_core::{
     CommitResult, ConmanError, FileAction, GitAuthor, GitBranch, GitCommit, GitDiffEntry,
@@ -29,6 +29,8 @@ use gitaly_proto::gitaly::{
 use tokio_stream::iter;
 
 use crate::adapter::GitAdapter;
+
+const ZERO_OID: &str = "0000000000000000000000000000000000000000";
 
 #[derive(Clone)]
 pub struct GitalyClient {
@@ -430,113 +432,134 @@ impl GitAdapter for GitalyClient {
     ) -> Result<CommitResult, ConmanError> {
         let mut client = self.operation_client();
 
-        let mut requests = Vec::new();
-        requests.push(UserCommitFilesRequest {
-            user_commit_files_request_payload: Some(UserCommitFilesRequestPayload::Header(
-                UserCommitFilesRequestHeader {
-                    repository: Some(to_proto_repo(repo)),
-                    user: Some(to_proto_user(user)),
-                    branch_name: branch_name.as_bytes().to_vec(),
-                    start_branch_name: start_branch_name.unwrap_or_default().as_bytes().to_vec(),
-                    commit_message: message.as_bytes().to_vec(),
-                    commit_author_name: user.name.as_bytes().to_vec(),
-                    commit_author_email: user.email.as_bytes().to_vec(),
-                    ..Default::default()
-                },
-            )),
-        });
-
-        for action in actions {
-            let (header, content) = match action {
-                FileAction::Create { path, content } => (
-                    UserCommitFilesActionHeader {
-                        action: ActionType::Create as i32,
-                        file_path: path.as_bytes().to_vec(),
-                        ..Default::default()
-                    },
-                    Some(content),
-                ),
-                FileAction::CreateDir { path } => (
-                    UserCommitFilesActionHeader {
-                        action: ActionType::CreateDir as i32,
-                        file_path: path.as_bytes().to_vec(),
-                        ..Default::default()
-                    },
-                    None,
-                ),
-                FileAction::Update { path, content } => (
-                    UserCommitFilesActionHeader {
-                        action: ActionType::Update as i32,
-                        file_path: path.as_bytes().to_vec(),
-                        ..Default::default()
-                    },
-                    Some(content),
-                ),
-                FileAction::Move {
-                    previous_path,
-                    path,
-                    content,
-                } => {
-                    let infer_content = content.is_none();
-                    (
-                        UserCommitFilesActionHeader {
-                            action: ActionType::Move as i32,
-                            file_path: path.as_bytes().to_vec(),
-                            previous_path: previous_path.as_bytes().to_vec(),
-                            infer_content,
-                            ..Default::default()
-                        },
-                        content,
-                    )
-                }
-                FileAction::Delete { path } => (
-                    UserCommitFilesActionHeader {
-                        action: ActionType::Delete as i32,
-                        file_path: path.as_bytes().to_vec(),
-                        ..Default::default()
-                    },
-                    None,
-                ),
-                FileAction::Chmod { path, execute } => (
-                    UserCommitFilesActionHeader {
-                        action: ActionType::Chmod as i32,
-                        file_path: path.as_bytes().to_vec(),
-                        execute_filemode: execute,
-                        ..Default::default()
-                    },
-                    None,
-                ),
-            };
-
+        let build_requests = |expected_old_oid: Option<&str>| {
+            let mut requests = Vec::new();
             requests.push(UserCommitFilesRequest {
-                user_commit_files_request_payload: Some(UserCommitFilesRequestPayload::Action(
-                    UserCommitFilesAction {
-                        user_commit_files_action_payload: Some(
-                            UserCommitFilesActionPayload::Header(header),
-                        ),
+                user_commit_files_request_payload: Some(UserCommitFilesRequestPayload::Header(
+                    UserCommitFilesRequestHeader {
+                        repository: Some(to_proto_repo(repo)),
+                        user: Some(to_proto_user(user)),
+                        branch_name: branch_name.as_bytes().to_vec(),
+                        start_branch_name: start_branch_name
+                            .unwrap_or_default()
+                            .as_bytes()
+                            .to_vec(),
+                        commit_message: message.as_bytes().to_vec(),
+                        commit_author_name: user.name.as_bytes().to_vec(),
+                        commit_author_email: user.email.as_bytes().to_vec(),
+                        expected_old_oid: expected_old_oid.unwrap_or_default().to_string(),
+                        ..Default::default()
                     },
                 )),
             });
 
-            if let Some(content) = content {
+            for action in actions.clone() {
+                let (header, content) = match action {
+                    FileAction::Create { path, content } => (
+                        UserCommitFilesActionHeader {
+                            action: ActionType::Create as i32,
+                            file_path: path.as_bytes().to_vec(),
+                            ..Default::default()
+                        },
+                        Some(content),
+                    ),
+                    FileAction::CreateDir { path } => (
+                        UserCommitFilesActionHeader {
+                            action: ActionType::CreateDir as i32,
+                            file_path: path.as_bytes().to_vec(),
+                            ..Default::default()
+                        },
+                        None,
+                    ),
+                    FileAction::Update { path, content } => (
+                        UserCommitFilesActionHeader {
+                            action: ActionType::Update as i32,
+                            file_path: path.as_bytes().to_vec(),
+                            ..Default::default()
+                        },
+                        Some(content),
+                    ),
+                    FileAction::Move {
+                        previous_path,
+                        path,
+                        content,
+                    } => {
+                        let infer_content = content.is_none();
+                        (
+                            UserCommitFilesActionHeader {
+                                action: ActionType::Move as i32,
+                                file_path: path.as_bytes().to_vec(),
+                                previous_path: previous_path.as_bytes().to_vec(),
+                                infer_content,
+                                ..Default::default()
+                            },
+                            content,
+                        )
+                    }
+                    FileAction::Delete { path } => (
+                        UserCommitFilesActionHeader {
+                            action: ActionType::Delete as i32,
+                            file_path: path.as_bytes().to_vec(),
+                            ..Default::default()
+                        },
+                        None,
+                    ),
+                    FileAction::Chmod { path, execute } => (
+                        UserCommitFilesActionHeader {
+                            action: ActionType::Chmod as i32,
+                            file_path: path.as_bytes().to_vec(),
+                            execute_filemode: execute,
+                            ..Default::default()
+                        },
+                        None,
+                    ),
+                };
+
                 requests.push(UserCommitFilesRequest {
                     user_commit_files_request_payload: Some(UserCommitFilesRequestPayload::Action(
                         UserCommitFilesAction {
                             user_commit_files_action_payload: Some(
-                                UserCommitFilesActionPayload::Content(content),
+                                UserCommitFilesActionPayload::Header(header),
                             ),
                         },
                     )),
                 });
-            }
-        }
 
+                if let Some(content) = content {
+                    requests.push(UserCommitFilesRequest {
+                        user_commit_files_request_payload: Some(
+                            UserCommitFilesRequestPayload::Action(UserCommitFilesAction {
+                                user_commit_files_action_payload: Some(
+                                    UserCommitFilesActionPayload::Content(content),
+                                ),
+                            }),
+                        ),
+                    });
+                }
+            }
+
+            requests
+        };
+
+        let requests = build_requests(None);
         let retry_requests = requests.clone();
 
-        let response = client
-            .user_commit_files(iter(requests))
-            .await
-            .map_err(map_status_to_error)?;
+        let response = match client.user_commit_files(iter(requests)).await {
+            Ok(response) => response,
+            Err(status)
+                if start_branch_name.is_none()
+                    && status.code() == Code::InvalidArgument
+                    && status
+                        .message()
+                        .contains("could not resolve parent commit from start_sha, start_branch_name, or branch_name") =>
+            {
+                client
+                    .user_commit_files(iter(build_requests(Some(ZERO_OID))))
+                    .await
+                    .map_err(map_status_to_error)?
+            }
+            Err(status) => return Err(map_status_to_error(status)),
+        };
 
         let response = response.into_inner();
         if let Some(branch_update) = response.branch_update {

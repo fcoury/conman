@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FilePlus, FolderPlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,6 +40,10 @@ interface FileTreeProps {
   onDelete: (path: string) => void;
 }
 
+function storageKey(repoId: string, workspaceId: string): string {
+  return `conman.file-tree.expanded.${repoId}.${workspaceId}`;
+}
+
 function isMissingRevisionError(error: unknown): boolean {
   return (
     error instanceof ApiError &&
@@ -62,42 +66,47 @@ function isTreeUnsupportedError(error: unknown): boolean {
 // Build a nested tree from the flat list of file entries
 function buildTree(entries: FileEntry[]): TreeNode[] {
   const root: TreeNode[] = [];
+  const seen = new Set<string>();
 
-  // Sort: directories first, then alphabetically
-  const sorted = [...entries].sort((a, b) => {
-    if (a.entry_type !== b.entry_type) {
-      return a.entry_type === 'dir' ? -1 : 1;
-    }
-    return a.path.localeCompare(b.path);
-  });
+  // Recursive listings from git can omit explicit directory entries.
+  // Build missing folder nodes from path prefixes and de-duplicate nodes.
+  for (const entry of entries) {
+    const normalizedPath = entry.path.replace(/^\/+|\/+$/g, '');
+    if (!normalizedPath) continue;
 
-  const dirMap = new Map<string, TreeNode>();
+    const parts = normalizedPath.split('/').filter(Boolean);
+    let children = root;
+    let currentPath = '';
 
-  for (const entry of sorted) {
-    const parts = entry.path.split('/');
-    const name = parts[parts.length - 1];
-    const node: TreeNode = {
-      name,
-      path: entry.path,
-      type: entry.entry_type,
-      ...(entry.entry_type === 'dir' ? { children: [] } : {}),
-    };
+    for (let i = 0; i < parts.length; i += 1) {
+      const part = parts[i];
+      const isLeaf = i === parts.length - 1;
+      const desiredType: 'file' | 'dir' = isLeaf ? entry.entry_type : 'dir';
 
-    if (entry.entry_type === 'dir') {
-      dirMap.set(entry.path, node);
-    }
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const dedupeKey = `${desiredType}:${currentPath}`;
+      let node = children.find((candidate) => candidate.path === currentPath);
 
-    // Find parent directory
-    const parentPath = parts.slice(0, -1).join('/');
-    const parent = parentPath ? dirMap.get(parentPath) : null;
+      if (!node) {
+        node = {
+          name: part,
+          path: currentPath,
+          type: desiredType,
+          ...(desiredType === 'dir' ? { children: [] } : {}),
+        };
+        if (!seen.has(dedupeKey)) {
+          children.push(node);
+          seen.add(dedupeKey);
+        }
+      } else if (desiredType === 'dir' && node.type !== 'dir') {
+        node.type = 'dir';
+        node.children = node.children ?? [];
+      }
 
-    if (parent?.children) {
-      parent.children.push(node);
-    } else if (!parentPath) {
-      root.push(node);
-    } else {
-      // Parent directory wasn't in the list — place at root
-      root.push(node);
+      if (node.type === 'dir') {
+        node.children = node.children ?? [];
+        children = node.children;
+      }
     }
   }
 
@@ -127,6 +136,57 @@ export default function FileTree({
   onCreateCancel,
   onDelete,
 }: FileTreeProps) {
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+
+  const expansionStorageKey = useMemo(
+    () => storageKey(repoId, workspaceId),
+    [repoId, workspaceId],
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const raw = window.localStorage.getItem(expansionStorageKey);
+    if (!raw) {
+      setExpandedPaths(new Set());
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as string[];
+      setExpandedPaths(new Set(parsed));
+    } catch {
+      setExpandedPaths(new Set());
+    }
+  }, [expansionStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(
+      expansionStorageKey,
+      JSON.stringify(Array.from(expandedPaths)),
+    );
+  }, [expandedPaths, expansionStorageKey]);
+
+  const isPathExpanded = useCallback(
+    (path: string) => expandedPaths.has(path),
+    [expandedPaths],
+  );
+
+  const onToggleDir = useCallback((path: string) => {
+    setExpandedPaths((previous) => {
+      const next = new Set(previous);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
+
   const treeQuery = useQuery({
     queryKey: ['file-tree', repoId, workspaceId],
     queryFn: () => getFileTree(repoId, workspaceId, '', true),
@@ -319,6 +379,8 @@ export default function FileTree({
                 key={node.path}
                 node={node}
                 depth={0}
+                isPathExpanded={isPathExpanded}
+                onToggleDir={onToggleDir}
                 selectedFile={selectedFile}
                 onFileSelect={onFileSelect}
                 pendingCreation={pendingCreation}
