@@ -12,6 +12,7 @@ export default defineConfig({
         changeOrigin: false,
       },
     },
+    allowedHosts: ['m3pro', 'dxflow-app.localhost', '.dxflow-app.localhost'],
     fs: { allow: ['..'] },
   },
   resolve: {

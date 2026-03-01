@@ -1,0 +1,11 @@
+services:
+  conman-local-proxy:
+    image: nginx:1.27-alpine
+    container_name: conman-local-proxy
+    ports:
+      - "${CONMAN_PROXY_HTTP_PORT:-80}:80"
+      - "${CONMAN_PROXY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+

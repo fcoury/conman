@@ -64,6 +64,43 @@ API docs while running locally:
 open http://127.0.0.1:3000/api/docs
 ```
 
+### Local HTTPS subdomains (`*.dxflow-app.localhost`)
+
+This is a Conman-only local setup for wildcard subdomains and HTTPS using
+`mkcert` + a single `nginx` proxy container.
+
+1. Generate certs:
+
+```bash
+./scripts/local-domains/certs.sh
+```
+
+2. Start Conman API (`:3000`) and web (`:5173`):
+
+```bash
+cargo run
+cd web && pnpm dev
+```
+
+3. Start the local HTTPS proxy:
+
+```bash
+./scripts/local-domains/up.sh
+```
+
+4. Open any subdomain:
+
+```text
+https://repo-a.dxflow-app.localhost/
+https://repo-b.dxflow-app.localhost/
+```
+
+Stop the proxy with:
+
+```bash
+./scripts/local-domains/down.sh
+```
+
 Create the first account (open signup):
 
 ```bash
@@ -71,6 +108,30 @@ curl -sS -X POST http://127.0.0.1:3000/api/auth/signup \
   -H 'content-type: application/json' \
   -d '{"name":"Admin User","email":"admin@example.com","password":"AdminPassw0rd!!"}'
 ```
+
+Conman web now includes first-party `login` and `signup` pages. When a user
+belongs to more than one team, sign-in routes them through a required team
+picker before entering the app shell.
+
+In the web interface, repositories are labeled as **instances**.
+
+### Assign `felipe.coury@gmail.com` as owner on all 4 bootstrap teams
+
+Use the idempotent bootstrap script:
+
+```bash
+cd conman
+ADMIN_EMAIL='admin@example.com' \
+ADMIN_PASSWORD='AdminPassw0rd!!' \
+FELIPE_PASSWORD='FelipePassw0rd!!' \
+./scripts/bootstrap-felipe-owner.sh
+```
+
+Defaults:
+
+- `FELIPE_EMAIL=felipe.coury@gmail.com`
+- `TEAM_SLUGS=hepquant-team,detoxu-team,biofidelity-team,dxflow-examples-team`
+- `RESULTS_DIR=tests/e2e/results`
 
 Manual end-to-end API testing sequence:
 

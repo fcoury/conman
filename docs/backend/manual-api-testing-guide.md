@@ -110,6 +110,21 @@ api_auth GET "/api/repos?page=1&limit=20" | jq
 api_auth GET "/api/repos/$REPO_ID" | jq
 ```
 
+### Optional: bootstrap `felipe.coury@gmail.com` as owner on all local teams
+
+If you created the four mirrored team slugs (`hepquant-team`, `detoxu-team`,
+`biofidelity-team`, `dxflow-examples-team`), run:
+
+```bash
+cd conman
+ADMIN_EMAIL="admin@example.com" \
+ADMIN_PASSWORD="AdminPassw0rd!!" \
+FELIPE_PASSWORD="FelipePassw0rd!!" \
+./scripts/bootstrap-felipe-owner.sh
+```
+
+The script is idempotent and writes a JSON summary to `tests/e2e/results/`.
+
 ## 6. Repository settings, members, and team invites
 
 ```bash
