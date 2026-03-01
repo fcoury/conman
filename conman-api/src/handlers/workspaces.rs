@@ -5,8 +5,8 @@ use axum::{
 use base64::{Engine, engine::general_purpose::STANDARD};
 use conman_auth::AuthUser;
 use conman_core::{
-    Repo, BaseRefType, CommitMode, ConflictStatus, ConmanError, FileAction, FileEntry,
-    FileEntryType, GitRepo, GitTreeEntryType, GitUser, Role, Workspace,
+    BaseRefType, CommitMode, ConflictStatus, ConmanError, FileAction, FileEntry, FileEntryType,
+    GitRepo, GitTreeEntryType, GitUser, Repo, Role, Workspace,
 };
 use conman_db::CreateWorkspaceInput;
 use serde::{Deserialize, Serialize};
@@ -122,6 +122,40 @@ fn default_workspace_branch(auth: &AuthUser, repo: &Repo) -> String {
     format!("ws/{}/{app_slug}", auth.user_id)
 }
 
+fn normalize_optional_title(title: Option<String>) -> Option<String> {
+    title
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn format_first_workspace_title(user_name: &str, app_title: &str) -> String {
+    format!("{}'s {} Workspace", user_name.trim(), app_title.trim())
+}
+
+async fn resolve_first_workspace_title(
+    state: &AppState,
+    auth: &AuthUser,
+    repo: &Repo,
+) -> Result<String, ApiConmanError> {
+    let owner_name = conman_db::UserRepo::new(state.db.clone())
+        .find_by_id(&auth.user_id)
+        .await?
+        .map(|user| user.name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| auth.email.clone());
+
+    let app_title = conman_db::AppRepo::new(state.db.clone())
+        .list_by_repo(&repo.id)
+        .await?
+        .into_iter()
+        .next()
+        .map(|app| app.title.trim().to_string())
+        .filter(|title| !title.is_empty())
+        .unwrap_or_else(|| repo.name.clone());
+
+    Ok(format_first_workspace_title(&owner_name, &app_title))
+}
+
 fn is_blocked_path(path: &str, blocked: &[String]) -> bool {
     blocked.iter().any(|pattern| {
         if let Some(prefix) = pattern.strip_suffix("/**") {
@@ -219,19 +253,53 @@ async fn ensure_default_workspace(
     auth: &AuthUser,
     repo: &Repo,
 ) -> Result<Workspace, ApiConmanError> {
+    // Auditing is delegated to `create_workspace_entry` via `audit_workspace_event(...)`.
+    create_workspace_entry(state, auth, repo, None, None).await
+}
+
+async fn create_workspace_entry(
+    state: &AppState,
+    auth: &AuthUser,
+    repo: &Repo,
+    requested_branch_name: Option<String>,
+    requested_title: Option<String>,
+) -> Result<Workspace, ApiConmanError> {
     let workspace_repo = conman_db::WorkspaceRepo::new(state.db.clone());
-    if let Some(existing) = workspace_repo.find_default(&repo.id, &auth.user_id).await? {
-        return Ok(existing);
+    let existing_workspaces = workspace_repo
+        .list_by_repo_owner(&repo.id, &auth.user_id)
+        .await?;
+    let is_first_workspace = existing_workspaces.is_empty();
+
+    let is_default = requested_branch_name.is_none();
+    if is_default
+        && existing_workspaces
+            .iter()
+            .any(|workspace| workspace.is_default)
+    {
+        return Err(ConmanError::Conflict {
+            message: "default workspace already exists for this repo".to_string(),
+        }
+        .into());
     }
 
-    let branch_name = default_workspace_branch(auth, repo);
+    let branch_name = requested_branch_name.unwrap_or_else(|| default_workspace_branch(auth, repo));
+    let title = if is_first_workspace {
+        Some(resolve_first_workspace_title(state, auth, repo).await?)
+    } else {
+        normalize_optional_title(requested_title)
+    };
+
     let git_repo = git_repo(repo);
     let git_user = git_user(auth);
     let mut head_sha = repo.integration_branch.clone();
-
     match state
         .git_adapter
-        .create_branch(&git_repo, &git_user, &branch_name, &repo.integration_branch)
+        .create_branch(
+            &git_repo,
+            &git_user,
+            &branch_name,
+            repo.integration_branch.as_str(),
+        )
         .await
     {
         Ok(branch) => {
@@ -248,13 +316,14 @@ async fn ensure_default_workspace(
             repo_id: repo.id.clone(),
             owner_user_id: auth.user_id.clone(),
             branch_name,
-            title: None,
-            is_default: true,
+            title,
+            is_default,
             base_ref_type: BaseRefType::Branch,
             base_ref_value: repo.integration_branch.clone(),
             head_sha,
         })
         .await?;
+
     audit_workspace_event(
         state,
         auth,
@@ -265,6 +334,7 @@ async fn ensure_default_workspace(
         Some(&workspace.head_sha),
     )
     .await;
+
     Ok(workspace)
 }
 
@@ -295,68 +365,9 @@ pub async fn create_workspace(
 ) -> Result<Json<ApiResponse<Workspace>>, ApiConmanError> {
     auth.require_role(&repo_id, Role::Member)?;
     let repo = find_repo(&state, &repo_id).await?;
-
-    let provided_branch = req.branch_name;
-    let is_default = provided_branch.is_none();
-    let branch_name = provided_branch.unwrap_or_else(|| default_workspace_branch(&auth, &repo));
-
-    if is_default
-        && conman_db::WorkspaceRepo::new(state.db.clone())
-            .find_default(&repo_id, &auth.user_id)
-            .await?
-            .is_some()
-    {
-        return Err(ConmanError::Conflict {
-            message: "default workspace already exists for this repo".to_string(),
-        }
-        .into());
-    }
-
-    let git_repo = git_repo(&repo);
-    let git_user = git_user(&auth);
-    let mut head_sha = repo.integration_branch.clone();
-    match state
-        .git_adapter
-        .create_branch(
-            &git_repo,
-            &git_user,
-            &branch_name,
-            repo.integration_branch.as_str(),
-        )
-        .await
-    {
-        Ok(branch) => {
-            if !branch.commit.id.is_empty() {
-                head_sha = branch.commit.id;
-            }
-        }
-        Err(err) if is_unimplemented_git(&err) => {}
-        Err(err) => return Err(err.into()),
-    }
-
-    let workspace = conman_db::WorkspaceRepo::new(state.db.clone())
-        .create(CreateWorkspaceInput {
-            repo_id,
-            owner_user_id: auth.user_id.clone(),
-            branch_name,
-            title: req.title,
-            is_default,
-            base_ref_type: BaseRefType::Branch,
-            base_ref_value: repo.integration_branch,
-            head_sha,
-        })
-        .await?;
-
-    audit_workspace_event(
-        &state,
-        &auth,
-        &workspace.repo_id,
-        &workspace.id,
-        "created",
-        serde_json::to_value(&workspace).ok(),
-        Some(&workspace.head_sha),
-    )
-    .await;
+    // Auditing is delegated to `create_workspace_entry` via `audit_workspace_event(...)`.
+    let workspace =
+        create_workspace_entry(&state, &auth, &repo, req.branch_name, req.title).await?;
 
     Ok(Json(ApiResponse::ok(workspace)))
 }
