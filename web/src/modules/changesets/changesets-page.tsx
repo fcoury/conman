@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { AlertCircle, FileDiff, RefreshCw } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/lib/toast/toast';
 
 import { ApiError } from '~/api/client';
+import { useAuth } from '~/modules/auth/auth-context';
 import { listWorkspaces } from '~/modules/workspaces/workspace-api';
 import { useResolvedRepo } from '~/modules/workspaces/workspace-context';
 import type { Workspace } from '~/modules/workspaces/workspace-types';
@@ -24,8 +26,17 @@ import {
   updateChangeset,
 } from './changesets-api';
 
+const PatchDiff = lazy(async () => {
+  const module = await import('@pierre/diffs/react');
+  return { default: module.PatchDiff };
+});
+
 function workspaceStorageKey(repoId: string): string {
   return `conman.my-changes.workspace.${repoId}`;
+}
+
+function diffViewStorageKey(userId: string, repoId: string): string {
+  return `conman.my-changes.diff-view.${userId}.${repoId}`;
 }
 
 function readWorkspaceSelection(repoId: string): string | null {
@@ -36,6 +47,18 @@ function readWorkspaceSelection(repoId: string): string | null {
 function writeWorkspaceSelection(repoId: string, workspaceId: string): void {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(workspaceStorageKey(repoId), workspaceId);
+}
+
+function readDiffViewPreference(userId: string, repoId: string): 'split' | 'unified' | null {
+  if (typeof window === 'undefined') return null;
+  const value = window.localStorage.getItem(diffViewStorageKey(userId, repoId));
+  if (value === 'split' || value === 'unified') return value;
+  return null;
+}
+
+function writeDiffViewPreference(userId: string, repoId: string, view: 'split' | 'unified'): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(diffViewStorageKey(userId, repoId), view);
 }
 
 function workspaceLabel(workspace: Workspace): string {
@@ -56,9 +79,13 @@ function isDraftState(state: string): boolean {
 
 export default function ChangesetsPage() {
   const { repoId, repoName, error: repoError } = useResolvedRepo();
+  const { session } = useAuth();
+  const { resolvedTheme } = useTheme();
+  const userId = session?.user.id;
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [diffView, setDiffView] = useState<'split' | 'unified'>('split');
   const [draftTitle, setDraftTitle] = useState('');
   const [draftDescription, setDraftDescription] = useState('');
   const [editTitle, setEditTitle] = useState('');
@@ -100,6 +127,11 @@ export default function ChangesetsPage() {
     setSelectedPath(null);
   }, [repoId, selectedWorkspaceId]);
 
+  useEffect(() => {
+    if (!userId || !repoId) return;
+    setDiffView(readDiffViewPreference(userId, repoId) ?? 'split');
+  }, [userId, repoId]);
+
   const changesQuery = useQuery({
     queryKey: ['workspace-changes', repoId, selectedWorkspaceId],
     queryFn: () => getWorkspaceChanges(repoId!, selectedWorkspaceId!),
@@ -136,6 +168,7 @@ export default function ChangesetsPage() {
   });
 
   const openChangeset = openChangesetQuery.data;
+  const isDark = resolvedTheme === 'dark';
 
   useEffect(() => {
     if (!openChangeset) {
@@ -325,6 +358,37 @@ export default function ChangesetsPage() {
             <RefreshCw className="size-3.5" />
             Refresh
           </Button>
+
+          <div className="flex h-8 items-center overflow-hidden rounded-md border border-input bg-background">
+            <Button
+              type="button"
+              variant={diffView === 'split' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 rounded-none border-0 px-3 text-xs"
+              onClick={() => {
+                setDiffView('split');
+                if (userId && repoId) {
+                  writeDiffViewPreference(userId, repoId, 'split');
+                }
+              }}
+            >
+              Split
+            </Button>
+            <Button
+              type="button"
+              variant={diffView === 'unified' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 rounded-none border-0 border-l px-3 text-xs"
+              onClick={() => {
+                setDiffView('unified');
+                if (userId && repoId) {
+                  writeDiffViewPreference(userId, repoId, 'unified');
+                }
+              }}
+            >
+              Unified
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -481,9 +545,30 @@ export default function ChangesetsPage() {
                   Binary file change. No text patch available.
                 </div>
               ) : (
-                <pre className="overflow-auto p-4 font-mono text-xs leading-relaxed text-foreground">
-                  {patchQuery.data?.patch || 'No textual diff output for this file.'}
-                </pre>
+                <div className="overflow-auto p-2">
+                  {patchQuery.data?.patch ? (
+                    <Suspense
+                      fallback={
+                        <div className="p-4 text-sm text-muted-foreground">
+                          Loading diff renderer...
+                        </div>
+                      }
+                    >
+                      <PatchDiff
+                        patch={patchQuery.data.patch}
+                        options={{
+                          diffStyle: diffView,
+                          lineDiffType: 'word',
+                          themeType: isDark ? 'dark' : 'light',
+                        }}
+                      />
+                    </Suspense>
+                  ) : (
+                    <div className="p-4 text-sm text-muted-foreground">
+                      No textual diff output for this file.
+                    </div>
+                  )}
+                </div>
               )}
             </ScrollArea>
           </CardContent>
