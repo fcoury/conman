@@ -13,8 +13,10 @@ const DEDUPE_PACKAGES = [
   '@codemirror/theme-one-dark',
   '@codemirror/lang-javascript',
   '@codemirror/lang-json',
+  '@codemirror/lang-markdown',
   '@codemirror/lang-css',
   '@codemirror/lang-yaml',
+  '@codemirror/legacy-modes',
 ];
 
 export default defineConfig({

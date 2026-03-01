@@ -4,8 +4,14 @@ import { EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirro
 import { css } from '@codemirror/lang-css';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
+import { markdown } from '@codemirror/lang-markdown';
 import { yaml } from '@codemirror/lang-yaml';
-import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import {
+  StreamLanguage,
+  defaultHighlightStyle,
+  syntaxHighlighting,
+} from '@codemirror/language';
+import { toml as tomlMode } from '@codemirror/legacy-modes/mode/toml';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { useTheme } from 'next-themes';
 
@@ -36,6 +42,11 @@ function getLanguageExtension(filePath: string) {
     case 'yaml':
     case 'yml':
       return yaml();
+    case 'md':
+    case 'markdown':
+      return markdown();
+    case 'toml':
+      return StreamLanguage.define(tomlMode);
     default:
       return null;
   }

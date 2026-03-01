@@ -60,6 +60,33 @@ function isFontFile(path: string): boolean {
   return ['ttf', 'woff', 'woff2', 'otf'].includes(ext);
 }
 
+// Heuristic for unknown extensions: decide whether a blob is likely text.
+function isLikelyTextContent(content: string): boolean {
+  if (!content) return true;
+
+  const sample = content.slice(0, 4096);
+  let suspicious = 0;
+
+  for (let i = 0; i < sample.length; i += 1) {
+    const code = sample.charCodeAt(i);
+
+    if (code === 0) {
+      return false;
+    }
+
+    const isTabOrNewline = code === 9 || code === 10 || code === 13;
+    const isPrintableAscii = code >= 32 && code <= 126;
+    const isExtendedText = code >= 160;
+
+    if (!isTabOrNewline && !isPrintableAscii && !isExtendedText) {
+      suspicious += 1;
+    }
+  }
+
+  const suspiciousRatio = suspicious / sample.length;
+  return suspiciousRatio < 0.1;
+}
+
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 function WorkspaceViewInner() {
@@ -244,8 +271,11 @@ function WorkspaceViewInner() {
       );
     }
 
-    // Text file editor
-    if (isTextFile(selectedFile) && decodedContent !== null) {
+    // Text file editor (known text extensions + unknown extensions that look like text)
+    if (
+      decodedContent !== null &&
+      (isTextFile(selectedFile) || isLikelyTextContent(decodedContent))
+    ) {
       const readOnly = fileQuery.data.size > 500_000;
       return (
         <FileEditor
