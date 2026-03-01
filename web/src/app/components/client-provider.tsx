@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { toast } from 'gistia-design-system';
+import { toast } from '@/lib/toast/toast';
 
 function createQueryClient() {
   return new QueryClient({

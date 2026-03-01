@@ -5,13 +5,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from 'gistia-design-system';
+} from '@/components/ui/sidebar';
 import { GitBranch, LayoutDashboard } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Repos', href: '/repos', icon: GitBranch },
+  { label: 'Instances', href: '/instances', icon: GitBranch },
 ];
 
 export default function AppSidebar() {

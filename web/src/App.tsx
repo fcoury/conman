@@ -1,6 +1,7 @@
-import { Toaster } from 'gistia-design-system';
 import { ThemeProvider } from 'next-themes';
+import { Toaster } from 'sonner';
 
+import { AuthProvider } from './modules/auth/auth-context';
 import Router from './app/router';
 
 export default function App() {
@@ -11,7 +12,9 @@ export default function App() {
       enableSystem={false}
       storageKey="theme"
     >
-      <Router />
+      <AuthProvider>
+        <Router />
+      </AuthProvider>
       <Toaster richColors position="top-center" />
     </ThemeProvider>
   );
