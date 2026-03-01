@@ -11,6 +11,7 @@ export default function App() {
       defaultTheme="light"
       enableSystem={false}
       storageKey="theme"
+      disableTransitionOnChange
     >
       <AuthProvider>
         <Router />

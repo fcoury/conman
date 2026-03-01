@@ -1,20 +1,54 @@
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import {
-  Outlet,
-  useNavigate,
-} from 'react-router-dom';
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '~/modules/auth/auth-context';
 import { useTeamContext } from '~/modules/teams/team-context';
 
 import AppSidebar from './app-sidebar';
 
+// Build breadcrumb segments from the current pathname
+function useBreadcrumbs() {
+  const { pathname } = useLocation();
+
+  if (pathname === '/') {
+    return [{ label: 'Dashboard', href: '/' }];
+  }
+
+  const segments = pathname.split('/').filter(Boolean);
+  const crumbs: { label: string; href: string }[] = [];
+  let accumulated = '';
+
+  for (const segment of segments) {
+    accumulated += `/${segment}`;
+    const label = segmentLabel(segment);
+    crumbs.push({ label, href: accumulated });
+  }
+
+  return crumbs;
+}
+
+function segmentLabel(segment: string): string {
+  const labels: Record<string, string> = {
+    workspaces: 'Workspaces',
+    instances: 'Instances',
+  };
+  return labels[segment] ?? segment;
+}
+
 export default function AppTemplate() {
   const auth = useAuth();
   const teamContext = useTeamContext();
   const navigate = useNavigate();
+  const breadcrumbs = useBreadcrumbs();
 
   async function onTeamChanged(teamId: string) {
     await teamContext.selectTeam(teamId);
@@ -29,24 +63,42 @@ export default function AppTemplate() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        {/* Sticky header with backdrop blur */}
+        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <span className="text-sm text-muted-foreground">Conman</span>
-          <div className="ml-auto flex items-center gap-2">
+
+          <Breadcrumb className="ml-2">
+            <BreadcrumbList>
+              {breadcrumbs.map((crumb, idx) => {
+                const isLast = idx === breadcrumbs.length - 1;
+                return (
+                  <BreadcrumbItem key={crumb.href}>
+                    {idx > 0 && <BreadcrumbSeparator />}
+                    {isLast ? (
+                      <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <Link to={crumb.href}>{crumb.label}</Link>
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                );
+              })}
+            </BreadcrumbList>
+          </Breadcrumb>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {teamContext.teams.length > 1 ? (
               <select
                 aria-label="Switch team"
                 value={teamContext.selectedTeamId ?? ''}
                 onChange={(event) => {
                   const value = event.target.value;
-                  if (!value) {
-                    return;
-                  }
+                  if (!value) return;
                   void onTeamChanged(value);
                 }}
                 disabled={teamContext.isSwitchingContext}
-                className="h-8 w-56 rounded-md border border-input bg-background px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
+                className="h-8 w-40 rounded-md border border-input bg-background px-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
               >
                 {teamContext.teams
                   .slice()
@@ -58,7 +110,7 @@ export default function AppTemplate() {
                   ))}
               </select>
             ) : null}
-            <span className="hidden text-xs text-muted-foreground md:inline">
+            <span className="hidden text-xs text-muted-foreground lg:inline">
               {auth.session?.user.email}
             </span>
             <Button variant="outline" size="sm" onClick={() => void signOut()}>
@@ -66,9 +118,8 @@ export default function AppTemplate() {
             </Button>
           </div>
         </header>
-        <main className="flex-1 p-4">
-          <Outlet />
-        </main>
+
+        <Outlet />
       </SidebarInset>
     </SidebarProvider>
   );
