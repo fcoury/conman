@@ -9,4 +9,3 @@ pub struct UiConfig {
     pub configured_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
-

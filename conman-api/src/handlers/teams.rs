@@ -408,7 +408,9 @@ pub async fn resend_team_invite(
     require_team_admin(&state, &auth.user_id, &team_id).await?;
 
     let invite_repo = conman_db::InviteRepo::new(state.db.clone());
-    let before = invite_repo.find_by_id_for_team(&team_id, &invite_id).await?;
+    let before = invite_repo
+        .find_by_id_for_team(&team_id, &invite_id)
+        .await?;
     let invite = invite_repo
         .resend(
             &team_id,

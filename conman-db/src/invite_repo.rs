@@ -170,11 +170,12 @@ impl InviteRepo {
         while cursor.advance().await.map_err(|e| ConmanError::Internal {
             message: format!("failed iterating invites cursor: {e}"),
         })? {
-            let invite: InviteDoc = cursor
-                .deserialize_current()
-                .map_err(|e| ConmanError::Internal {
-                    message: format!("failed to deserialize invite: {e}"),
-                })?;
+            let invite: InviteDoc =
+                cursor
+                    .deserialize_current()
+                    .map_err(|e| ConmanError::Internal {
+                        message: format!("failed to deserialize invite: {e}"),
+                    })?;
             invites.push(invite.into());
         }
 

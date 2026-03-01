@@ -73,11 +73,7 @@ impl AppRepo {
         }
     }
 
-    pub async fn create(
-        &self,
-        repo_id: &str,
-        input: CreateAppInput,
-    ) -> Result<App, ConmanError> {
+    pub async fn create(&self, repo_id: &str, input: CreateAppInput) -> Result<App, ConmanError> {
         let repo_id = ObjectId::parse_str(repo_id).map_err(|e| ConmanError::Validation {
             message: format!("invalid repo_id: {e}"),
         })?;
@@ -118,12 +114,11 @@ impl AppRepo {
         while cursor.advance().await.map_err(|e| ConmanError::Internal {
             message: format!("app cursor error: {e}"),
         })? {
-            let doc: AppDoc =
-                cursor
-                    .deserialize_current()
-                    .map_err(|e| ConmanError::Internal {
-                        message: format!("failed to decode app: {e}"),
-                    })?;
+            let doc: AppDoc = cursor
+                .deserialize_current()
+                .map_err(|e| ConmanError::Internal {
+                    message: format!("failed to decode app: {e}"),
+                })?;
             items.push(doc.into());
         }
         Ok(items)
@@ -143,11 +138,7 @@ impl AppRepo {
         Ok(doc.map(Into::into))
     }
 
-    pub async fn update(
-        &self,
-        app_id: &str,
-        input: UpdateAppInput,
-    ) -> Result<App, ConmanError> {
+    pub async fn update(&self, app_id: &str, input: UpdateAppInput) -> Result<App, ConmanError> {
         let id = ObjectId::parse_str(app_id).map_err(|e| ConmanError::Validation {
             message: format!("invalid app_id: {e}"),
         })?;
@@ -208,7 +199,11 @@ impl EnsureIndexes for AppRepo {
                 .map_err(|e| ConmanError::Internal {
                     message: format!("failed to list app indexes: {e}"),
                 })?;
-        for legacy in ["apps_name_unique", "apps_repo_path_unique", "apps_tenant_id_idx"] {
+        for legacy in [
+            "apps_name_unique",
+            "apps_repo_path_unique",
+            "apps_tenant_id_idx",
+        ] {
             if existing_indexes.iter().any(|name| name == legacy) {
                 self.collection
                     .drop_index(legacy)

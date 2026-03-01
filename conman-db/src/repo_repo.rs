@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use conman_core::{Repo, RepoSettings, ConmanError};
+use conman_core::{ConmanError, Repo, RepoSettings};
 use mongodb::{
     Collection, Database, IndexModel,
     bson::{doc, oid::ObjectId},
@@ -177,11 +177,12 @@ impl RepoStore {
         while cursor.advance().await.map_err(|e| ConmanError::Internal {
             message: format!("failed iterating repos cursor: {e}"),
         })? {
-            let repo: RepoDoc = cursor
-                .deserialize_current()
-                .map_err(|e| ConmanError::Internal {
-                    message: format!("failed to deserialize repo: {e}"),
-                })?;
+            let repo: RepoDoc =
+                cursor
+                    .deserialize_current()
+                    .map_err(|e| ConmanError::Internal {
+                        message: format!("failed to deserialize repo: {e}"),
+                    })?;
             repos.push(repo.into());
         }
 
@@ -206,11 +207,12 @@ impl RepoStore {
         while cursor.advance().await.map_err(|e| ConmanError::Internal {
             message: format!("failed iterating repos cursor: {e}"),
         })? {
-            let repo: RepoDoc = cursor
-                .deserialize_current()
-                .map_err(|e| ConmanError::Internal {
-                    message: format!("failed to deserialize repo: {e}"),
-                })?;
+            let repo: RepoDoc =
+                cursor
+                    .deserialize_current()
+                    .map_err(|e| ConmanError::Internal {
+                        message: format!("failed to deserialize repo: {e}"),
+                    })?;
             repos.push(repo.into());
         }
         Ok(repos)

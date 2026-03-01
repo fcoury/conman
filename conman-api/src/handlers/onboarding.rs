@@ -1,14 +1,9 @@
-use axum::{
-    Extension, Json,
-    extract::State,
-};
+use axum::{Extension, Json, extract::State};
 use conman_auth::{AuthUser, issue_token};
 use conman_core::{ConmanError, Repo, Role, Team};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::ApiConmanError, events::emit_audit, response::ApiResponse, state::AppState,
-};
+use crate::{error::ApiConmanError, events::emit_audit, response::ApiResponse, state::AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateInstanceRequest {
@@ -122,8 +117,7 @@ pub async fn create_instance(
     {
         Ok(repo) => repo,
         Err(ConmanError::Conflict { message })
-            if message.contains("repos_name_unique")
-                || message.contains("dup key: { name:") =>
+            if message.contains("repos_name_unique") || message.contains("dup key: { name:") =>
         {
             return Err(ConmanError::Conflict {
                 message: "instance_name is already in use".to_string(),
@@ -171,7 +165,9 @@ pub async fn create_instance(
         tracing::warn!(error = %err, "failed to write audit event");
     }
 
-    let roles = repo_membership_repo.find_roles_by_user_id(&auth.user_id).await?;
+    let roles = repo_membership_repo
+        .find_roles_by_user_id(&auth.user_id)
+        .await?;
     let token = issue_token(
         &auth.user_id,
         &auth.email,

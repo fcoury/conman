@@ -571,7 +571,12 @@ impl JobRunner {
             Ok(Err(err)) => {
                 self.repo.complete_failure(&job.id, err.clone()).await?;
                 self.repo
-                    .append_log(&job.repo_id, &job.id, "error", &format!("job failed: {err}"))
+                    .append_log(
+                        &job.repo_id,
+                        &job.id,
+                        "error",
+                        &format!("job failed: {err}"),
+                    )
                     .await?;
                 counter!(JOBS_COMPLETED_TOTAL, "job_type" => job_type, "outcome" => "failed")
                     .increment(1);

@@ -86,4 +86,3 @@ pub async fn serve_app_index() -> impl IntoResponse {
 pub async fn serve_app_asset(AxumPath(path): AxumPath<String>) -> impl IntoResponse {
     serve_app_path(Some(path)).await
 }
-

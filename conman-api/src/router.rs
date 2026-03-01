@@ -11,11 +11,6 @@ use uuid::Uuid;
 use crate::auth::{
     accept_invite, auth_middleware, forgot_password, login, logout, reset_password, signup,
 };
-use crate::handlers::repos::{
-    assign_member, create_runtime_profile, get_repo, get_runtime_profile, list_repos,
-    list_environments, list_members, list_runtime_profiles, replace_environments,
-    reveal_runtime_profile_secret, update_repo_settings, update_runtime_profile,
-};
 use crate::handlers::changesets::{
     create_changeset, create_changeset_comment, get_changeset, get_changeset_diff,
     list_changeset_comments, list_changesets, move_changeset_to_draft, queue_changeset,
@@ -33,10 +28,14 @@ use crate::handlers::releases::{
     assemble_release, create_release, get_release, list_releases, publish_release,
     reorder_release_changesets, set_release_changesets,
 };
+use crate::handlers::repos::{
+    assign_member, create_runtime_profile, get_repo, get_runtime_profile, list_environments,
+    list_members, list_repos, list_runtime_profiles, replace_environments,
+    reveal_runtime_profile_secret, update_repo_settings, update_runtime_profile,
+};
 use crate::handlers::teams::{
-    create_repo_app, create_repo_under_team, create_team, create_team_invite,
-    delete_team_invite, get_team, list_repo_apps, list_team_invites, list_teams,
-    resend_team_invite, update_repo_app,
+    create_repo_app, create_repo_under_team, create_team, create_team_invite, delete_team_invite,
+    get_team, list_repo_apps, list_team_invites, list_teams, resend_team_invite, update_repo_app,
 };
 use crate::handlers::temp_envs::{
     create_temp_env, delete_temp_env, extend_temp_env, list_temp_envs, undo_expire_temp_env,
@@ -74,10 +73,7 @@ pub fn build_router(state: AppState) -> Router {
             "/api/repos/{repoId}/apps",
             get(list_repo_apps).post(create_repo_app),
         )
-        .route(
-            "/api/repos/{repoId}/apps/{appId}",
-            patch(update_repo_app),
-        )
+        .route("/api/repos/{repoId}/apps/{appId}", patch(update_repo_app))
         .route("/api/repos", get(list_repos))
         .route("/api/repos/{repoId}", get(get_repo))
         .route("/api/repos/{repoId}/settings", patch(update_repo_settings))
@@ -93,7 +89,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/teams/{teamId}/invites/{inviteId}/resend",
             post(resend_team_invite),
         )
-        .route("/api/teams/{teamId}/invites/{inviteId}", delete(delete_team_invite))
+        .route(
+            "/api/teams/{teamId}/invites/{inviteId}",
+            delete(delete_team_invite),
+        )
         .route(
             "/api/repos/{repoId}/workspaces",
             get(list_workspaces).post(create_workspace),
@@ -475,7 +474,11 @@ mod tests {
             ("src/auth.rs", "reset_password", "emit_audit("),
             ("src/auth.rs", "accept_invite", "emit_audit("),
             ("src/handlers/repos.rs", "create_repo", "emit_audit("),
-            ("src/handlers/repos.rs", "update_repo_settings", "emit_audit("),
+            (
+                "src/handlers/repos.rs",
+                "update_repo_settings",
+                "emit_audit(",
+            ),
             ("src/handlers/repos.rs", "assign_member", "emit_audit("),
             ("src/handlers/teams.rs", "create_team_invite", "emit_audit("),
             (

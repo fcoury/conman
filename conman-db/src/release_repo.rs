@@ -70,7 +70,9 @@ impl ReleaseRepo {
         let day_prefix = format!("r{:04}.{:02}.{:02}.", now.year(), now.month(), now.day());
         let count = self
             .collection
-            .count_documents(doc! {"repo_id": repo_id, "tag": {"$regex": format!("^{}", day_prefix)}})
+            .count_documents(
+                doc! {"repo_id": repo_id, "tag": {"$regex": format!("^{}", day_prefix)}},
+            )
             .await
             .map_err(|e| ConmanError::Internal {
                 message: format!("failed to count releases for next tag: {e}"),

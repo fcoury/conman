@@ -1,17 +1,9 @@
-use axum::{
-    Extension, Json,
-    extract::State,
-};
+use axum::{Extension, Json, extract::State};
 use conman_auth::AuthUser;
 use conman_core::{App, ConmanError, Repo, Role, Team, UiConfig};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::ApiConmanError,
-    events::emit_audit,
-    response::ApiResponse,
-    state::AppState,
-};
+use crate::{error::ApiConmanError, events::emit_audit, response::ApiResponse, state::AppState};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]

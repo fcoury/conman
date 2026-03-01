@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use conman_core::{RepoMembership, ConmanError, Role};
+use conman_core::{ConmanError, RepoMembership, Role};
 use mongodb::{
     Collection, Database, IndexModel,
     bson::{doc, oid::ObjectId},
@@ -179,7 +179,8 @@ impl RepoMembershipRepo {
             });
         }
 
-        self.insert(&user_id.to_hex(), &repo_id.to_hex(), role).await
+        self.insert(&user_id.to_hex(), &repo_id.to_hex(), role)
+            .await
     }
 }
 
